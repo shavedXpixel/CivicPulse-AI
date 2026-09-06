@@ -1,0 +1,1202 @@
+# CivicPulse AI — Agent Rules
+
+You are working on **CivicPulse AI**.
+
+Product:
+**CivicPulse AI**
+
+Tagline:
+**Citizen Signals → Government Intelligence → Public Action**
+
+CivicPulse is an AI-powered public-problem intelligence layer. It does not replace existing government grievance systems. Its purpose is to understand citizen/public signals, identify underlying problems, estimate public impact, support government action, verify resolution evidence, and provide grounded governance intelligence.
+
+---
+
+# 1. SOURCE OF TRUTH
+
+Before making substantial changes, read the relevant specification files.
+
+Required project context:
+
+* `docs/01_PRD.md`
+* `docs/02_PRODUCT_SCOPE.md`
+* `docs/03_ARCHITECTURE.md`
+* `docs/04_DESIGN.md`
+* `docs/05_AI_SPEC.md`
+* `docs/06_DATA_MODEL.md`
+* `docs/07_API_SPEC.md`
+* `docs/08_SECURITY.md`
+* `docs/09_PHASES.md`
+* `docs/10_DEMO_AND_EVALUATION.md`
+* `docs/11_IMPLEMENTATION_RULES.md`
+
+These files define WHAT the product is, HOW it is structured, and WHICH constraints apply.
+
+Do not invent requirements that conflict with them.
+
+---
+
+# 2. PHASE DISCIPLINE
+
+Implement only the phase explicitly requested.
+
+Never silently implement future phases.
+
+Required workflow:
+
+```text
+READ
+↓
+INSPECT
+↓
+PLAN
+↓
+IMPLEMENT
+↓
+TEST
+↓
+BROWSER VERIFY
+↓
+FIX
+↓
+DOCUMENT
+↓
+STOP
+```
+
+After completing the requested phase, stop.
+
+Do not automatically continue to the next phase.
+
+---
+
+# 3. BEFORE CODING
+
+Before non-trivial implementation:
+
+1. Inspect the repository.
+2. Inspect existing related code.
+3. Read the relevant specification.
+4. Identify reusable components/services.
+5. Identify dependencies and data-flow implications.
+6. Create a concise implementation plan.
+
+Do not rewrite existing working code without understanding it first.
+
+---
+
+# 4. PRODUCT BOUNDARY
+
+CivicPulse is NOT:
+
+* a generic chatbot;
+* a simple complaint CRUD application;
+* a replacement for official grievance platforms;
+* an autonomous government decision-maker;
+* a social network;
+* a generic AI dashboard.
+
+The core product loop is:
+
+```text
+SIGNAL
+↓
+UNDERSTAND
+↓
+RELATE
+↓
+CLUSTER
+↓
+PRIORITIZE
+↓
+ACT
+↓
+VERIFY
+↓
+LEARN
+```
+
+Maintain this product identity throughout implementation.
+
+---
+
+# 5. ARCHITECTURE
+
+Prefer a modular architecture.
+
+Recommended stack:
+
+* Next.js
+* React
+* TypeScript
+* Tailwind CSS
+* Firebase Authentication
+* Firestore
+* Cloud Storage
+* Cloud Run where appropriate
+* BigQuery for analytics
+* Gemini / Vertex AI
+* Google Maps Platform
+
+Do not introduce unnecessary frameworks or infrastructure.
+
+Do not create microservices unless a real requirement justifies them.
+
+---
+
+# 6. ARCHITECTURAL BOUNDARIES
+
+Frontend responsibilities:
+
+* presentation;
+* interaction;
+* navigation;
+* local UI state.
+
+Backend responsibilities:
+
+* authentication verification;
+* authorization;
+* business logic;
+* database access;
+* AI orchestration;
+* workflow;
+* deterministic calculations;
+* audit logging.
+
+AI responsibilities:
+
+* language understanding;
+* unstructured extraction;
+* semantic reasoning;
+* multimodal interpretation;
+* summarization;
+* natural-language explanations.
+
+Database responsibilities:
+
+* persistence;
+* consistency;
+* queryable state;
+* historical records.
+
+Do not violate these boundaries for convenience.
+
+---
+
+# 7. AI RULE
+
+AI is an intelligence component, not the source of truth.
+
+Use Gemini for:
+
+* multilingual understanding;
+* structured extraction;
+* classification;
+* semantic reasoning;
+* image interpretation;
+* summarization;
+* governance language;
+* resolution evidence interpretation.
+
+Do NOT use Gemini as the authoritative source for:
+
+* authorization;
+* roles;
+* permissions;
+* exact counts;
+* arithmetic;
+* impact score calculation;
+* SLA calculations;
+* status transitions;
+* database integrity;
+* financial execution.
+
+---
+
+# 8. AI OUTPUT SAFETY
+
+Never trust raw model output.
+
+Every structured AI result must:
+
+```text
+Receive
+↓
+Parse
+↓
+Validate
+↓
+Normalize
+↓
+Business-check
+↓
+Persist / Return
+```
+
+Use runtime schemas.
+
+Reject malformed or impossible results.
+
+Handle AI failure gracefully.
+
+---
+
+# 9. AI CONFIDENCE
+
+Confidence is not certainty.
+
+Use confidence carefully.
+
+Low-confidence results should support:
+
+```text
+requires_review = true
+```
+
+where appropriate.
+
+Never turn uncertainty into false certainty.
+
+---
+
+# 10. AI PROMPT SECURITY
+
+Treat all user-controlled content as untrusted.
+
+This includes:
+
+* citizen reports;
+* uploaded text;
+* external data;
+* imported records;
+* filenames;
+* documents.
+
+User content must never override system instructions.
+
+Protect against prompt injection.
+
+---
+
+# 11. GOVERNANCE AI
+
+Governance AI must NOT have unrestricted database access.
+
+Use:
+
+```text
+Question
+↓
+Intent
+↓
+Authorization
+↓
+Controlled Tool
+↓
+Structured Data
+↓
+Gemini
+↓
+Validated Answer
+```
+
+Prefer allowlisted analytical tools such as:
+
+* `getTopProblems`
+* `getWardImpact`
+* `getDepartmentBacklog`
+* `getTrend`
+* `getProblemDetails`
+* `getSlaRisk`
+* `getProblemsNearFacility`
+* `getDepartmentPerformance`
+
+Never execute unrestricted SQL generated directly from user input.
+
+---
+
+# 12. DETERMINISTIC IMPACT SCORING
+
+The authoritative impact score must be calculated by application code.
+
+Default model:
+
+```text
+Severity                         25%
+Population Affected             20%
+Duration                        15%
+Complaint Concentration         15%
+Critical Facility Exposure      10%
+Recurrence                      10%
+Evidence Confidence              5%
+```
+
+Store component scores and final score.
+
+AI may explain the score but must not silently alter it.
+
+---
+
+# 13. PROBLEM CLUSTERS
+
+Keep these concepts separate:
+
+```text
+Signal
+Problem Cluster
+Action
+Resolution
+Verification
+```
+
+A duplicate signal must never be deleted simply because it is related to another signal.
+
+Always preserve the original signal according to authorization rules.
+
+---
+
+# 14. WORKFLOW INTEGRITY
+
+Problem state transitions must be validated server-side.
+
+Valid lifecycle:
+
+```text
+NEW
+↓
+TRIAGED
+↓
+ASSIGNED
+↓
+IN_PROGRESS
+↓
+AWAITING_VERIFICATION
+↓
+RESOLVED
+↓
+CLOSED
+```
+
+Possible reopening:
+
+```text
+RESOLVED
+↓
+REOPENED
+```
+
+Do not allow arbitrary client-side status changes.
+
+---
+
+# 15. AUTHORIZATION
+
+Never trust the frontend for authorization.
+
+Never trust client-supplied:
+
+* role;
+* user ID;
+* department;
+* permissions.
+
+Authorization must be enforced server-side.
+
+A hidden button is NOT a security control.
+
+---
+
+# 16. DATABASE RULES
+
+Use:
+
+* Firestore for operational data;
+* BigQuery for analytical workloads;
+* Cloud Storage for large media.
+
+Do not store large images directly in Firestore.
+
+Do not perform unlimited collection reads.
+
+Use:
+
+* pagination;
+* indexes;
+* scoped queries;
+* transactions where needed.
+
+---
+
+# 17. DATA PRIVACY
+
+Collect only necessary data.
+
+Protect:
+
+* citizen identity;
+* contact information;
+* exact location where sensitive;
+* uploaded evidence;
+* internal notes.
+
+Aggregate dashboards should not expose unnecessary citizen identity.
+
+Do not use sensitive personal characteristics for impact prioritization.
+
+---
+
+# 18. SECRETS
+
+Never commit:
+
+* API keys;
+* service-account credentials;
+* private keys;
+* database credentials;
+* production tokens.
+
+Use environment variables and appropriate cloud secret management.
+
+Maintain `.env.example`.
+
+---
+
+# 19. API RULES
+
+APIs use:
+
+```text
+/api/v1
+```
+
+Every endpoint should have:
+
+* authentication requirements;
+* authorization requirements;
+* request schema;
+* response schema;
+* validation;
+* error behavior.
+
+Use stable error codes.
+
+Do not expose internal stack traces.
+
+---
+
+# 20. FRONTEND RULES
+
+Do not place:
+
+* privileged database operations;
+* server credentials;
+* Gemini credentials;
+* core business rules;
+
+inside React components.
+
+Use reusable components.
+
+Do not duplicate UI patterns unnecessarily.
+
+---
+
+# 21. UI DESIGN
+
+Follow `docs/04_DESIGN.md`.
+
+CivicPulse should look like:
+
+**modern civic infrastructure software**
+
+not:
+
+**generic AI SaaS**
+
+Avoid:
+
+* excessive gradients;
+* neon effects;
+* glowing cards;
+* excessive glassmorphism;
+* excessive rounded containers;
+* AI avatars;
+* decorative AI animations;
+* unnecessary 3D visuals.
+
+Prefer:
+
+* strong typography;
+* restrained color;
+* clear hierarchy;
+* evidence;
+* useful data visualization;
+* subtle borders;
+* calm layouts.
+
+---
+
+# 22. CITIZEN UX
+
+The citizen flow must remain simple.
+
+Preferred:
+
+```text
+Report
+↓
+Describe
+↓
+Location
+↓
+Optional Image
+↓
+Submit
+```
+
+Avoid unnecessary fields.
+
+Use plain language.
+
+---
+
+# 23. GOVERNMENT UX
+
+Government users need:
+
+* clear priorities;
+* evidence;
+* filters;
+* operational status;
+* map context;
+* actionable workflows.
+
+Do not make every metric visually equal.
+
+Prioritize:
+
+1. what needs attention;
+2. why it matters;
+3. where it is;
+4. what is being done;
+5. what changed.
+
+---
+
+# 24. AI / HUMAN DISTINCTION
+
+Make it visually clear whether information is:
+
+```text
+OBSERVED
+CALCULATED
+AI INTERPRETATION
+RECOMMENDATION
+```
+
+Do not present AI interpretation as official government fact.
+
+---
+
+# 25. LOADING / ERROR / EMPTY STATES
+
+Every asynchronous UI operation should support appropriate:
+
+* loading;
+* success;
+* error;
+* empty states.
+
+Never leave blank screens.
+
+For AI processing prefer meaningful messages such as:
+
+```text
+Analyzing report...
+Checking related signals...
+Preparing result...
+```
+
+instead of:
+
+```text
+AI is thinking...
+```
+
+---
+
+# 26. ACCESSIBILITY
+
+All user-facing screens should support:
+
+* semantic HTML;
+* keyboard navigation;
+* visible focus;
+* accessible labels;
+* adequate contrast;
+* non-color status indicators;
+* reduced motion where supported.
+
+---
+
+# 27. RESPONSIVENESS
+
+Test important screens on:
+
+* desktop;
+* tablet;
+* mobile.
+
+Do not simply shrink desktop UI.
+
+Citizen reporting should be mobile-first.
+
+---
+
+# 28. TYPESCRIPT
+
+Use strict TypeScript.
+
+Avoid `any`.
+
+Prefer:
+
+* explicit types;
+* discriminated unions;
+* constrained literals;
+* shared schemas;
+* runtime validation.
+
+---
+
+# 29. CODE QUALITY
+
+Prefer:
+
+* small composable functions;
+* clear naming;
+* single responsibility;
+* explicit error handling;
+* reusable services;
+* reusable components.
+
+Avoid:
+
+* giant components;
+* duplicated logic;
+* magic numbers;
+* unexplained abstractions;
+* silent failures.
+
+---
+
+# 30. CONSTANTS
+
+Do not scatter magic numbers.
+
+Prefer named configuration.
+
+Example:
+
+```ts
+IMPACT_THRESHOLDS.CRITICAL
+```
+
+instead of:
+
+```ts
+score >= 85
+```
+
+---
+
+# 31. CONFIGURATION
+
+Centralize configurable values:
+
+* model IDs;
+* impact weights;
+* impact thresholds;
+* similarity thresholds;
+* confidence thresholds;
+* feature flags;
+* service URLs.
+
+Do not scatter configuration through application code.
+
+---
+
+# 32. DEPENDENCIES
+
+Before adding a package:
+
+1. inspect existing dependencies;
+2. check whether the platform already provides the capability;
+3. check whether an existing dependency can solve it;
+4. add only when there is meaningful value.
+
+Avoid dependency duplication.
+
+---
+
+# 33. FILE STRUCTURE
+
+Prefer clear separation such as:
+
+```text
+frontend/
+backend/
+shared/
+docs/
+data/
+scripts/
+tests/
+```
+
+Within backend use logical modules such as:
+
+```text
+auth
+signals
+ai
+clustering
+impact
+problems
+assignments
+resolutions
+verification
+governance
+analytics
+notifications
+admin
+audit
+```
+
+---
+
+# 34. DATA ACCESS
+
+Use repositories or equivalent data-access abstractions.
+
+Example:
+
+```text
+SignalRepository
+ProblemRepository
+AssignmentRepository
+ResolutionRepository
+AuditRepository
+```
+
+Repositories should not contain UI or prompt logic.
+
+---
+
+# 35. ASYNC PROCESSING
+
+Use asynchronous processing where appropriate for:
+
+* image analysis;
+* expensive AI operations;
+* large imports;
+* large-scale clustering;
+* resolution verification;
+* heavy analytics.
+
+Do not make user requests unnecessarily block on expensive processing.
+
+---
+
+# 36. RETRIES
+
+Transient AI/external failures may be retried.
+
+Default maximum:
+
+```text
+3 attempts
+```
+
+Use bounded backoff.
+
+Never retry indefinitely.
+
+---
+
+# 37. IDEMPOTENCY
+
+Operations that can be retried must avoid duplicate side effects.
+
+Pay special attention to:
+
+* AI job creation;
+* assignments;
+* resolution submissions;
+* notifications.
+
+---
+
+# 38. CONCURRENCY
+
+Protect important shared state.
+
+Use:
+
+* transactions;
+* version checks;
+* timestamps;
+* controlled state transitions.
+
+Avoid silent lost updates.
+
+---
+
+# 39. LOGGING
+
+Use structured logs.
+
+Useful fields:
+
+* request ID;
+* route;
+* method;
+* status;
+* duration;
+* actor role;
+* operation.
+
+Do not log unnecessary sensitive data.
+
+Never log:
+
+* passwords;
+* access tokens;
+* API keys;
+* entire private citizen records;
+* unnecessary AI contexts.
+
+---
+
+# 40. AUDIT
+
+Audit important administrative actions.
+
+Examples:
+
+```text
+ASSIGNMENT_CREATED
+STATUS_CHANGED
+EVIDENCE_SUBMITTED
+VERIFICATION_COMPLETED
+ROLE_CHANGED
+CONFIG_CHANGED
+```
+
+Audit records should be protected and append-oriented.
+
+---
+
+# 41. FILE UPLOADS
+
+Validate:
+
+* ownership;
+* MIME type;
+* file size;
+* allowed file category.
+
+Never trust filename extension alone.
+
+Store media in Cloud Storage.
+
+Store metadata/reference in Firestore.
+
+---
+
+# 42. DEMO DATA
+
+Synthetic data must be clearly identified.
+
+Never present synthetic data as real government data.
+
+The application should support a controlled demo environment.
+
+---
+
+# 43. GOLDEN DEMO
+
+The primary demonstration should show:
+
+```text
+Citizen Signal
+↓
+AI Understanding
+↓
+327+ Related Signals
+↓
+Problem Cluster
+↓
+Impact 92
+↓
+Government Priority
+↓
+Officer Action
+↓
+Resolution Evidence
+↓
+AI Verification
+↓
+Governance AI
+```
+
+Do not break the core demo flow with unrelated features.
+
+---
+
+# 44. TESTING
+
+For meaningful implementation work, test at appropriate levels.
+
+Prioritize tests for:
+
+* authorization;
+* impact scoring;
+* lifecycle transitions;
+* AI output validation;
+* clustering;
+* resolution flow;
+* Governance AI retrieval.
+
+Do not write tests merely to increase test count.
+
+---
+
+# 45. AI TESTING
+
+Include cases for:
+
+* normal input;
+* ambiguous input;
+* malformed output;
+* low confidence;
+* prompt injection;
+* unsupported language;
+* image analysis failure;
+* unauthorized query;
+* provider failure.
+
+---
+
+# 46. MOCKING
+
+Mocks may be used for:
+
+* unit tests;
+* local development;
+* unavailable external services.
+
+Mocks must follow real schemas.
+
+Never silently present mocked results as live production AI.
+
+---
+
+# 47. BROWSER VERIFICATION
+
+For user-facing changes, verify the actual application in the browser where practical.
+
+Check:
+
+* layout;
+* navigation;
+* interaction;
+* loading;
+* errors;
+* mobile responsiveness;
+* data rendering;
+* console errors.
+
+---
+
+# 48. BUILD VERIFICATION
+
+Before completing a phase, run the project's relevant checks, including:
+
+```text
+lint
+tests
+build
+```
+
+Fix errors before declaring completion.
+
+---
+
+# 49. DOCUMENTATION
+
+When a significant change affects:
+
+* architecture;
+* database;
+* APIs;
+* AI behavior;
+* security;
+* environment variables;
+
+update the relevant documentation.
+
+---
+
+# 50. NO FAKE COMPLETION
+
+Do not claim a feature works because:
+
+* the UI exists;
+* a button appears;
+* a mock response renders;
+* code "looks correct."
+
+A feature is complete only when its actual behavior has been verified.
+
+---
+
+# 51. NO UNNECESSARY REWRITES
+
+Do not:
+
+* delete unrelated work;
+* replace the entire codebase;
+* rewrite working modules without reason;
+* change architecture casually.
+
+Make incremental, targeted changes.
+
+---
+
+# 52. NO SCOPE CREEP
+
+Do not add major features unless the relevant specification or user request requires them.
+
+Features outside the current phase should remain untouched.
+
+---
+
+# 53. SECURITY INVARIANTS
+
+Always preserve:
+
+1. Client input is untrusted.
+2. AI output is untrusted until validated.
+3. Roles are server-controlled.
+4. Impact scores are server-calculated.
+5. Status transitions are server-authorized.
+6. Private data is permission-scoped.
+7. Secrets remain server-side.
+8. Original evidence remains traceable.
+9. Important administrative actions are auditable.
+10. AI cannot bypass governance controls.
+
+---
+
+# 54. CHANGE MANAGEMENT
+
+Before a major architectural change:
+
+1. explain why it is necessary;
+2. inspect the relevant specification;
+3. consider simpler alternatives;
+4. document the decision;
+5. update affected specification files.
+
+Do not silently change the architecture.
+
+---
+
+# 55. AGENT RESPONSE AFTER IMPLEMENTATION
+
+After completing the requested work, report:
+
+```text
+Phase:
+Status:
+
+Implemented:
+- ...
+
+Files changed:
+- ...
+
+Database changes:
+- ...
+
+API changes:
+- ...
+
+AI changes:
+- ...
+
+Tests:
+- ...
+
+Browser verification:
+- ...
+
+Known issues:
+- ...
+
+Next phase:
+- ...
+```
+
+Be factual.
+
+Do not claim tests or browser verification that were not actually performed.
+
+---
+
+# 56. STOP CONDITION
+
+When the requested phase is complete and verified:
+
+**STOP.**
+
+Do not automatically continue to another phase.
+
+---
+
+# 57. FINAL ENGINEERING PRINCIPLE
+
+Build CivicPulse AI as credible civic infrastructure.
+
+Prefer:
+
+```text
+Simple
++
+Explainable
++
+Secure
++
+Verifiable
++
+Maintainable
+```
+
+over:
+
+```text
+Complex
++
+Flashy
++
+Opaque
++
+Fragile
+```
+
+The goal is not to make the most impressive-looking AI demo.
+
+The goal is to build the most convincing, useful, and technically credible demonstration of:
+
+**Citizen Signals → Government Intelligence → Public Action**
