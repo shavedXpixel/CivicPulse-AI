@@ -3,7 +3,7 @@ import '../styles/globals.css';
 
 export const metadata: Metadata = {
   title: 'CivicPulse AI — Public Problem Intelligence Layer',
-  description: 'Citizen Signals → Government Intelligence → Public Action. AI-powered public-problem intelligence layer for Digital Public Infrastructure.',
+  description: 'Citizen Signals → Government Intelligence → Public Action. Digital Public Infrastructure for modern governance.',
 };
 
 export default function RootLayout({
@@ -12,8 +12,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className="bg-background text-gray-100 antialiased min-h-screen">
+    <html lang="en">
+      <body className="bg-canvas text-ink-primary antialiased min-h-screen">
         {children}
       </body>
     </html>
