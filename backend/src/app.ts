@@ -12,6 +12,7 @@ import { dashboardRouter } from './modules/dashboard/dashboard.routes';
 import { resolutionRouter } from './modules/resolutions/resolution.routes';
 import { governanceRouter } from './modules/governance/governance.routes';
 import simulationRouter from './modules/simulation/simulation.routes';
+import { adminRouter } from './modules/admin/admin.routes';
 
 export function createApp(): Express {
   const app = express();
@@ -51,6 +52,7 @@ export function createApp(): Express {
   app.use('/api/v1/governance', governanceRouter);
   app.use('/api/v1/simulations', simulationRouter);
   app.use('/api/v1/simulation', simulationRouter);
+  app.use('/api/v1/admin', adminRouter);
 
 
   // Catch-all 404 handler

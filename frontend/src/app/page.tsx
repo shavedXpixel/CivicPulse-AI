@@ -73,11 +73,18 @@ export default function HomePage() {
               href="/api/v1/health"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-secondary hover:text-ink-primary px-3 py-1.5 rounded-lg border border-ink-border hover:bg-canvas-subtle transition-all"
+              className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-ink-secondary hover:text-ink-primary px-3 py-1.5 rounded-lg border border-ink-border hover:bg-canvas-subtle transition-all"
             >
               <span>System Health</span>
               <ExternalLink className="w-3.5 h-3.5 text-ink-tertiary" />
             </a>
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-civic-blue hover:bg-civic-blueDark px-3.5 py-1.5 rounded-lg shadow-subtle transition-all"
+            >
+              <span>Launch Demo</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
         </div>
       </header>
@@ -104,19 +111,25 @@ export default function HomePage() {
             </p>
 
             <div className="flex flex-wrap items-center gap-4 text-sm">
+              <Link
+                href="/login"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-civic-blue hover:bg-civic-blueDark shadow-subtle transition-all"
+              >
+                <span>Launch Demo Journey</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
               <a
                 href="#citizen-experience"
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg font-medium text-white bg-civic-blue hover:bg-civic-blueDark shadow-subtle transition-all"
-              >
-                <span>Explore Citizen Signal</span>
-                <ArrowRight className="w-4 h-4" />
-              </a>
-              <a
-                href="#government-intelligence"
                 className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg font-medium text-ink-primary bg-white hover:bg-canvas-subtle border border-ink-border shadow-subtle transition-all"
               >
-                <span>View Command Center</span>
+                <span>Explore Citizen Signal</span>
               </a>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg font-medium text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle transition-all"
+              >
+                <span>Command Center →</span>
+              </Link>
             </div>
           </div>
 

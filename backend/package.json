@@ -13,7 +13,8 @@
     "data:validate": "tsx scripts/data-validate.ts",
     "data:verify": "tsx scripts/data-verify.ts",
     "test:live": "tsx scripts/verify-live-creds.ts",
-    "test:real-live": "tsx scripts/live-real-mode-runner.ts"
+    "test:real-live": "tsx scripts/live-real-mode-runner.ts",
+    "demo:reset": "tsx scripts/demo-reset.ts"
   },
   "dependencies": {
     "@civicpulse/shared": "*",

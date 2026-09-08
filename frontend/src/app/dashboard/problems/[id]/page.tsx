@@ -294,22 +294,47 @@ export default function ProblemDetailPage({
   return (
     <GovernmentShell>
       <div className="space-y-8 max-w-6xl mx-auto">
-        {/* Navigation Breadcrumb */}
-        <div className="flex items-center justify-between">
-          <Link
-            href="/dashboard/problems"
-            className="inline-flex items-center gap-1.5 text-xs text-ink-secondary hover:text-ink-primary font-medium"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Back to Problem Directory</span>
-          </Link>
+        {/* Navigation Breadcrumb & Contextual Actions */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-ink-border/50">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard/problems"
+              className="inline-flex items-center gap-1.5 text-xs text-ink-secondary hover:text-ink-primary font-medium"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to Problems</span>
+            </Link>
+            <span className="text-ink-border">•</span>
+            <Link
+              href="/dashboard"
+              className="text-xs text-ink-secondary hover:text-ink-primary font-medium"
+            >
+              Command Center
+            </Link>
+          </div>
 
-          {isDemo && (
-            <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-300 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              SYNTHETIC DEMO CLUSTER
-            </span>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href={`/dashboard/ai?problemId=${id}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-civic-blueLight text-civic-blueDark hover:bg-civic-blue hover:text-white transition-colors border border-civic-blue/20 shadow-subtle"
+            >
+              <span>Governance AI</span>
+              <ArrowRight className="w-3 h-3" />
+            </Link>
+            <Link
+              href={`/dashboard/simulation?problemId=${id}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-900 hover:bg-amber-100 transition-colors border border-amber-300 shadow-subtle"
+            >
+              <Sliders className="w-3 h-3" />
+              <span>Simulate Intervention</span>
+            </Link>
+            {isDemo && (
+              <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-300 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                SYNTHETIC DEMO
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Evaluation Persona Switcher for RBAC & Verification Testing */}

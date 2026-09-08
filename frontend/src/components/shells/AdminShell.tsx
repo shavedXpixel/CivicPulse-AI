@@ -14,6 +14,7 @@ import {
   Settings,
   Users,
   Database,
+  Sliders,
   Menu,
   X,
   LogOut,
@@ -29,12 +30,13 @@ export function AdminShell({ children }: AdminShellProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const mainNav = [
-    { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Command Center', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Problems', href: '/dashboard/problems', icon: AlertOctagon },
     { name: 'Map Workspace', href: '/dashboard/map', icon: Map },
     { name: 'Departments', href: '/dashboard/departments', icon: Building2 },
     { name: 'Trends & Velocity', href: '/dashboard/trends', icon: TrendingUp },
     { name: 'Governance AI', href: '/dashboard/ai', icon: Brain },
+    { name: 'Intervention Simulator', href: '/dashboard/simulation', icon: Sliders },
   ];
 
   const adminNav = [

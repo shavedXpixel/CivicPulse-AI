@@ -18,14 +18,16 @@
     "build": "npm.cmd run build:shared && npm.cmd run build:backend && npm.cmd run build:frontend",
     "test:shared": "npm.cmd --prefix shared run test",
     "test:backend": "npm.cmd --prefix backend run test",
-    "test": "npm.cmd run test:shared && npm.cmd run test:backend",
+    "test:frontend": "npm.cmd --prefix frontend run test",
+    "test": "npm.cmd run test:shared && npm.cmd run test:backend && npm.cmd run test:frontend",
     "lint:shared": "npm.cmd --prefix shared run lint",
     "lint:backend": "npm.cmd --prefix backend run lint",
     "lint:frontend": "npm.cmd --prefix frontend run lint",
     "lint": "npm.cmd run lint:shared && npm.cmd run lint:backend && npm.cmd run lint:frontend",
     "data:import": "npm.cmd --prefix backend run data:import",
     "data:validate": "npm.cmd --prefix backend run data:validate",
-    "data:verify": "npm.cmd --prefix backend run data:verify"
+    "data:verify": "npm.cmd --prefix backend run data:verify",
+    "demo:reset": "npm.cmd --prefix backend run demo:reset --"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

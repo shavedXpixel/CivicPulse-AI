@@ -1052,5 +1052,28 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     }
     return null;
   }
+
+  /**
+   * DEMO-ONLY: Deterministically restores the in-memory database to its canonical Golden Demo state.
+   * Completely clears all mutated collections and re-seeds canonical fixtures:
+   * - ProblemCluster PRB-2026-0819 (Score 92, Nayapalli Ward 18, WATCO)
+   * - Canonical signals, members, assignment, actions, and resolution evidence
+   * - Municipal departments and demo personas
+   */
+  public resetToGoldenDemo(): void {
+    this.users.clear();
+    this.citizenProfiles.clear();
+    this.signals.clear();
+    this.signalMedia.clear();
+    this.aiOperations.clear();
+    this.problemClusters.clear();
+    this.problemClusterMembers.clear();
+    this.assignments.clear();
+    this.actions.clear();
+    this.departments.clear();
+    this.resolutionEvidence.clear();
+    this.verificationResults.clear();
+    this.seedMinimalFixtures();
+  }
 }
 

@@ -27,7 +27,7 @@ export function GovernmentShell({ children }: GovernmentShellProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navigation = [
-    { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Command Center', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Problems', href: '/dashboard/problems', icon: AlertOctagon, badge: '14' },
     { name: 'Map Workspace', href: '/dashboard/map', icon: Map },
     { name: 'Departments', href: '/dashboard/departments', icon: Building2 },

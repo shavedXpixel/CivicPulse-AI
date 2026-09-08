@@ -1,4 +1,6 @@
 import { env } from '../config/env';
+import { AppError } from '../middleware/error.middleware';
+import { ERROR_CODES } from '@civicpulse/shared';
 import { IDatabaseProvider } from './database/database.interface';
 import { MockDatabaseProvider } from './database/mock.database';
 import { FirestoreDatabaseProvider } from './database/firestore.provider';
@@ -183,6 +185,25 @@ class ProviderContainer {
 
   public static setFacilityProvider(provider: IFacilityProvider | null) {
     this.facilityInstance = provider;
+  }
+
+  public static resetToGoldenDemo(): void {
+    if (!env.DEMO_MODE) {
+      throw new AppError({
+        statusCode: 403,
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Demo reset is strictly disabled when DEMO_MODE is false (REAL_MODE active). Firestore data is protected.'
+      });
+    }
+
+    const db = this.getDatabaseProvider();
+    if (db instanceof MockDatabaseProvider) {
+      db.resetToGoldenDemo();
+    }
+    if (this.simulationInstance instanceof MockSimulationAIProvider) {
+      this.simulationInstance.simulateFailure(false);
+      this.simulationInstance.simulateTimeout(false);
+    }
   }
 
   public static resetAllProviders() {

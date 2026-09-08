@@ -16,9 +16,11 @@ import {
   DEMO_AI_BRIEF,
 } from '../../lib/mockData';
 import { apiClient } from '../../lib/api-client';
+import { useAuth } from '../../context/AuthContext';
 import { ArrowRight, Activity, Users, AlertOctagon, CheckCircle2, Clock } from 'lucide-react';
 
 export default function GovernmentDashboardPage() {
+  const { isDemoMode } = useAuth();
   const [ward, setWard] = useState('ALL');
   const [category, setCategory] = useState('ALL');
   const [severity, setSeverity] = useState('ALL');
@@ -57,6 +59,14 @@ export default function GovernmentDashboardPage() {
 
   const problemsToFilter = liveProblems.length > 0 ? liveProblems : DEMO_PROBLEMS;
 
+  // Determine highest impact problem for primary contextual navigation
+  const highestProblem = problemsToFilter.slice().sort((a, b) => {
+    const scoreA = a.impact_score ?? a.impactScore ?? 0;
+    const scoreB = b.impact_score ?? b.impactScore ?? 0;
+    return scoreB - scoreA;
+  })[0];
+  const primaryProblemId = highestProblem?.id || (isDemoMode ? 'PRB-2026-0819' : null);
+
   const filteredProblems = problemsToFilter.filter((p) => {
     const pWard = p.ward_id || p.wardId;
     if (ward !== 'ALL' && pWard !== ward) return false;
@@ -84,15 +94,65 @@ export default function GovernmentDashboardPage() {
             </span>
           }
           actions={
-            <Link
-              href="/dashboard/ai"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-civic-blue text-white hover:bg-civic-blueDark transition-colors shadow-subtle"
-            >
-              <span>Ask Governance AI</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/dashboard/problems"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-ink-border bg-white hover:bg-canvas-subtle text-ink-primary transition-colors"
+              >
+                <span>Problems Queue</span>
+              </Link>
+              <Link
+                href="/dashboard/ai"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-civic-blue text-white hover:bg-civic-blueDark transition-colors shadow-subtle"
+              >
+                <span>Ask Governance AI</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           }
         />
+
+        {/* Quick Operational Actions / Demo Journey Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-white border border-ink-border shadow-subtle text-xs">
+          <div className="flex items-center gap-2 text-ink-secondary">
+            <span className="font-semibold text-ink-primary">Quick Navigation:</span>
+            <span>Jump across intelligence layers</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/dashboard/problems"
+              className="px-3 py-1.5 rounded-lg border border-ink-border bg-canvas-subtle hover:bg-white text-ink-primary font-medium transition-colors"
+            >
+              All Problems ({problemsToFilter.length})
+            </Link>
+            {primaryProblemId && (
+              <Link
+                href={`/dashboard/problems/${primaryProblemId}`}
+                className="px-3 py-1.5 rounded-lg border border-civic-rose/30 bg-rose-50 text-rose-800 hover:bg-rose-100 font-semibold transition-colors flex items-center gap-1.5"
+              >
+                <span className="w-2 h-2 rounded-full bg-civic-rose animate-pulse" />
+                <span>
+                  {isDemoMode && primaryProblemId === 'PRB-2026-0819'
+                    ? 'Golden Demo: PRB-2026-0819 (Impact 92)'
+                    : `Highest Impact: #${primaryProblemId}`}
+                </span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            )}
+            <Link
+              href={`/dashboard/ai${primaryProblemId ? `?problemId=${primaryProblemId}` : ''}`}
+              className="px-3 py-1.5 rounded-lg border border-civic-blue/30 bg-civic-blueLight/50 text-civic-blueDark hover:bg-civic-blueLight font-medium transition-colors"
+            >
+              Governance AI
+            </Link>
+            <Link
+              href={`/dashboard/simulation${primaryProblemId ? `?problemId=${primaryProblemId}` : ''}`}
+              className="px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 font-medium transition-colors"
+            >
+              Intervention Simulator
+            </Link>
+          </div>
+        </div>
 
         {/* Filter Bar */}
         <FilterBar

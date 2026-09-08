@@ -7,8 +7,6 @@ import {
   Home,
   PlusCircle,
   FileText,
-  Bell,
-  User,
   Globe,
   LogOut
 } from 'lucide-react';
@@ -24,18 +22,16 @@ export function CitizenShell({ children }: CitizenShellProps) {
 
   const navItems = [
     { label: 'Home', href: '/citizen', icon: Home },
-    { label: 'Report', href: '/citizen/report', icon: PlusCircle, isHighlight: true },
+    { label: 'Report an Issue', href: '/citizen/report', icon: PlusCircle, isHighlight: true },
     { label: 'My Reports', href: '/citizen/issues', icon: FileText },
-    { label: 'Notifications', href: '#notifications', icon: Bell },
-    { label: 'Profile', href: '#profile', icon: User },
   ];
 
   return (
     <div className="min-h-screen bg-canvas text-ink-primary flex flex-col pb-20 md:pb-0">
       {/* Top Header */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-ink-border">
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link href="/citizen" className="flex items-center gap-2.5">
+        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
+          <Link href="/citizen" className="flex items-center gap-2.5 shrink-0">
             <div className="w-7 h-7 rounded-lg bg-ink-primary flex items-center justify-center text-white font-bold text-xs">
               CP
             </div>
@@ -46,11 +42,46 @@ export function CitizenShell({ children }: CitizenShellProps) {
             </div>
           </Link>
 
+          {/* Desktop Navigation Links */}
+          <nav className="hidden sm:flex items-center gap-1 text-xs font-medium" aria-label="Citizen Navigation">
+            <Link
+              href="/citizen"
+              className={`px-3 py-1.5 rounded-lg transition-colors ${
+                pathname === '/citizen'
+                  ? 'bg-civic-blueLight text-civic-blueDark font-semibold'
+                  : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
+              }`}
+            >
+              Home
+            </Link>
+            <Link
+              href="/citizen/report"
+              className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+                pathname === '/citizen/report'
+                  ? 'bg-civic-blue text-white font-semibold shadow-subtle'
+                  : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
+              }`}
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Report an Issue</span>
+            </Link>
+            <Link
+              href="/citizen/issues"
+              className={`px-3 py-1.5 rounded-lg transition-colors ${
+                pathname === '/citizen/issues'
+                  ? 'bg-civic-blueLight text-civic-blueDark font-semibold'
+                  : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
+              }`}
+            >
+              My Reports
+            </Link>
+          </nav>
+
           {/* Language Selector & Switcher / Auth Actions */}
-          <div className="flex items-center gap-3">
-            <button className="flex items-center gap-1 text-xs text-ink-secondary hover:text-ink-primary px-2.5 py-1 rounded-md border border-ink-border bg-canvas-subtle">
+          <div className="flex items-center gap-3 shrink-0">
+            <button className="hidden md:flex items-center gap-1 text-xs text-ink-secondary hover:text-ink-primary px-2.5 py-1 rounded-md border border-ink-border bg-canvas-subtle">
               <Globe className="w-3.5 h-3.5 text-civic-blue" />
-              <span>English / ଓଡ଼ିଆ / हिंदी</span>
+              <span>English / ଓଡ଼ିଆ</span>
             </button>
             {isDemoMode ? (
               <Link
@@ -92,10 +123,10 @@ export function CitizenShell({ children }: CitizenShellProps) {
 
       {/* Mobile Bottom Navigation Bar */}
       <nav
-        className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-ink-border md:hidden"
+        className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-ink-border sm:hidden"
         aria-label="Mobile Citizen Navigation"
       >
-        <div className="grid grid-cols-5 h-16 max-w-md mx-auto items-center">
+        <div className="grid grid-cols-3 h-16 max-w-md mx-auto items-center">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -105,10 +136,10 @@ export function CitizenShell({ children }: CitizenShellProps) {
                 <Link
                   key={item.label}
                   href={item.href}
-                  className="flex flex-col items-center justify-center -mt-5"
+                  className="flex flex-col items-center justify-center -mt-4"
                 >
-                  <div className="w-12 h-12 rounded-full bg-civic-blue text-white flex items-center justify-center shadow-elevated hover:bg-civic-blueDark transition-colors">
-                    <Icon className="w-6 h-6" />
+                  <div className="w-11 h-11 rounded-full bg-civic-blue text-white flex items-center justify-center shadow-elevated hover:bg-civic-blueDark transition-colors">
+                    <Icon className="w-5 h-5" />
                   </div>
                   <span className="text-[10px] font-semibold text-civic-blue mt-1">
                     {item.label}
@@ -134,7 +165,7 @@ export function CitizenShell({ children }: CitizenShellProps) {
       </nav>
 
       {/* Desktop Navigation Links */}
-      <footer className="hidden md:block py-6 border-t border-ink-border bg-white text-xs text-ink-tertiary">
+      <footer className="hidden sm:block py-6 border-t border-ink-border bg-white text-xs text-ink-tertiary">
         <div className="max-w-4xl mx-auto px-4 flex items-center justify-between">
           <div className="flex items-center gap-6">
             {navItems.map((item) => (

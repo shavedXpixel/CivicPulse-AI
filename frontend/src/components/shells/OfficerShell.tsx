@@ -10,6 +10,7 @@ import {
   LogOut,
   User,
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export interface OfficerShellProps {
   children: ReactNode;
@@ -17,11 +18,17 @@ export interface OfficerShellProps {
 
 export function OfficerShell({ children }: OfficerShellProps) {
   const pathname = usePathname();
+  const { isDemoMode } = useAuth();
 
   const navigation = [
-    { name: 'My Work', href: '/officer', icon: Briefcase, badge: '3 Active' },
-    { name: 'Priority Problems', href: '/dashboard/problems', icon: AlertTriangle },
-    { name: 'History', href: '#history', icon: History },
+    { name: 'My Work / Officer Queue', href: '/officer', icon: Briefcase, badge: '3 Active' },
+    {
+      name: 'Assigned Problems',
+      href: isDemoMode ? '/dashboard/problems/PRB-2026-0819' : '/officer',
+      icon: AlertTriangle,
+      badge: isDemoMode ? 'Golden Demo' : undefined,
+    },
+    { name: 'Priority Problems', href: '/dashboard/problems', icon: History },
   ];
 
   return (

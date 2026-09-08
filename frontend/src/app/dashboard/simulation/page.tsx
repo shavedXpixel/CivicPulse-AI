@@ -16,8 +16,10 @@ import {
   RefreshCw,
   Info,
   Layers,
+  ArrowRight,
 } from 'lucide-react';
 import { apiClient, setAuthToken, ApiError } from '../../../lib/api-client';
+import { useAuth } from '../../../context/AuthContext';
 import {
   InterventionType,
   SimulationResult,
@@ -83,9 +85,21 @@ const PERSONAS: Persona[] = [
 ];
 
 export default function InterventionSimulatorPage() {
+  const { isDemoMode } = useAuth();
+  const [queryProblemId, setQueryProblemId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get('problemId');
+      if (q) setQueryProblemId(q);
+    }
+  }, []);
+
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>('admin');
   const [mode, setMode] = useState<'PROBLEM' | 'BUDGET'>('PROBLEM');
   const [activeProblemId] = useState<string>('PRB-2026-0819');
+  const displayProblemId = queryProblemId || (isDemoMode ? 'PRB-2026-0819' : null);
 
   // Single-Problem Simulation State
   const [scenarioName, setScenarioName] = useState<string>('Scenario B: Accelerated Dual-Crew Repair & Mechanical Sleeve');
@@ -279,6 +293,32 @@ export default function InterventionSimulatorPage() {
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-semibold bg-civic-amberLight text-amber-900 border border-amber-300">
               <Sliders className="w-3.5 h-3.5 text-amber-700" />
               <span>SIMULATION / ADVISORY</span>
+            </div>
+          }
+          actions={
+            <div className="flex items-center gap-2 flex-wrap">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-ink-border bg-white hover:bg-canvas-subtle text-ink-primary transition-colors"
+              >
+                <span>Command Center</span>
+              </Link>
+              {displayProblemId && (
+                <Link
+                  href={`/dashboard/problems/${displayProblemId}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-ink-border bg-white hover:bg-canvas-subtle text-ink-primary transition-colors"
+                >
+                  <span>{isDemoMode && displayProblemId === 'PRB-2026-0819' ? 'Golden Demo Problem' : `Problem #${displayProblemId}`}</span>
+                  <ArrowRight className="w-3 h-3 text-ink-tertiary" />
+                </Link>
+              )}
+              <Link
+                href={`/dashboard/ai${displayProblemId ? `?problemId=${displayProblemId}` : ''}`}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-civic-blue text-white hover:bg-civic-blueDark transition-colors shadow-subtle"
+              >
+                <span>Governance AI</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
           }
         />
