@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { OfficerShell } from '../../components/shells/OfficerShell';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { StatusBadge } from '../../components/domain/StatusBadge';
+import { apiClient } from '../../lib/api-client';
+import { Assignment, ProblemCluster } from '@civicpulse/shared';
 import {
   MapPin,
   Camera,
@@ -13,132 +15,336 @@ import {
   Clock,
   Navigation,
   FileCheck,
+  AlertTriangle,
+  Play,
+  RefreshCw,
+  UserCheck,
+  ShieldAlert,
 } from 'lucide-react';
 
-export default function OfficerPage() {
-  const [activeTask] = useState({
-    id: 'WO-402',
-    problemId: 'PRB-2026-0819',
-    title: 'Ward 18 Main Distribution Rupture & Submersion',
-    location: '4th Cross, 100ft Road, Indiranagar',
-    coordinates: '12.9784° N, 77.6408° E',
-    impactScore: 92,
-    severity: 'CRITICAL',
-    status: 'IN_PROGRESS',
-    assignedAt: 'Today, 07:30 AM',
-    slaDeadline: 'Today, 04:00 PM (3h 15m remaining)',
-    instructions:
-      'Excavate damaged 300mm cast iron main, isolate auxiliary valve 4B, and fit new ductile iron coupling. Submit geotagged post-repair photo upon pressure restoration.',
-  });
+interface AssignmentWithProblem extends Assignment {
+  problem?: ProblemCluster;
+}
 
-  const [evidenceSubmitted, setEvidenceSubmitted] = useState(false);
+export default function OfficerPage() {
+  const [officerToken, setOfficerToken] = useState<'demo-token-officer' | 'demo-token-field-drainage'>('demo-token-officer');
+  const [assignments, setAssignments] = useState<AssignmentWithProblem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const fetchAssignments = useCallback(async () => {
+    setLoading(true);
+    setActionError(null);
+    try {
+      const res = await apiClient.get<{ data: AssignmentWithProblem[] }>(
+        '/api/v1/assignments?assigned_to=me',
+        { Authorization: `Bearer ${officerToken}` }
+      );
+      if (res?.data) {
+        setAssignments(res.data);
+      }
+    } catch (err: any) {
+      console.warn('Could not fetch live officer assignments:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [officerToken]);
+
+  useEffect(() => {
+    fetchAssignments();
+  }, [fetchAssignments]);
+
+  const handleStartWork = async (problemId: string) => {
+    setActionLoading(problemId);
+    setActionSuccess(null);
+    setActionError(null);
+    try {
+      await apiClient.post(
+        `/api/v1/problems/${problemId}/actions`,
+        {
+          action_type: 'STARTED_WORK',
+          notes: 'Field crew deployed on site and initiated maintenance protocol.',
+        },
+        { Authorization: `Bearer ${officerToken}` }
+      );
+      setActionSuccess(`Work successfully commenced on problem ${problemId}! State transitioned to IN_PROGRESS.`);
+      await fetchAssignments();
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to start work');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRequestVerification = async (problemId: string) => {
+    setActionLoading(problemId);
+    setActionSuccess(null);
+    setActionError(null);
+    try {
+      await apiClient.post(
+        `/api/v1/problems/${problemId}/actions`,
+        {
+          action_type: 'VERIFICATION_REQUESTED',
+          notes: 'Field repairs completed. Restored infrastructure submitted for supervisory verification.',
+        },
+        { Authorization: `Bearer ${officerToken}` }
+      );
+      setActionSuccess(`Verification requested for ${problemId}! State transitioned to AWAITING_VERIFICATION.`);
+      await fetchAssignments();
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to request verification');
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   return (
     <OfficerShell>
       <div className="space-y-6">
-        <PageHeader
-          title="Field Operations Queue"
-          description="Active emergency dispatches and assigned infrastructure work orders."
-          badge={
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-civic-amberLight text-amber-900">
-              1 Critical Active
+        {/* Header with Officer Persona Switcher */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <PageHeader
+            title="Field Operations Queue"
+            description="Active emergency dispatches and assigned infrastructure work orders (scoped to assigned_to === user.id)."
+            badge={
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-civic-amberLight text-amber-900">
+                {assignments.length} Assigned {assignments.length === 1 ? 'Task' : 'Tasks'}
+              </span>
+            }
+          />
+
+          {/* Persona Switcher for Verification */}
+          <div className="flex items-center gap-2 bg-white p-1.5 rounded-lg border border-ink-border shadow-subtle text-xs">
+            <span className="text-ink-tertiary font-medium px-2 flex items-center gap-1">
+              <UserCheck className="w-3.5 h-3.5 text-civic-blue" />
+              <span>Officer Scope:</span>
             </span>
-          }
-        />
-
-        {/* Urgent Task Card */}
-        <div className="p-6 rounded-xl border border-civic-rose/30 bg-white shadow-card space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-ink-border/60 pb-4 gap-2">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-civic-roseLight text-civic-rose">
-                  EMERGENCY DISPATCH
-                </span>
-                <span className="text-xs font-mono text-ink-tertiary">Work Order #{activeTask.id}</span>
-              </div>
-              <h2 className="text-lg font-bold text-ink-primary">{activeTask.title}</h2>
-            </div>
-            <StatusBadge status={activeTask.status} />
+            <button
+              onClick={() => setOfficerToken('demo-token-officer')}
+              className={`px-2.5 py-1 rounded font-semibold transition-colors ${
+                officerToken === 'demo-token-officer'
+                  ? 'bg-civic-blue text-white shadow-subtle'
+                  : 'text-ink-secondary hover:bg-canvas-subtle'
+              }`}
+            >
+              Rajesh K. (WATCO)
+            </button>
+            <button
+              onClick={() => setOfficerToken('demo-token-field-drainage')}
+              className={`px-2.5 py-1 rounded font-semibold transition-colors ${
+                officerToken === 'demo-token-field-drainage'
+                  ? 'bg-civic-blue text-white shadow-subtle'
+                  : 'text-ink-secondary hover:bg-canvas-subtle'
+              }`}
+            >
+              Suresh P. (Drainage)
+            </button>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div className="flex items-start gap-2 text-ink-secondary">
-              <MapPin className="w-4 h-4 text-civic-rose shrink-0 mt-0.5" />
-              <div>
-                <span className="font-semibold text-ink-primary">{activeTask.location}</span>
-                <div className="text-[11px] font-mono text-ink-tertiary">{activeTask.coordinates}</div>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-2 text-ink-secondary">
-              <Clock className="w-4 h-4 text-civic-amber shrink-0 mt-0.5" />
-              <div>
-                <span className="font-semibold text-ink-primary">SLA Countdown</span>
-                <div className="text-[11px] font-mono text-civic-amber font-bold">{activeTask.slaDeadline}</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-lg bg-canvas-subtle border border-ink-border text-xs space-y-1">
-            <span className="font-mono text-ink-tertiary uppercase font-semibold text-[10px]">
-              ENGINEERING INSTRUCTIONS
-            </span>
-            <p className="text-ink-secondary leading-relaxed">{activeTask.instructions}</p>
-          </div>
-
-          {/* Resolution Submission Box */}
-          {evidenceSubmitted ? (
-            <div className="p-4 rounded-xl border border-civic-emerald/30 bg-civic-emeraldLight/20 text-xs flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-civic-emerald shrink-0" />
-                <div>
-                  <span className="font-bold text-ink-primary">Resolution Evidence Uploaded</span>
-                  <p className="text-ink-secondary text-[11px]">
-                    Photo match validated at 8.4m radius. AI verification score: 91%.
-                  </p>
-                </div>
-              </div>
-              <span className="font-mono text-civic-emerald font-bold text-xs">Awaiting Approval</span>
-            </div>
-          ) : (
-            <div className="pt-2 flex flex-wrap items-center gap-3">
-              <Button
-                variant="primary"
-                size="md"
-                className="gap-2"
-                onClick={() => setEvidenceSubmitted(true)}
-              >
-                <Camera className="w-4 h-4" />
-                <span>Submit Resolution Proof & Photo</span>
-              </Button>
-              <Button variant="outline" size="md" className="gap-2">
-                <Navigation className="w-4 h-4" />
-                <span>Navigate to Coordinates</span>
-              </Button>
-              <Link
-                href={`/dashboard/problems/${activeTask.problemId}`}
-                className="text-xs font-semibold text-civic-blue hover:underline ml-auto"
-              >
-                Inspect Problem Dossier →
-              </Link>
-            </div>
-          )}
         </div>
 
-        {/* Completed History List */}
+        {/* Action alerts */}
+        {actionSuccess && (
+          <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="font-semibold">{actionSuccess}</span>
+          </div>
+        )}
+
+        {actionError && (
+          <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-900 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span className="font-semibold">{actionError}</span>
+          </div>
+        )}
+
+        {/* Work Queue List */}
+        {loading ? (
+          <div className="p-8 rounded-xl border border-ink-border bg-white shadow-card flex items-center justify-center text-xs text-ink-tertiary gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin text-civic-blue" />
+            <span>Loading scoped officer tasks...</span>
+          </div>
+        ) : assignments.length === 0 ? (
+          <div className="p-12 rounded-xl border border-ink-border bg-white shadow-card text-center space-y-2">
+            <CheckCircle2 className="w-8 h-8 text-civic-emerald mx-auto" />
+            <h3 className="text-sm font-bold text-ink-primary">No Operational Problems Assigned</h3>
+            <p className="text-xs text-ink-secondary max-w-sm mx-auto">
+              You are current on all assigned tasks. New dispatches will appear here once explicitly assigned by department leadership.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {assignments.map((assignment) => {
+              const problem = assignment.problem;
+              const sla = problem?.sla_state;
+              const isCritical = problem?.impact_level === 'CRITICAL';
+              const hoursRemaining = sla ? Math.max(0, Math.round(sla.hours_remaining)) : 3;
+              const riskStatus = sla?.status || (isCritical ? 'AT_RISK' : 'ON_TRACK');
+              const wasBreached = sla?.was_breached;
+
+              return (
+                <div
+                  key={assignment.id}
+                  className={`p-6 rounded-xl border ${
+                    isCritical ? 'border-civic-rose/30 bg-white' : 'border-ink-border bg-white'
+                  } shadow-card space-y-5`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-ink-border/60 pb-4 gap-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                            isCritical ? 'bg-civic-roseLight text-civic-rose' : 'bg-civic-blueLight text-civic-blueDark'
+                          }`}
+                        >
+                          {isCritical ? 'EMERGENCY DISPATCH' : 'SCHEDULED WORK ORDER'}
+                        </span>
+                        <span className="text-xs font-mono text-ink-tertiary">
+                          Assignment #{assignment.id}
+                        </span>
+                        {problem?.is_demo && (
+                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                            DEMO SEED
+                          </span>
+                        )}
+                      </div>
+                      <h2 className="text-lg font-bold text-ink-primary">
+                        {problem?.title || `Problem Incident #${assignment.problem_id}`}
+                      </h2>
+                    </div>
+                    {problem && <StatusBadge status={problem.status} />}
+                  </div>
+
+                  {/* Operational Telemetry Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                    <div className="flex items-start gap-2 text-ink-secondary">
+                      <MapPin className="w-4 h-4 text-civic-rose shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold text-ink-primary">Location & GIS</span>
+                        <div className="text-[11px] font-mono text-ink-tertiary">
+                          {problem?.location
+                            ? `${problem.location.lat.toFixed(4)}° N, ${problem.location.lng.toFixed(4)}° E`
+                            : 'Nayapalli Ward 18, Bhubaneswar'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2 text-ink-secondary">
+                      <Clock className="w-4 h-4 text-civic-amber shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold text-ink-primary">SLA Target & Countdown</span>
+                        <div className="text-[11px] font-mono flex items-center gap-1.5 font-bold">
+                          <span className="text-ink-secondary">
+                            Target: {sla?.target_hours ?? (isCritical ? 24 : 48)}h
+                          </span>
+                          <span className="text-ink-tertiary">•</span>
+                          <span
+                            className={
+                              riskStatus === 'BREACHED'
+                                ? 'text-civic-rose'
+                                : riskStatus === 'AT_RISK'
+                                ? 'text-civic-amber'
+                                : 'text-civic-emerald'
+                            }
+                          >
+                            {hoursRemaining}h remaining ({riskStatus})
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Historical SLA Breach Guardrail Indicator */}
+                    {wasBreached && (
+                      <div className="flex items-start gap-2 text-rose-800 bg-rose-50 p-2.5 rounded-lg border border-rose-200">
+                        <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-bold text-[11px]">Historical Breach Preserved</span>
+                          <p className="text-[10px] text-rose-700 leading-tight">
+                            Exceeded deadline prior to resolution. Retained for audit & performance reporting.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Assignment Instructions */}
+                  <div className="p-4 rounded-lg bg-canvas-subtle border border-ink-border text-xs space-y-1">
+                    <span className="font-mono text-ink-tertiary uppercase font-semibold text-[10px]">
+                      DISPATCH INSTRUCTIONS & NOTES
+                    </span>
+                    <p className="text-ink-secondary leading-relaxed">
+                      {assignment.notes || 'Proceed to coordinates, inspect reported infrastructure disruption, and execute repair protocol.'}
+                    </p>
+                  </div>
+
+                  {/* Action Workflow Buttons */}
+                  <div className="pt-2 flex flex-wrap items-center gap-3">
+                    {problem?.status === 'ASSIGNED' && (
+                      <Button
+                        variant="primary"
+                        size="md"
+                        className="gap-2 bg-civic-blue hover:bg-blue-700"
+                        disabled={actionLoading === problem.id}
+                        onClick={() => handleStartWork(problem.id)}
+                      >
+                        <Play className="w-4 h-4" />
+                        <span>{actionLoading === problem.id ? 'Starting Work...' : 'Start Work (Commence Repairs)'}</span>
+                      </Button>
+                    )}
+
+                    {problem?.status === 'IN_PROGRESS' && (
+                      <Button
+                        variant="primary"
+                        size="md"
+                        className="gap-2 bg-civic-emerald hover:bg-emerald-700"
+                        disabled={actionLoading === problem.id}
+                        onClick={() => handleRequestVerification(problem.id)}
+                      >
+                        <Camera className="w-4 h-4" />
+                        <span>{actionLoading === problem.id ? 'Requesting...' : 'Request Verification (Submit Proof)'}</span>
+                      </Button>
+                    )}
+
+                    {problem?.status === 'AWAITING_VERIFICATION' && (
+                      <div className="px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>Verification Requested — Awaiting Department Supervisory Review</span>
+                      </div>
+                    )}
+
+                    <Button variant="outline" size="md" className="gap-2 text-xs">
+                      <Navigation className="w-3.5 h-3.5" />
+                      <span>Navigate to Site</span>
+                    </Button>
+
+                    <Link
+                      href={`/dashboard/problems/${assignment.problem_id}`}
+                      className="text-xs font-semibold text-civic-blue hover:underline ml-auto"
+                    >
+                      Inspect Problem Dossier →
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Completed Tasks History Section */}
         <div className="space-y-3 pt-4">
-          <h3 className="text-sm font-bold text-ink-primary font-mono uppercase tracking-wider">
+          <h3 className="text-sm font-bold text-ink-primary uppercase tracking-wider">
             Completed Tasks Today
           </h3>
           <div className="p-4 rounded-xl border border-ink-border bg-white shadow-card flex items-center justify-between text-xs">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-ink-primary">Valve Pressure Check #WO-398</span>
-                <span className="px-2 py-0.2 rounded text-[10px] font-mono bg-civic-emeraldLight text-emerald-800 font-semibold">
-                  Verified Closed
+                <span className="px-2 py-0.2 rounded text-[10px] bg-civic-emeraldLight text-emerald-800 font-semibold">
+                  Resolved
                 </span>
               </div>
-              <div className="text-[11px] text-ink-tertiary font-mono">100ft Road • Completed 08:30 AM</div>
+              <div className="text-[11px] text-ink-tertiary">Nayapalli VIP Road • Completed 08:30 AM</div>
             </div>
             <FileCheck className="w-5 h-5 text-civic-emerald" />
           </div>

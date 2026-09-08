@@ -1181,16 +1181,16 @@ in Wards 17–19.
 ## Acceptance Criteria
 
 ```text id="n1f4dm"
-[ ] Governance AI works
-[ ] Questions are permission-scoped
-[ ] Controlled tools implemented
-[ ] Structured data retrieved
-[ ] Gemini receives grounded context
-[ ] Answers include evidence
-[ ] Unsupported questions handled
-[ ] No arbitrary SQL
-[ ] AI output validated
-[ ] Browser verification completed
+[x] Governance AI works
+[x] Questions are permission-scoped
+[x] Controlled tools implemented
+[x] Structured data retrieved
+[x] Gemini receives grounded context
+[x] Answers include evidence
+[x] Unsupported questions handled
+[x] No arbitrary SQL
+[x] AI output validated
+[x] Browser verification completed
 ```
 
 ---
@@ -1263,12 +1263,12 @@ This feature must never:
 ## Acceptance Criteria
 
 ```text id="18mxs3"
-[ ] Budget input works
-[ ] Scenario calculation works
-[ ] Assumptions visible
-[ ] Results explainable
-[ ] Simulation clearly labeled
-[ ] No financial action is executed
+[x] Budget input works
+[x] Scenario calculation works
+[x] Assumptions visible
+[x] Results explainable
+[x] Simulation clearly labeled
+[x] No financial action is executed
 ```
 
 ---

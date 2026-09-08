@@ -42,11 +42,11 @@ export function KPIStat({
       </div>
 
       <div className="flex items-baseline justify-between">
-        <div className="text-2xl sm:text-3xl font-extrabold font-mono text-ink-primary tracking-tight">
+        <div className="text-2xl sm:text-3xl font-extrabold text-ink-primary tracking-tight">
           {value}
         </div>
         {trend && trendValue && (
-          <div className={`flex items-center gap-1 text-xs font-mono font-semibold ${getTrendColor()}`}>
+          <div className={`flex items-center gap-1 text-xs font-semibold ${getTrendColor()}`}>
             <TrendIcon className="w-3.5 h-3.5" />
             <span>{trendValue}</span>
           </div>
@@ -54,7 +54,7 @@ export function KPIStat({
       </div>
 
       {comparison && (
-        <div className="text-[11px] text-ink-tertiary font-mono pt-1">
+        <div className="text-[11px] text-ink-tertiary pt-1">
           {comparison}
         </div>
       )}

@@ -33,12 +33,12 @@ export function ImpactScore({
   return (
     <div className={`space-y-1.5 ${className}`}>
       <div className="flex items-baseline justify-between gap-2">
-        <div className={`font-mono font-extrabold tracking-tight ${textSizes} ${tier.color}`}>
+        <div className={`font-extrabold tracking-tight ${textSizes} ${tier.color}`}>
           {normalizedScore}
           <span className="text-xs font-normal text-ink-secondary ml-1">/100</span>
         </div>
         <span
-          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider ${tier.bg} ${tier.color}`}
+          className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${tier.bg} ${tier.color}`}
         >
           {tier.label}
         </span>

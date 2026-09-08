@@ -15,6 +15,7 @@ import {
   X,
   Bell,
   LogOut,
+  Sliders,
 } from 'lucide-react';
 
 export interface GovernmentShellProps {
@@ -32,6 +33,7 @@ export function GovernmentShell({ children }: GovernmentShellProps) {
     { name: 'Departments', href: '/dashboard/departments', icon: Building2 },
     { name: 'Trends & Velocity', href: '/dashboard/trends', icon: TrendingUp },
     { name: 'Governance AI', href: '/dashboard/ai', icon: Brain, isAI: true },
+    { name: 'Intervention Simulator', href: '/dashboard/simulation', icon: Sliders, badge: 'Advisory' },
   ];
 
   return (
@@ -56,7 +58,7 @@ export function GovernmentShell({ children }: GovernmentShellProps) {
 
         {/* Navigation items */}
         <div className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          <div className="px-3 pb-2 text-[10px] font-mono uppercase tracking-wider text-ink-tertiary">
+          <div className="px-3 pb-2 text-[10px] uppercase tracking-wider font-semibold text-ink-tertiary">
             Intelligence Layer
           </div>
           {navigation.map((item) => {
@@ -78,12 +80,12 @@ export function GovernmentShell({ children }: GovernmentShellProps) {
                   <span>{item.name}</span>
                 </div>
                 {item.badge && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-civic-roseLight text-civic-rose font-bold">
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-civic-roseLight text-civic-rose">
                     {item.badge}
                   </span>
                 )}
                 {item.isAI && (
-                  <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-civic-blue/10 text-civic-blue font-bold">
+                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-civic-blue/10 text-civic-blue">
                     ANALYTICS
                   </span>
                 )}
@@ -96,8 +98,8 @@ export function GovernmentShell({ children }: GovernmentShellProps) {
         <div className="p-4 border-t border-ink-border bg-canvas-subtle/40 space-y-2">
           <div className="flex items-center justify-between text-xs">
             <div>
-              <div className="font-semibold text-ink-primary">City Commissioner</div>
-              <div className="text-[11px] text-ink-tertiary font-mono">BBMP East Zone</div>
+              <div className="font-semibold text-ink-primary">Municipal Commissioner</div>
+              <div className="text-[11px] text-ink-tertiary">BMC Central Zone • Bhubaneswar</div>
             </div>
             <Link
               href="/login"
@@ -137,7 +139,7 @@ export function GovernmentShell({ children }: GovernmentShellProps) {
           <div className="flex items-center gap-3">
             <div className="hidden sm:inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-mono bg-canvas-subtle border border-ink-border text-ink-secondary">
               <span className="w-2 h-2 rounded-full bg-civic-emerald" />
-              <span>DEMO_MODE: Bangalore Ward 18 Scenario</span>
+              <span>DEMO_MODE: Bhubaneswar Ward 18 Scenario</span>
             </div>
 
             <button
@@ -188,7 +190,7 @@ export function GovernmentShell({ children }: GovernmentShellProps) {
                         <span>{item.name}</span>
                       </div>
                       {item.badge && (
-                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-civic-roseLight text-civic-rose font-bold">
+                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-civic-roseLight text-civic-rose">
                           {item.badge}
                         </span>
                       )}
@@ -200,7 +202,7 @@ export function GovernmentShell({ children }: GovernmentShellProps) {
               <div className="p-4 border-t border-ink-border">
                 <Link
                   href="/login"
-                  className="text-xs font-mono text-ink-secondary hover:text-ink-primary flex items-center gap-2"
+                  className="text-xs font-medium text-ink-secondary hover:text-ink-primary flex items-center gap-2"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                   <span>Switch Role</span>

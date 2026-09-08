@@ -10,7 +10,9 @@ import {
   Bell,
   User,
   Globe,
+  LogOut
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export interface CitizenShellProps {
   children: ReactNode;
@@ -18,6 +20,7 @@ export interface CitizenShellProps {
 
 export function CitizenShell({ children }: CitizenShellProps) {
   const pathname = usePathname();
+  const { user, isDemoMode, signOut } = useAuth();
 
   const navItems = [
     { label: 'Home', href: '/citizen', icon: Home },
@@ -43,18 +46,41 @@ export function CitizenShell({ children }: CitizenShellProps) {
             </div>
           </Link>
 
-          {/* Language Selector & Switcher */}
+          {/* Language Selector & Switcher / Auth Actions */}
           <div className="flex items-center gap-3">
             <button className="flex items-center gap-1 text-xs text-ink-secondary hover:text-ink-primary px-2.5 py-1 rounded-md border border-ink-border bg-canvas-subtle">
               <Globe className="w-3.5 h-3.5 text-civic-blue" />
-              <span>English / ಕನ್ನಡ</span>
+              <span>English / ଓଡ଼ିଆ / हिंदी</span>
             </button>
-            <Link
-              href="/login"
-              className="text-xs font-mono text-ink-tertiary hover:text-ink-primary"
-            >
-              Switch Role
-            </Link>
+            {isDemoMode ? (
+              <Link
+                href="/login"
+                className="text-xs font-medium text-ink-tertiary hover:text-ink-primary"
+              >
+                Switch Role
+              </Link>
+            ) : user ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-ink-secondary hidden sm:inline">
+                  {user.email?.split('@')[0]}
+                </span>
+                <button
+                  onClick={() => signOut()}
+                  className="text-xs font-medium text-ink-tertiary hover:text-civic-rose flex items-center gap-1"
+                  title="Sign Out"
+                >
+                  <LogOut className="w-3 h-3" />
+                  <span className="hidden sm:inline">Sign Out</span>
+                </button>
+              </div>
+            ) : (
+              <Link
+                href="/login"
+                className="text-xs font-semibold text-civic-blue hover:underline"
+              >
+                Sign In
+              </Link>
+            )}
           </div>
         </div>
       </header>

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   CreateSignalSchema,
+  RegisterMediaSchema,
   SignalAnalysisOutputSchema,
   IMPACT_WEIGHTS,
   IMPACT_MAX_SCORES,
@@ -54,4 +55,35 @@ describe('Shared Library', () => {
   it('contains water_supply in civic categories', () => {
     expect(CIVIC_CATEGORIES).toContain('water_supply');
   });
+
+  it('validates a correct media registration within 10 MB limit', () => {
+    const validMedia = {
+      file_name: 'broken_pipe.jpg',
+      mime_type: 'image/jpeg',
+      file_size_bytes: 4 * 1024 * 1024 // 4 MB
+    };
+    const result = RegisterMediaSchema.safeParse(validMedia);
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects media exceeding the 10 MB canonical limit', () => {
+    const oversizedMedia = {
+      file_name: 'huge_recording.jpg',
+      mime_type: 'image/jpeg',
+      file_size_bytes: 11 * 1024 * 1024 // 11 MB > 10 MB
+    };
+    const result = RegisterMediaSchema.safeParse(oversizedMedia);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects unsupported media MIME types', () => {
+    const invalidTypeMedia = {
+      file_name: 'script.sh',
+      mime_type: 'application/x-sh',
+      file_size_bytes: 1024
+    };
+    const result = RegisterMediaSchema.safeParse(invalidTypeMedia);
+    expect(result.success).toBe(false);
+  });
 });
+

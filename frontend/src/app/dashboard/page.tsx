@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { GovernmentShell } from '../../components/shells/GovernmentShell';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -15,6 +15,7 @@ import {
   DEMO_DEPARTMENTS,
   DEMO_AI_BRIEF,
 } from '../../lib/mockData';
+import { apiClient } from '../../lib/api-client';
 import { ArrowRight, Activity, Users, AlertOctagon, CheckCircle2, Clock } from 'lucide-react';
 
 export default function GovernmentDashboardPage() {
@@ -23,10 +24,47 @@ export default function GovernmentDashboardPage() {
   const [severity, setSeverity] = useState('ALL');
   const [department, setDepartment] = useState('ALL');
 
-  const filteredProblems = DEMO_PROBLEMS.filter((p) => {
-    if (ward !== 'ALL' && p.wardId !== ward) return false;
+  const [liveSummary, setLiveSummary] = useState<any>(null);
+  const [liveProblems, setLiveProblems] = useState<any[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadDashboard() {
+      try {
+        const [summaryRes, problemsRes] = await Promise.all([
+          apiClient.get<any>('/api/v1/dashboard/summary').catch(() => null),
+          apiClient.get<any>('/api/v1/dashboard/problems').catch(() => null),
+        ]);
+
+        if (mounted) {
+          if (summaryRes?.data) {
+            setLiveSummary(summaryRes.data);
+          }
+          if (problemsRes?.data && Array.isArray(problemsRes.data)) {
+            setLiveProblems(problemsRes.data);
+          }
+        }
+      } catch (err) {
+        console.warn('Dashboard live API fetch fallback:', err);
+      }
+    }
+
+    loadDashboard();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const problemsToFilter = liveProblems.length > 0 ? liveProblems : DEMO_PROBLEMS;
+
+  const filteredProblems = problemsToFilter.filter((p) => {
+    const pWard = p.ward_id || p.wardId;
+    if (ward !== 'ALL' && pWard !== ward) return false;
     if (category !== 'ALL' && p.category !== category) return false;
-    if (severity !== 'ALL' && p.severity !== severity) return false;
+    const pSeverity = p.impact_level || p.severity;
+    if (severity !== 'ALL' && pSeverity !== severity) return false;
+    const pDept = p.department_id || p.department;
+    if (department !== 'ALL' && pDept !== department) return false;
     return true;
   });
 
@@ -36,7 +74,10 @@ export default function GovernmentDashboardPage() {
         {/* Page Header */}
         <PageHeader
           title="District Intelligence Operations"
-          description="Live view of citizen signals, public problem clusters, impact velocity, and verified government action."
+          description={
+            liveSummary?.scope_description ||
+            'Live view of citizen signals, public problem clusters, impact velocity, and verified government action.'
+          }
           badge={
             <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-civic-emeraldLight text-emerald-800">
               Live Feed Active
@@ -75,7 +116,11 @@ export default function GovernmentDashboardPage() {
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <KPIStat
             label="Citizen Signals"
-            value={DEMO_KPIS.totalSignals.toLocaleString()}
+            value={
+              liveSummary
+                ? liveSummary.total_signals.toLocaleString()
+                : DEMO_KPIS.totalSignals.toLocaleString()
+            }
             comparison="+384 today"
             trend="up"
             trendValue="+12%"
@@ -84,7 +129,11 @@ export default function GovernmentDashboardPage() {
           />
           <KPIStat
             label="Active Problems"
-            value={DEMO_KPIS.activeProblems.toLocaleString()}
+            value={
+              liveSummary
+                ? liveSummary.active_problems.toLocaleString()
+                : DEMO_KPIS.activeProblems.toLocaleString()
+            }
             comparison="Clustered from signals"
             trend="down"
             trendValue="-4%"
@@ -92,8 +141,8 @@ export default function GovernmentDashboardPage() {
             icon={<AlertOctagon className="w-4 h-4" />}
           />
           <KPIStat
-            label="High Impact (>60)"
-            value={DEMO_KPIS.highImpact}
+            label="Critical / High Impact"
+            value={liveSummary ? liveSummary.critical_problems : DEMO_KPIS.highImpact}
             comparison="Urgent municipal focus"
             trend="up"
             trendValue="+2"
@@ -101,18 +150,32 @@ export default function GovernmentDashboardPage() {
             icon={<Users className="w-4 h-4" />}
           />
           <KPIStat
-            label="Resolution Rate"
-            value={DEMO_KPIS.resolutionRate}
-            comparison="Verified by proof"
+            label="SLA Compliance"
+            value={
+              liveSummary ? `${liveSummary.sla_compliance_rate}%` : DEMO_KPIS.resolutionRate
+            }
+            comparison={
+              liveSummary?.sla_breached_count
+                ? `${liveSummary.sla_breached_count} SLA breached`
+                : 'Deterministic SLA tracking'
+            }
             trend="up"
             trendValue="+5%"
             isPositive={true}
             icon={<CheckCircle2 className="w-4 h-4" />}
           />
           <KPIStat
-            label="Median Response"
-            value={DEMO_KPIS.medianResponse}
-            comparison="Across all 198 wards"
+            label="SLA Risk Pipeline"
+            value={
+              liveSummary
+                ? `${liveSummary.sla_at_risk_count} At Risk`
+                : DEMO_KPIS.medianResponse
+            }
+            comparison={
+              liveSummary
+                ? `${liveSummary.sla_on_track_count} on-track`
+                : 'Across all 198 wards'
+            }
             trend="down"
             trendValue="-3 hrs"
             isPositive={true}
@@ -148,9 +211,8 @@ export default function GovernmentDashboardPage() {
           <div className="lg:col-span-5 space-y-4">
             <div className="space-y-0.5">
               <h2 className="text-base font-bold text-ink-primary">Intelligence Brief</h2>
-              <p className="text-xs text-ink-secondary">Synthesized from live signals and GIS layers</p>
+              <p className="text-xs text-ink-secondary">Real-time cross-district synthesis</p>
             </div>
-
             <AIBrief
               headline={DEMO_AI_BRIEF.headline}
               summary={DEMO_AI_BRIEF.summary}
@@ -162,66 +224,80 @@ export default function GovernmentDashboardPage() {
           </div>
         </div>
 
-        {/* Map Workspace Section */}
+        {/* Geographic Problem Map */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold text-ink-primary">Public Impact Map</h2>
-              <p className="text-xs text-ink-secondary">Geospatial problem density and ward incident clusters</p>
+              <h2 className="text-base font-bold text-ink-primary">Geographic Problem Heatmap</h2>
+              <p className="text-xs text-ink-secondary">
+                Spatial distribution of correlated citizen signals and active municipal problem clusters
+              </p>
             </div>
             <Link
               href="/dashboard/map"
               className="text-xs font-semibold text-civic-blue hover:underline"
             >
-              Full Workspace →
+              Open Fullscreen GIS →
             </Link>
           </div>
-
-          <MapContainer problems={filteredProblems} height="h-[420px]" />
+          <div className="rounded-xl overflow-hidden border border-ink-border shadow-card">
+            <MapContainer problems={filteredProblems as any} height="420px" />
+          </div>
         </div>
 
-        {/* Department Overview Table */}
-        <div className="space-y-3">
+        {/* Department Workload Summary Strip */}
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold text-ink-primary">Department Performance & SLA</h2>
-              <p className="text-xs text-ink-secondary">Workload distribution and response velocity</p>
+              <h2 className="text-base font-bold text-ink-primary">Department Workload Distribution</h2>
+              <p className="text-xs text-ink-secondary">
+                Active problem queues and SLA adherence by municipal agency
+              </p>
             </div>
             <Link
               href="/dashboard/departments"
               className="text-xs font-semibold text-civic-blue hover:underline"
             >
-              Department Dossier →
+              All Departments ({DEMO_DEPARTMENTS.length}) →
             </Link>
           </div>
 
-          <div className="rounded-xl border border-ink-border bg-white shadow-card overflow-hidden">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-canvas-subtle/60 border-b border-ink-border text-ink-secondary font-mono">
-                <tr>
-                  <th className="p-3.5 font-medium">DEPARTMENT</th>
-                  <th className="p-3.5 font-medium">ACTIVE PROBLEMS</th>
-                  <th className="p-3.5 font-medium">HIGH IMPACT</th>
-                  <th className="p-3.5 font-medium">MEDIAN RESOLUTION</th>
-                  <th className="p-3.5 font-medium">SLA RISK</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-border/60">
-                {DEMO_DEPARTMENTS.map((dept) => (
-                  <tr key={dept.name} className="hover:bg-canvas-subtle/30 transition-colors">
-                    <td className="p-3.5 font-semibold text-ink-primary">{dept.name}</td>
-                    <td className="p-3.5 font-mono">{dept.active}</td>
-                    <td className="p-3.5 font-mono font-bold text-civic-rose">{dept.highImpact}</td>
-                    <td className="p-3.5 font-mono">{dept.medianResolution}</td>
-                    <td className="p-3.5">
-                      <span className="px-2 py-0.5 rounded font-mono font-bold bg-civic-amberLight text-amber-900">
-                        {dept.slaRisk} at risk
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {DEMO_DEPARTMENTS.slice(0, 3).map((dept) => (
+              <div
+                key={dept.name}
+                className="p-5 rounded-xl border border-ink-border bg-white shadow-card space-y-3"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-ink-primary">{dept.name}</h3>
+                    <span className="text-xs text-ink-secondary font-mono">
+                      {dept.active} active problems
+                    </span>
+                  </div>
+                  {dept.slaRisk > 0 && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-civic-amberLight text-amber-900">
+                      {dept.slaRisk} SLA At Risk
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="p-2 rounded bg-canvas-subtle border border-ink-border">
+                    <span className="text-ink-tertiary block text-[10px] uppercase font-semibold">
+                      High Impact
+                    </span>
+                    <span className="font-bold text-civic-rose">{dept.highImpact}</span>
+                  </div>
+                  <div className="p-2 rounded bg-canvas-subtle border border-ink-border">
+                    <span className="text-ink-tertiary block text-[10px] uppercase font-semibold">
+                      Median Res.
+                    </span>
+                    <span className="font-bold text-ink-primary">{dept.medianResolution}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

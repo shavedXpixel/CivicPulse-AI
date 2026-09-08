@@ -42,9 +42,9 @@ export function ProblemList({ problems, isLoading = false }: ProblemListProps) {
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 selectedCategory === cat
-                  ? 'bg-ink-primary text-white'
+                  ? 'bg-ink-primary text-white font-semibold'
                   : 'bg-white text-ink-secondary border border-ink-border hover:bg-canvas-subtle'
               }`}
             >

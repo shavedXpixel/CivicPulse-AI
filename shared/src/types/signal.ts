@@ -1,4 +1,7 @@
+import { SignalAIAnalysis } from './ai';
+
 export enum SignalSourceType {
+
   CITIZEN = 'CITIZEN',
   FIELD_OFFICER = 'FIELD_OFFICER',
   IMPORTED_GRIEVANCE = 'IMPORTED_GRIEVANCE',
@@ -63,6 +66,8 @@ export interface Signal {
   duration_days?: number;
   department_id?: string;
   ward_id?: string;
+  ward_name?: string;
+  geography_provenance?: import('./problem').ProvenanceSource;
   location?: GeoCoordinates;
   location_reference?: string;
   critical_facility?: string;
@@ -74,4 +79,44 @@ export interface Signal {
   created_at: string;
   updated_at: string;
   submitted_at?: string;
+  media_ids?: string[];
+  recommended_department?: string;
+  ai_analysis?: SignalAIAnalysis;
+}
+
+
+export interface CreateSignalInput {
+  original_text: string;
+  category?: string | null;
+  location?: GeoCoordinates | null;
+  ward_id?: string | null;
+  location_reference?: string | null;
+  media_ids?: string[];
+}
+
+export interface RegisterMediaInput {
+  file_name: string;
+  mime_type: string;
+  file_size_bytes: number;
+}
+
+export interface RegisterMediaResponse {
+  media_id: string;
+  upload_url: string;
+  storage_path: string;
+  expires_at: string;
+}
+
+export interface SignalFilterQuery {
+  limit?: number;
+  cursor?: string;
+  status?: SignalStatus;
+  category?: string;
+  subcategory?: string;
+  severity?: SignalSeverity;
+  department_id?: string;
+  ward_id?: string;
+  problem_cluster_id?: string;
+  citizen_id?: string;
+  search?: string;
 }

@@ -1,9 +1,37 @@
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { User, ShieldCheck, Briefcase, Settings, ArrowRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import {
+  User,
+  ShieldCheck,
+  Briefcase,
+  Settings,
+  ArrowRight,
+  Building2,
+  Lock,
+  Mail,
+  AlertCircle,
+  Loader2,
+  LogOut,
+  CheckCircle2
+} from 'lucide-react';
+import { setAuthToken } from '../../lib/api-client';
+import { useAuth } from '../../context/AuthContext';
 
 export default function LoginPage() {
-  const roles = [
+  const router = useRouter();
+  const { user, loading: authLoading, isDemoMode, isConfigured, signIn, signUp, signOut } = useAuth();
+
+  // REAL_MODE state
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const demoRoles = [
     {
       role: 'Citizen',
       tagline: 'Public reporting, audio intake, instant plain-language comprehension.',
@@ -11,22 +39,34 @@ export default function LoginPage() {
       icon: User,
       badge: 'Public Portal',
       badgeColor: 'bg-civic-blueLight text-civic-blueDark',
+      token: 'demo-token-citizen',
     },
     {
-      role: 'Government Official',
+      role: 'Government Official (Admin)',
       tagline: 'Citywide command center, priority queues, impact maps, and Governance AI.',
       href: '/dashboard',
       icon: ShieldCheck,
       badge: 'Operations Command',
       badgeColor: 'bg-civic-emeraldLight text-emerald-800',
+      token: 'demo-token-admin',
     },
     {
-      role: 'Field Officer',
-      tagline: 'Assigned emergency work orders, location navigation, and resolution proof.',
+      role: 'Department Officer (WATCO)',
+      tagline: 'Department queue supervision, resolution evidence review, and scoped simulation.',
+      href: '/dashboard',
+      icon: Building2,
+      badge: 'Dept Officer',
+      badgeColor: 'bg-civic-blueLight text-civic-blueDark',
+      token: 'demo-token-dept-watco',
+    },
+    {
+      role: 'Field Officer (Rajesh K.)',
+      tagline: 'Assigned emergency work orders, location navigation, and resolution proof submission.',
       href: '/officer',
       icon: Briefcase,
       badge: 'Field Ops',
       badgeColor: 'bg-civic-amberLight text-amber-900',
+      token: 'demo-token-officer',
     },
     {
       role: 'System Administrator',
@@ -35,8 +75,51 @@ export default function LoginPage() {
       icon: Settings,
       badge: 'Platform Root',
       badgeColor: 'bg-purple-50 text-purple-900',
+      token: 'demo-token-admin',
     },
   ];
+
+  const handleSelectPersona = (token: string, href: string) => {
+    setAuthToken(token);
+    router.push(href);
+  };
+
+  const handleRealAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    if (!email.trim() || !password.trim()) {
+      setFormError('Please enter both email and password.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setFormError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      if (isRegistering) {
+        await signUp(email.trim(), password);
+      } else {
+        await signIn(email.trim(), password);
+      }
+      router.push('/citizen');
+    } catch (err: any) {
+      let msg = err.message || 'Authentication failed. Please check your credentials.';
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        msg = 'Invalid email or password.';
+      } else if (err.code === 'auth/email-already-in-use') {
+        msg = 'An account with this email address already exists. Please sign in instead.';
+      } else if (err.code === 'auth/invalid-email') {
+        msg = 'Please enter a valid email address.';
+      }
+      setFormError(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-canvas flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -50,47 +133,169 @@ export default function LoginPage() {
           </span>
         </Link>
         <h2 className="text-2xl font-bold tracking-tight text-ink-primary">
-          Select Demo Persona
+          {isDemoMode ? 'Select Demo Persona' : isRegistering ? 'Create Citizen Account' : 'Citizen Authentication'}
         </h2>
         <p className="text-xs text-ink-secondary">
-          CivicPulse AI adapts its visual system to the user&apos;s governance role. Choose an application shell to explore.
+          {isDemoMode
+            ? "CivicPulse AI adapts its visual system to the user's governance role. Choose an application shell to explore."
+            : 'Authenticate securely to submit verified civic signals and monitor resolution progress.'}
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl px-4">
-        <div className="space-y-3">
-          {roles.map((r) => {
-            const Icon = r.icon;
-            return (
-              <Link
-                key={r.role}
-                href={r.href}
-                className="group flex items-start gap-4 p-5 rounded-xl border border-ink-border bg-white shadow-card hover:border-civic-blue hover:shadow-elevated transition-all"
-              >
-                <div className="p-3 rounded-lg bg-canvas-subtle border border-ink-border group-hover:bg-civic-blueLight/40 group-hover:border-civic-blue/30 transition-colors">
-                  <Icon className="w-5 h-5 text-civic-blue" />
+        {isDemoMode ? (
+          /* DEMO_MODE: Existing persona cards unchanged */
+          <div className="space-y-3">
+            {demoRoles.map((r) => {
+              const Icon = r.icon;
+              return (
+                <button
+                  key={r.role}
+                  onClick={() => handleSelectPersona(r.token, r.href)}
+                  className="w-full text-left group flex items-start gap-4 p-5 rounded-xl border border-ink-border bg-white shadow-card hover:border-civic-blue hover:shadow-elevated transition-all"
+                >
+                  <div className="p-3 rounded-lg bg-canvas-subtle border border-ink-border group-hover:bg-civic-blueLight/40 group-hover:border-civic-blue/30 transition-colors">
+                    <Icon className="w-5 h-5 text-civic-blue" />
+                  </div>
+
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-ink-primary group-hover:text-civic-blue transition-colors">
+                          {r.role}
+                        </span>
+                        <span className={`px-2 py-0.2 rounded text-[10px] font-mono font-medium ${r.badgeColor}`}>
+                          {r.badge}
+                        </span>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-ink-tertiary group-hover:text-civic-blue group-hover:translate-x-1 transition-all" />
+                    </div>
+                    <p className="text-xs text-ink-secondary leading-relaxed">
+                      {r.tagline}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          /* REAL_MODE: Firebase Authentication Form */
+          <div className="bg-white p-6 sm:p-8 rounded-2xl border border-ink-border shadow-card space-y-6">
+            {!isConfigured ? (
+              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-amber-800">
+                  <AlertCircle className="w-4 h-4 text-amber-600" />
+                  <span>Firebase Client Not Configured</span>
+                </div>
+                <p className="leading-relaxed">
+                  REAL_MODE is active, but client authentication keys have not been set in this environment. Please configure:
+                </p>
+                <code className="block bg-amber-100/70 p-2 rounded text-[11px] font-mono text-amber-950">
+                  NEXT_PUBLIC_FIREBASE_API_KEY=...<br />
+                  NEXT_PUBLIC_FIREBASE_PROJECT_ID=...<br />
+                  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+                </code>
+              </div>
+            ) : user ? (
+              /* Already authenticated user view */
+              <div className="space-y-5 text-center py-4">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-ink-primary">Currently Authenticated</h3>
+                  <p className="text-xs text-ink-secondary font-mono">{user.email}</p>
+                  <p className="text-[11px] text-ink-tertiary">Server-provisioned Role: CITIZEN</p>
                 </div>
 
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-ink-primary group-hover:text-civic-blue transition-colors">
-                        {r.role}
-                      </span>
-                      <span className={`px-2 py-0.2 rounded text-[10px] font-mono font-medium ${r.badgeColor}`}>
-                        {r.badge}
-                      </span>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-ink-tertiary group-hover:text-civic-blue group-hover:translate-x-1 transition-all" />
-                  </div>
-                  <p className="text-xs text-ink-secondary leading-relaxed">
-                    {r.tagline}
-                  </p>
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={() => router.push('/citizen')}
+                    className="px-4 py-2 rounded-lg text-xs font-semibold bg-civic-blue text-white hover:bg-civic-blueDark transition-colors shadow-subtle flex items-center gap-1.5"
+                  >
+                    <span>Go to Citizen Portal</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={signOut}
+                    className="px-4 py-2 rounded-lg text-xs font-semibold bg-white border border-ink-border text-ink-primary hover:bg-canvas-subtle transition-colors flex items-center gap-1.5"
+                  >
+                    <LogOut className="w-3.5 h-3.5 text-ink-tertiary" />
+                    <span>Sign Out</span>
+                  </button>
                 </div>
-              </Link>
-            );
-          })}
-        </div>
+              </div>
+            ) : (
+              /* Sign In / Register Form */
+              <form onSubmit={handleRealAuth} className="space-y-4">
+                {formError && (
+                  <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-900 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <span>{formError}</span>
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-ink-primary">Email Address</label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-ink-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="citizen@example.com"
+                      className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-ink-border bg-canvas-subtle focus:bg-white focus:outline-none focus:border-civic-blue transition-colors text-ink-primary"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-ink-primary">Password</label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-ink-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-ink-border bg-canvas-subtle focus:bg-white focus:outline-none focus:border-civic-blue transition-colors text-ink-primary"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submitting || authLoading}
+                  className="w-full py-2.5 px-4 rounded-lg text-xs font-semibold bg-civic-blue text-white hover:bg-civic-blueDark transition-colors shadow-subtle flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>{isRegistering ? 'Creating Account...' : 'Authenticating...'}</span>
+                    </>
+                  ) : (
+                    <span>{isRegistering ? 'Register as Citizen' : 'Sign In as Citizen'}</span>
+                  )}
+                </button>
+
+                <div className="text-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsRegistering(!isRegistering);
+                      setFormError(null);
+                    }}
+                    className="text-xs text-civic-blue hover:underline font-medium"
+                  >
+                    {isRegistering ? 'Already have an account? Sign in' : "Don't have an account? Register"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
 
         <div className="mt-8 text-center">
           <Link

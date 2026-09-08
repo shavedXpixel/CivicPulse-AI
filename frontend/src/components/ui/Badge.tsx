@@ -40,7 +40,7 @@ export function Badge({
 
   return (
     <span
-      className={`inline-flex items-center rounded-md border font-mono ${sizeStyles} ${variantStyles} ${className}`}
+      className={`inline-flex items-center rounded-md border ${sizeStyles} ${variantStyles} ${className}`}
     >
       {hasDot && <span className={`w-1.5 h-1.5 rounded-full ${dotColors}`} />}
       {children}

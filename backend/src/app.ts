@@ -2,6 +2,16 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { errorHandler, AppError } from './middleware/error.middleware';
 import { ERROR_CODES } from '@civicpulse/shared';
+import { authRouter } from './modules/auth/auth.routes';
+import { signalRouter } from './modules/signals/signal.routes';
+import { storageRouter } from './modules/storage/storage.routes';
+import { problemRouter } from './modules/problems/problem.routes';
+import { assignmentRouter } from './modules/assignments/assignment.routes';
+import { departmentRouter } from './modules/departments/department.routes';
+import { dashboardRouter } from './modules/dashboard/dashboard.routes';
+import { resolutionRouter } from './modules/resolutions/resolution.routes';
+import { governanceRouter } from './modules/governance/governance.routes';
+import simulationRouter from './modules/simulation/simulation.routes';
 
 export function createApp(): Express {
   const app = express();
@@ -28,6 +38,20 @@ export function createApp(): Express {
       }
     });
   });
+
+  // Domain API Routers
+  app.use('/api/v1/auth', authRouter);
+  app.use('/api/v1/signals', signalRouter);
+  app.use('/api/v1/storage', storageRouter);
+  app.use('/api/v1/problems', problemRouter);
+  app.use('/api/v1/assignments', assignmentRouter);
+  app.use('/api/v1/departments', departmentRouter);
+  app.use('/api/v1/dashboard', dashboardRouter);
+  app.use('/api/v1/resolution-evidence', resolutionRouter);
+  app.use('/api/v1/governance', governanceRouter);
+  app.use('/api/v1/simulations', simulationRouter);
+  app.use('/api/v1/simulation', simulationRouter);
+
 
   // Catch-all 404 handler
   app.use((req: Request, _res: Response, next: NextFunction) => {

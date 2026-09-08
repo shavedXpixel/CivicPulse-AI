@@ -1,5 +1,13 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import '../styles/globals.css';
+import { AuthProvider } from '../context/AuthContext';
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+});
 
 export const metadata: Metadata = {
   title: 'CivicPulse AI — Public Problem Intelligence Layer',
@@ -12,9 +20,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="bg-canvas text-ink-primary antialiased min-h-screen">
-        {children}
+    <html lang="en" className={inter.variable}>
+      <body className="bg-canvas text-ink-primary font-sans antialiased min-h-screen">
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

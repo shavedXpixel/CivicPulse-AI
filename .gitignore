@@ -46,3 +46,9 @@ Thumbs.db
 
 # Turbopack cache
 .turbo
+secrets/
+*.json
+!package.json
+!package-lock.json
+!tsconfig*.json
+!data/**/*.json

@@ -14,6 +14,7 @@ import {
   Clock,
   ExternalLink,
   Check,
+  RotateCcw,
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -133,18 +134,18 @@ export default function HomePage() {
                     <span className="text-xs text-ink-tertiary font-mono">#PRB-2026-0819</span>
                   </div>
                   <h2 className="text-xl sm:text-2xl font-bold text-ink-primary">
-                    Ward 18 Main Distribution Rupture & Submersion
+                    Water Supply Disruption — Nayapalli Ward 18
                   </h2>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="text-right">
                     <div className="text-xs text-ink-secondary font-medium">Public Impact Score</div>
-                    <div className="text-2xl font-mono font-bold text-civic-rose">92<span className="text-xs font-normal text-ink-secondary">/100</span></div>
+                    <div className="text-2xl font-bold text-civic-rose">92<span className="text-xs font-normal text-ink-secondary">/100</span></div>
                   </div>
                   <div className="h-10 w-px bg-ink-border" />
                   <div className="text-right">
                     <div className="text-xs text-ink-secondary font-medium">Signals Clustered</div>
-                    <div className="text-2xl font-mono font-bold text-ink-primary">327</div>
+                    <div className="text-2xl font-bold text-ink-primary">327</div>
                   </div>
                 </div>
               </div>
@@ -167,7 +168,7 @@ export default function HomePage() {
                         &ldquo;High pressure water pipe burst near 4th Cross. Flooding basement parking and road impassable.&rdquo;
                       </p>
                       <div className="flex items-center gap-2 pt-1">
-                        <span className="px-2 py-0.5 rounded bg-canvas-subtle text-ink-secondary font-mono">Audio (Kannada)</span>
+                        <span className="px-2 py-0.5 rounded bg-canvas-subtle text-ink-secondary font-mono">Audio (Odia)</span>
                         <span className="px-2 py-0.5 rounded bg-civic-blueLight text-civic-blueDark font-mono">Auto-Translated</span>
                       </div>
                     </div>
@@ -198,7 +199,7 @@ export default function HomePage() {
                     <div className="bg-white p-3.5 rounded-md border border-ink-border space-y-2 shadow-subtle">
                       <div className="text-ink-secondary font-medium">Affected Population & Reach</div>
                       <div className="flex items-baseline justify-between">
-                        <span className="text-xl font-bold font-mono text-ink-primary">14,200</span>
+                        <span className="text-xl font-bold text-ink-primary">18,400</span>
                         <span className="text-ink-secondary">Residents in 1.4 km²</span>
                       </div>
                       <div className="w-full bg-canvas-muted rounded-full h-1.5 overflow-hidden">
@@ -210,17 +211,18 @@ export default function HomePage() {
                       <div className="text-ink-secondary font-medium">Critical Infrastructure at Risk</div>
                       <div className="flex items-center gap-2 text-ink-primary font-medium">
                         <Building2 className="w-4 h-4 text-civic-rose shrink-0" />
-                        <span>St. Mary’s District Clinic (400m away)</span>
+                        <span>DAV Public School (adjacent to corridor)</span>
                       </div>
                       <div className="text-ink-tertiary">Backup water reserves depleted in 4 hours</div>
                     </div>
 
                     <div className="bg-white p-3.5 rounded-md border border-ink-border space-y-2 shadow-subtle">
-                      <div className="text-ink-secondary font-medium">Deterministic Impact Weight</div>
-                      <div className="grid grid-cols-3 gap-2 font-mono text-[11px] text-center">
-                        <div className="p-1.5 bg-canvas rounded">Pop: 0.30</div>
-                        <div className="p-1.5 bg-canvas rounded">Sev: 0.25</div>
-                        <div className="p-1.5 bg-canvas rounded">Infra: 0.10</div>
+                      <div className="text-ink-secondary font-medium">Authoritative 7-Factor Model</div>
+                      <div className="grid grid-cols-4 gap-1.5 text-[10px] text-center">
+                        <div className="p-1 bg-canvas rounded">Sev: 25%</div>
+                        <div className="p-1 bg-canvas rounded">Pop: 20%</div>
+                        <div className="p-1 bg-canvas rounded">Dur: 15%</div>
+                        <div className="p-1 bg-canvas rounded">Conc: 15%</div>
                       </div>
                     </div>
                   </div>
@@ -433,14 +435,14 @@ export default function HomePage() {
               <div className="border-l-2 border-civic-blue pl-4 space-y-1">
                 <h3 className="text-lg font-bold text-ink-primary">Zero technical or administrative jargon</h3>
                 <p className="text-sm text-ink-secondary">
-                  Citizens do not need to know whether an issue belongs to PWD, BWSSB, or BBMP. The multimodal engine classifies category, extracts intent, and maps jurisdiction automatically.
+                  Citizens do not need to know whether an issue belongs to Works Dept, WATCO, or BMC. The multimodal engine classifies category, extracts intent, and maps jurisdiction automatically.
                 </p>
               </div>
 
               <div className="border-l-2 border-ink-border pl-4 space-y-1">
                 <h3 className="text-lg font-bold text-ink-primary">Language sovereignty</h3>
                 <p className="text-sm text-ink-secondary">
-                  Citizens speak or type in Kannada, Hindi, Tamil, Telugu, or English. Gemini multimodal models transcribe, translate, and standardize the signal preserving nuance and urgency.
+                  Citizens speak or type in Odia, Hindi, or English. Gemini multimodal models transcribe, translate, and standardize the signal preserving nuance and urgency.
                 </p>
               </div>
 
@@ -484,51 +486,69 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Formula Breakdown Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Formula Breakdown Cards - 7 Authoritative Factors */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="p-4 rounded-lg bg-white border border-ink-border space-y-2 shadow-subtle">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-civic-blue">30% Weight</span>
-                  <Users className="w-4 h-4 text-ink-tertiary" />
-                </div>
-                <div className="text-sm font-semibold text-ink-primary">Population Affected</div>
-                <p className="text-xs text-ink-secondary">Calculated via signal density, residential census density, and Ward demographics.</p>
-              </div>
-
-              <div className="p-4 rounded-lg bg-white border border-ink-border space-y-2 shadow-subtle">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-civic-blue">25% Weight</span>
+                  <span className="text-xs font-bold text-civic-blue">25% Weight</span>
                   <AlertTriangle className="w-4 h-4 text-ink-tertiary" />
                 </div>
                 <div className="text-sm font-semibold text-ink-primary">Severity & Urgency</div>
-                <p className="text-xs text-ink-secondary">Hazard classification, structural hazard risk, health risk, and escalation velocity.</p>
+                <p className="text-xs text-ink-secondary">Physical hazard classification, health risk, structural hazard, and escalation velocity.</p>
               </div>
 
               <div className="p-4 rounded-lg bg-white border border-ink-border space-y-2 shadow-subtle">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-civic-blue">20% Weight</span>
-                  <MapPin className="w-4 h-4 text-ink-tertiary" />
+                  <span className="text-xs font-bold text-civic-blue">20% Weight</span>
+                  <Users className="w-4 h-4 text-ink-tertiary" />
                 </div>
-                <div className="text-sm font-semibold text-ink-primary">Spatial Spread</div>
-                <p className="text-xs text-ink-secondary">Geographic convex hull of reports, corridor blockage, and transit disruption.</p>
+                <div className="text-sm font-semibold text-ink-primary">Population Affected</div>
+                <p className="text-xs text-ink-secondary">Signal density, residential census demographics, and estimated neighborhood exposure.</p>
               </div>
 
               <div className="p-4 rounded-lg bg-white border border-ink-border space-y-2 shadow-subtle">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-civic-blue">15% Weight</span>
+                  <span className="text-xs font-bold text-civic-blue">15% Weight</span>
                   <Clock className="w-4 h-4 text-ink-tertiary" />
                 </div>
-                <div className="text-sm font-semibold text-ink-primary">Duration & Recurrence</div>
-                <p className="text-xs text-ink-secondary">Hours unresolved, historical recurrence rate at same coordinates, compounding decay.</p>
+                <div className="text-sm font-semibold text-ink-primary">Duration</div>
+                <p className="text-xs text-ink-secondary">Elapsed hours unresolved against departmental SLA benchmarks and decay velocity.</p>
               </div>
 
               <div className="p-4 rounded-lg bg-white border border-ink-border space-y-2 shadow-subtle">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-civic-blue">10% Weight</span>
+                  <span className="text-xs font-bold text-civic-blue">15% Weight</span>
+                  <MapPin className="w-4 h-4 text-ink-tertiary" />
+                </div>
+                <div className="text-sm font-semibold text-ink-primary">Complaint Concentration</div>
+                <p className="text-xs text-ink-secondary">Spatial report density, geographic cluster centroid concentration, and localized clustering.</p>
+              </div>
+
+              <div className="p-4 rounded-lg bg-white border border-ink-border space-y-2 shadow-subtle">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-civic-blue">10% Weight</span>
                   <Building2 className="w-4 h-4 text-ink-tertiary" />
                 </div>
-                <div className="text-sm font-semibold text-ink-primary">Critical Facilities</div>
-                <p className="text-xs text-ink-secondary">Proximity to hospitals, schools, transit junctions, and drinking water sources.</p>
+                <div className="text-sm font-semibold text-ink-primary">Critical Facility Exposure</div>
+                <p className="text-xs text-ink-secondary">Proximity to hospitals, primary schools, transit corridors, and drinking water sources.</p>
+              </div>
+
+              <div className="p-4 rounded-lg bg-white border border-ink-border space-y-2 shadow-subtle">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-civic-blue">10% Weight</span>
+                  <RotateCcw className="w-4 h-4 text-ink-tertiary" />
+                </div>
+                <div className="text-sm font-semibold text-ink-primary">Recurrence</div>
+                <p className="text-xs text-ink-secondary">Historical failure frequency at the exact GIS coordinates and chronic infrastructure vulnerability.</p>
+              </div>
+
+              <div className="p-4 rounded-lg bg-white border border-ink-border space-y-2 shadow-subtle sm:col-span-2 lg:col-span-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-civic-blue">5% Weight</span>
+                  <ShieldCheck className="w-4 h-4 text-ink-tertiary" />
+                </div>
+                <div className="text-sm font-semibold text-ink-primary">Evidence Confidence</div>
+                <p className="text-xs text-ink-secondary">Multimodal corroboration quality, verified media signals, and GPS telemetry precision.</p>
               </div>
             </div>
           </div>
@@ -614,31 +634,31 @@ export default function HomePage() {
                 </thead>
                 <tbody className="divide-y divide-ink-border/60">
                   <tr className="hover:bg-canvas-subtle/60 transition-colors">
-                    <td className="py-3 font-semibold text-ink-primary">Main Distribution Rupture & Submersion</td>
-                    <td className="py-3 font-mono">Ward 18 (Indiranagar)</td>
+                    <td className="py-3 font-semibold text-ink-primary">Water Supply Disruption — Nayapalli Ward 18</td>
+                    <td className="py-3 font-mono">Ward 18 (Nayapalli, Bhubaneswar)</td>
                     <td className="py-3 font-mono font-bold text-civic-rose">92 / 100</td>
                     <td className="py-3 font-mono">327 reports</td>
-                    <td className="py-3">Water Board (BWSSB)</td>
+                    <td className="py-3">Water Corporation (WATCO)</td>
                     <td className="py-3">
                       <span className="px-2 py-0.5 rounded-full bg-civic-amberLight text-civic-amber font-medium">Dispatched</span>
                     </td>
                   </tr>
                   <tr className="hover:bg-canvas-subtle/60 transition-colors">
                     <td className="py-3 font-semibold text-ink-primary">Feeder Line Tripping & Transformer Sparking</td>
-                    <td className="py-3 font-mono">Ward 04 (Malleshwaram)</td>
+                    <td className="py-3 font-mono">Ward 04 (Saheed Nagar)</td>
                     <td className="py-3 font-mono font-bold text-civic-rose">86 / 100</td>
                     <td className="py-3 font-mono">184 reports</td>
-                    <td className="py-3">Electricity Supply (BESCOM)</td>
+                    <td className="py-3">Power Distribution (TPCODL)</td>
                     <td className="py-3">
                       <span className="px-2 py-0.5 rounded-full bg-civic-blueLight text-civic-blueDark font-medium">Investigating</span>
                     </td>
                   </tr>
                   <tr className="hover:bg-canvas-subtle/60 transition-colors">
                     <td className="py-3 font-semibold text-ink-primary">Arterial Road Cavity & Sewer Collapse</td>
-                    <td className="py-3 font-mono">Ward 22 (Koramangala)</td>
+                    <td className="py-3 font-mono">Ward 22 (Patia)</td>
                     <td className="py-3 font-mono font-bold text-civic-amber">74 / 100</td>
                     <td className="py-3 font-mono">92 reports</td>
-                    <td className="py-3">Roads & Infrastructure (BBMP)</td>
+                    <td className="py-3">Municipal Corporation (BMC)</td>
                     <td className="py-3">
                       <span className="px-2 py-0.5 rounded-full bg-canvas-subtle text-ink-secondary font-medium">Triage</span>
                     </td>
@@ -690,7 +710,7 @@ export default function HomePage() {
                   <div className="aspect-[4/3] rounded-lg bg-ink-primary/5 border border-ink-border flex flex-col items-center justify-center p-4 text-center">
                     <Camera className="w-8 h-8 text-ink-tertiary mb-2" />
                     <span className="text-xs text-ink-secondary font-medium">Citizen Photo Evidence</span>
-                    <span className="text-[10px] text-ink-tertiary font-mono">GPS: 12.9784° N, 77.6408° E</span>
+                    <span className="text-[10px] text-ink-tertiary font-mono">GPS: 20.2961° N, 85.8245° E</span>
                   </div>
                 </div>
 
@@ -791,11 +811,11 @@ export default function HomePage() {
 
               <div className="text-sm text-ink-primary leading-relaxed space-y-3 bg-canvas-subtle/50 p-5 rounded-lg border border-ink-border">
                 <p>
-                  <strong>Ward 18 (Indiranagar)</strong> currently accounts for <strong>61% of all active water disruption impact</strong> in the eastern division.
-                  The primary driver is an ongoing transmission line rupture on 4th Cross affecting approximately <strong>14,200 residents</strong> and approaching St. Mary’s District Clinic.
+                  <strong>Ward 18 (Nayapalli, Bhubaneswar)</strong> currently accounts for <strong>61% of all active water disruption impact</strong> in the municipal division.
+                  The primary driver is an ongoing transmission line rupture on Nayapalli VIP Road affecting approximately <strong>18,400 residents</strong> and DAV Public School.
                 </p>
                 <p>
-                  The secondary concentration is in <strong>Ward 22 (Koramangala)</strong> with 3 localized low-pressure pipe failures affecting 2,800 residents.
+                  The secondary concentration is in <strong>Ward 22 (Patia)</strong> with 3 localized low-pressure pipe failures affecting 2,800 residents.
                 </p>
               </div>
 
@@ -810,7 +830,7 @@ export default function HomePage() {
                     [2] Signal Cluster Batch #W18-994 (327 Signals)
                   </span>
                   <span className="px-2.5 py-1 rounded bg-canvas border border-ink-border text-ink-secondary hover:border-civic-blue transition-colors cursor-pointer">
-                    [3] BWSSB Work Order #WO-402
+                    [3] WATCO Work Order #WO-402
                   </span>
                 </div>
               </div>
@@ -826,22 +846,22 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center">
             <div className="space-y-1">
-              <div className="text-3xl sm:text-4xl font-extrabold font-mono text-ink-primary">84%</div>
+              <div className="text-3xl sm:text-4xl font-extrabold text-ink-primary">84%</div>
               <div className="text-xs sm:text-sm text-ink-secondary font-medium">Reduction in Duplicate Triage</div>
             </div>
 
             <div className="space-y-1">
-              <div className="text-3xl sm:text-4xl font-extrabold font-mono text-civic-blue">3.2x</div>
+              <div className="text-3xl sm:text-4xl font-extrabold text-civic-blue">3.2x</div>
               <div className="text-xs sm:text-sm text-ink-secondary font-medium">Faster Critical Incident Identification</div>
             </div>
 
             <div className="space-y-1">
-              <div className="text-3xl sm:text-4xl font-extrabold font-mono text-civic-emerald">91%</div>
+              <div className="text-3xl sm:text-4xl font-extrabold text-civic-emerald">91%</div>
               <div className="text-xs sm:text-sm text-ink-secondary font-medium">Multi-Factor Verification Accuracy</div>
             </div>
 
             <div className="space-y-1">
-              <div className="text-3xl sm:text-4xl font-extrabold font-mono text-ink-primary">0–100</div>
+              <div className="text-3xl sm:text-4xl font-extrabold text-ink-primary">0–100</div>
               <div className="text-xs sm:text-sm text-ink-secondary font-medium">Deterministic Public Impact Scale</div>
             </div>
           </div>
@@ -857,7 +877,7 @@ export default function HomePage() {
             Ready to transform citizen signals into verified public action?
           </h2>
           <p className="text-base text-ink-secondary max-w-xl mx-auto">
-            Experience the full DPI intelligence lifecycle with the deterministic Ward 18 Golden Scenario and live API endpoints.
+            Experience the full DPI intelligence lifecycle with the deterministic Bhubaneswar Ward 18 Scenario and live API endpoints.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
             <a
@@ -899,7 +919,7 @@ export default function HomePage() {
             <span>•</span>
             <span>Open API Architecture</span>
             <span>•</span>
-            <span className="font-mono text-ink-tertiary">v1.0.0 (Phase 0 Foundation)</span>
+            <span className="font-mono text-ink-tertiary">v1.0.0 (Phase 1 DPI Layer)</span>
           </div>
         </div>
       </footer>

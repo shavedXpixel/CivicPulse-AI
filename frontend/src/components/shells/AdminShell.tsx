@@ -68,7 +68,7 @@ export function AdminShell({ children }: AdminShellProps) {
         <div className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
           {/* Main Section */}
           <div className="space-y-1">
-            <div className="px-3 pb-2 text-[10px] font-mono uppercase tracking-wider text-ink-tertiary">
+            <div className="px-3 pb-2 text-[10px] uppercase tracking-wider font-semibold text-ink-tertiary">
               Operational Workspace
             </div>
             {mainNav.map((item) => {
@@ -93,7 +93,7 @@ export function AdminShell({ children }: AdminShellProps) {
 
           {/* Admin Dedicated Section */}
           <div className="space-y-1 pt-2 border-t border-ink-border/60">
-            <div className="px-3 pb-2 text-[10px] font-mono uppercase tracking-wider text-purple-700 font-semibold">
+            <div className="px-3 pb-2 text-[10px] uppercase tracking-wider text-purple-700 font-semibold">
               Administration & DPI
             </div>
             {adminNav.map((item) => {
@@ -122,7 +122,7 @@ export function AdminShell({ children }: AdminShellProps) {
           <div className="flex items-center justify-between text-xs">
             <div>
               <div className="font-semibold text-ink-primary">System Administrator</div>
-              <div className="text-[11px] text-ink-tertiary font-mono">DPI Infrastructure Lead</div>
+              <div className="text-[11px] text-ink-tertiary">DPI Infrastructure Lead</div>
             </div>
             <Link
               href="/login"
@@ -146,13 +146,13 @@ export function AdminShell({ children }: AdminShellProps) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <span className="text-xs font-mono font-medium text-ink-secondary">
+            <span className="text-xs font-medium text-ink-secondary">
               System Console • Root Partition
             </span>
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-purple-50 text-purple-800 border border-purple-200">
+            <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-800 border border-purple-200">
               AUDIT ACTIVE
             </span>
             <button

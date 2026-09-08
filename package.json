@@ -22,7 +22,10 @@
     "lint:shared": "npm.cmd --prefix shared run lint",
     "lint:backend": "npm.cmd --prefix backend run lint",
     "lint:frontend": "npm.cmd --prefix frontend run lint",
-    "lint": "npm.cmd run lint:shared && npm.cmd run lint:backend && npm.cmd run lint:frontend"
+    "lint": "npm.cmd run lint:shared && npm.cmd run lint:backend && npm.cmd run lint:frontend",
+    "data:import": "npm.cmd --prefix backend run data:import",
+    "data:validate": "npm.cmd --prefix backend run data:validate",
+    "data:verify": "npm.cmd --prefix backend run data:verify"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

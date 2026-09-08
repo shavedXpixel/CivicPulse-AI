@@ -1,29 +1,34 @@
 import React from 'react';
-import { Users, AlertTriangle, MapPin, Clock, Building2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  Users,
+  Clock,
+  MapPin,
+  Building2,
+  RotateCcw,
+  ShieldCheck,
+} from 'lucide-react';
 
 export interface ImpactBreakdownProps {
-  population: number; // 0-30
-  severity: number;   // 0-25
-  spread: number;     // 0-20
-  duration: number;   // 0-15
-  facilities: number; // 0-10
+  severity: number;      // Max 25 (25%)
+  population: number;    // Max 20 (20%)
+  duration: number;      // Max 15 (15%)
+  concentration: number; // Max 15 (15%)
+  facilities: number;    // Max 10 (10%)
+  recurrence: number;    // Max 10 (10%)
+  evidence: number;      // Max 5  (5%)
 }
 
 export function ImpactBreakdown({
-  population,
   severity,
-  spread,
+  population,
   duration,
+  concentration,
   facilities,
+  recurrence,
+  evidence,
 }: ImpactBreakdownProps) {
   const factors = [
-    {
-      label: 'Population Affected',
-      weight: '30%',
-      value: population,
-      max: 30,
-      icon: Users,
-    },
     {
       label: 'Severity & Urgency',
       weight: '25%',
@@ -32,32 +37,53 @@ export function ImpactBreakdown({
       icon: AlertTriangle,
     },
     {
-      label: 'Spatial Spread',
+      label: 'Population Affected',
       weight: '20%',
-      value: spread,
+      value: population,
       max: 20,
-      icon: MapPin,
+      icon: Users,
     },
     {
-      label: 'Duration & Recurrence',
+      label: 'Duration',
       weight: '15%',
       value: duration,
       max: 15,
       icon: Clock,
     },
     {
-      label: 'Critical Facilities',
+      label: 'Complaint Concentration',
+      weight: '15%',
+      value: concentration,
+      max: 15,
+      icon: MapPin,
+    },
+    {
+      label: 'Critical Facility Exposure',
       weight: '10%',
       value: facilities,
       max: 10,
       icon: Building2,
     },
+    {
+      label: 'Recurrence',
+      weight: '10%',
+      value: recurrence,
+      max: 10,
+      icon: RotateCcw,
+    },
+    {
+      label: 'Evidence Confidence',
+      weight: '5%',
+      value: evidence,
+      max: 5,
+      icon: ShieldCheck,
+    },
   ];
 
   return (
     <div className="space-y-3">
-      <div className="text-xs font-mono uppercase tracking-wider text-ink-secondary">
-        Impact Factor Breakdown (Section 6.2)
+      <div className="text-xs uppercase tracking-wider font-semibold text-ink-secondary">
+        Authoritative 7-Factor Impact Model (Total 100%)
       </div>
       <div className="space-y-2">
         {factors.map((factor) => {
@@ -74,16 +100,16 @@ export function ImpactBreakdown({
                   <Icon className="w-3.5 h-3.5 text-ink-tertiary" />
                   <span>{factor.label}</span>
                 </div>
-                <div className="flex items-center gap-2 font-mono text-[11px]">
-                  <span className="text-ink-tertiary">Max {factor.weight}</span>
-                  <span className="font-bold text-ink-primary">
+                <div className="flex items-center gap-2 text-[11px]">
+                  <span className="text-ink-tertiary">Weight {factor.weight}</span>
+                  <span className="font-semibold text-ink-primary">
                     {factor.value}/{factor.max}
                   </span>
                 </div>
               </div>
               <div className="w-full bg-canvas-muted rounded-full h-1 overflow-hidden">
                 <div
-                  className="bg-civic-blue h-full rounded-full"
+                  className="bg-civic-blue h-full rounded-full transition-all"
                   style={{ width: `${pct}%` }}
                 />
               </div>

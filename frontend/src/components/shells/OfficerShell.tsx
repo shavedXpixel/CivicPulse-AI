@@ -35,10 +35,10 @@ export function OfficerShell({ children }: OfficerShellProps) {
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-sm tracking-tight text-ink-primary">
-                CivicPulse <span className="font-mono text-xs text-civic-blue">Field Ops</span>
+                CivicPulse <span className="text-xs font-semibold text-civic-blue">Field Ops</span>
               </span>
-              <span className="text-[10px] text-ink-tertiary font-mono">
-                BWSSB Water Division • Ward 18
+              <span className="text-[10px] text-ink-tertiary">
+                WATCO Water Division • Ward 18 Nayapalli
               </span>
             </div>
           </Link>
@@ -59,7 +59,7 @@ export function OfficerShell({ children }: OfficerShellProps) {
                   <Icon className="w-4 h-4" />
                   <span>{item.name}</span>
                   {item.badge && (
-                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-civic-blueLight text-civic-blueDark">
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-civic-blueLight text-civic-blueDark">
                       {item.badge}
                     </span>
                   )}
@@ -75,7 +75,7 @@ export function OfficerShell({ children }: OfficerShellProps) {
             </div>
             <Link
               href="/login"
-              className="text-xs font-mono text-ink-tertiary hover:text-ink-primary p-1 rounded hover:bg-canvas"
+              className="text-xs font-medium text-ink-tertiary hover:text-ink-primary p-1 rounded hover:bg-canvas"
               title="Switch Role"
             >
               <LogOut className="w-4 h-4" />

@@ -4,9 +4,10 @@ import {
   Clock,
   UserCheck,
   Wrench,
-  FileCheck,
+  FileCheck2,
   CheckCircle2,
   Archive,
+  RotateCcw,
 } from 'lucide-react';
 
 export type ProblemStatusType =
@@ -14,9 +15,10 @@ export type ProblemStatusType =
   | 'TRIAGED'
   | 'ASSIGNED'
   | 'IN_PROGRESS'
-  | 'RESOLUTION_SUBMITTED'
-  | 'VERIFIED_RESOLVED'
-  | 'CLOSED';
+  | 'AWAITING_VERIFICATION'
+  | 'RESOLVED'
+  | 'CLOSED'
+  | 'REOPENED';
 
 export interface StatusBadgeProps {
   status: ProblemStatusType | string;
@@ -50,15 +52,15 @@ export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
           icon: Wrench,
           color: 'text-blue-900 bg-blue-100 border-blue-200',
         };
-      case 'RESOLUTION_SUBMITTED':
+      case 'AWAITING_VERIFICATION':
         return {
-          label: 'Verification Pending',
-          icon: FileCheck,
+          label: 'Awaiting Verification',
+          icon: FileCheck2,
           color: 'text-purple-900 bg-purple-100 border-purple-200',
         };
-      case 'VERIFIED_RESOLVED':
+      case 'RESOLVED':
         return {
-          label: 'Verified Resolved',
+          label: 'Resolved',
           icon: CheckCircle2,
           color: 'text-emerald-900 bg-civic-emeraldLight border-civic-emerald/20',
         };
@@ -67,6 +69,12 @@ export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
           label: 'Closed',
           icon: Archive,
           color: 'text-ink-secondary bg-canvas-subtle border-ink-border',
+        };
+      case 'REOPENED':
+        return {
+          label: 'Reopened',
+          icon: RotateCcw,
+          color: 'text-rose-900 bg-rose-100 border-rose-200',
         };
       default:
         return {
@@ -78,13 +86,13 @@ export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
   })();
 
   const Icon = config.icon;
-  const sizeClasses = size === 'sm' ? 'text-[10px] px-2 py-0.5 gap-1' : 'text-xs px-2.5 py-1 gap-1.5';
+  const sizeClasses = size === 'sm' ? 'text-[11px] px-2 py-0.5 gap-1' : 'text-xs px-2.5 py-1 gap-1.5';
 
   return (
     <span
-      className={`inline-flex items-center rounded-full font-mono font-medium border ${sizeClasses} ${config.color}`}
+      className={`inline-flex items-center rounded-full font-medium border ${sizeClasses} ${config.color}`}
     >
-      <Icon className="w-3 h-3 shrink-0" />
+      <Icon className="w-3.5 h-3.5 shrink-0" />
       <span>{config.label}</span>
     </span>
   );

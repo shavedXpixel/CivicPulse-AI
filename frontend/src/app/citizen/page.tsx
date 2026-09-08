@@ -11,7 +11,7 @@ export default function CitizenHomePage() {
         <div className="space-y-2 text-left">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-mono bg-civic-blueLight text-civic-blueDark">
             <MapPin className="w-3.5 h-3.5" />
-            <span>Ward 18 • Indiranagar</span>
+            <span>Ward 18 • Nayapalli, Bhubaneswar</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink-primary">
             Report a problem in your neighborhood
@@ -32,7 +32,7 @@ export default function CitizenHomePage() {
             </div>
             <div>
               <div className="text-sm font-semibold text-ink-primary">Speak in your language</div>
-              <div className="text-[11px] text-ink-secondary">Kannada, Hindi, English, etc.</div>
+              <div className="text-[11px] text-ink-secondary">Odia (ଓଡ଼ିଆ), Hindi, English</div>
             </div>
           </Link>
 
@@ -76,10 +76,10 @@ export default function CitizenHomePage() {
 
           <div className="space-y-1">
             <h3 className="text-sm font-bold text-ink-primary">
-              Water supply disruption on 4th Cross
+              Water supply disruption on VIP Road
             </h3>
             <p className="text-xs text-ink-secondary leading-relaxed">
-              327 neighboring residents have reported this issue. BWSSB repair crew is on-site replacing Valve 4B.
+              327 neighboring residents have reported this issue. WATCO repair crew is on-site replacing Valve 4B.
             </p>
           </div>
 

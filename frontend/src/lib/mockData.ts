@@ -2,6 +2,12 @@
  * STATIC UI PLACEHOLDER DATA
  * 
  * Used STRICTLY for visual development and component layout during Phase 1.
+ * Centered on the approved synthetic civic scenario:
+ * Bhubaneswar / Odisha / India (English, Hindi, Odia).
+ * 
+ * Reflects the authoritative 7-factor impact model (Section 6.2) and
+ * canonical problem lifecycle statuses (docs/06_DATA_MODEL.md).
+ * 
  * This file is completely isolated from production APIs and will be replaced
  * by domain services and database providers in subsequent phases.
  */
@@ -16,7 +22,15 @@ export interface MockProblem {
   impactScore: number;
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
   signalCount: number;
-  status: 'NEW' | 'TRIAGED' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLUTION_SUBMITTED' | 'VERIFIED_RESOLVED' | 'CLOSED';
+  status:
+    | 'NEW'
+    | 'TRIAGED'
+    | 'ASSIGNED'
+    | 'IN_PROGRESS'
+    | 'AWAITING_VERIFICATION'
+    | 'RESOLVED'
+    | 'CLOSED'
+    | 'REOPENED';
   department: string;
   createdAt: string;
   updatedAt: string;
@@ -26,51 +40,61 @@ export interface MockProblem {
     address: string;
   };
   impactBreakdown: {
-    population: number; // 0-30
-    severity: number;   // 0-25
-    spread: number;     // 0-20
-    duration: number;   // 0-15
-    facilities: number; // 0-10
+    severity: number;      // Max 25 (25%)
+    population: number;    // Max 20 (20%)
+    duration: number;      // Max 15 (15%)
+    concentration: number; // Max 15 (15%)
+    facilities: number;    // Max 10 (10%)
+    recurrence: number;    // Max 10 (10%)
+    evidence: number;      // Max 5  (5%)
     total: number;
   };
   aiSummary: string;
   whyThisMatters: string[];
+  isDemo?: boolean;
+  is_demo?: boolean;
+  supporting_media_count?: number;
 }
 
 export const DEMO_PROBLEMS: MockProblem[] = [
   {
     id: 'PRB-2026-0819',
-    title: 'Ward 18 Main Distribution Rupture & Submersion',
+    title: 'Water Supply Disruption — Nayapalli Ward 18',
     category: 'WATER_SUPPLY',
     subcategory: 'Pipeline Burst',
     wardId: 'WARD-018',
-    wardName: 'Ward 18 (Indiranagar)',
+    wardName: 'Ward 18 (Nayapalli, Bhubaneswar)',
     impactScore: 92,
     severity: 'CRITICAL',
     signalCount: 327,
+    supporting_media_count: 42,
+    isDemo: true,
+    is_demo: true,
     status: 'IN_PROGRESS',
-    department: 'Water Board (BWSSB)',
-    createdAt: '2026-09-05T06:30:00Z',
-    updatedAt: '2026-09-06T12:00:00Z',
+    department: 'Water Corporation of Odisha (WATCO)',
+    createdAt: '2026-09-04T08:00:00Z',
+    updatedAt: '2026-09-07T00:30:00Z',
     location: {
-      lat: 12.9784,
-      lng: 77.6408,
-      address: '4th Cross, 100ft Road, Indiranagar, Bengaluru',
+      lat: 20.2961,
+      lng: 85.8245,
+      address: 'VIP Road, Jayadev Vihar Crossing, Nayapalli, Bhubaneswar',
     },
     impactBreakdown: {
-      population: 28,
       severity: 24,
-      spread: 18,
-      duration: 13,
+      population: 18,
+      duration: 14,
+      concentration: 14,
       facilities: 9,
+      recurrence: 8,
+      evidence: 5,
       total: 92,
     },
     aiSummary:
-      'High-pressure main transmission line rupture causing street inundation across 4 residential blocks. Backup water reserves depleted.',
+      'High-pressure main transmission line rupture causing street inundation and water outage across Nayapalli corridor. Backup water reserves depleted.',
     whyThisMatters: [
-      'Over 14,200 residents without potable water for 28+ hours.',
-      'St. Mary\'s District Clinic located 400m downstream with critical dialysis needs.',
-      'Roadway undermining poses structural collapse risk for transit buses.',
+      'Estimated 18,400 residents affected by potable water supply disruption across Nayapalli corridor.',
+      'Active water supply outage duration of 72 hours (3 days) exceeding statutory SLA remediation targets.',
+      'Critical facility exposure: DAV Public School located directly within affected distribution zone.',
     ],
   },
   {
@@ -79,33 +103,35 @@ export const DEMO_PROBLEMS: MockProblem[] = [
     category: 'ELECTRICITY',
     subcategory: 'Transformer Sparking',
     wardId: 'WARD-004',
-    wardName: 'Ward 04 (Malleshwaram)',
+    wardName: 'Ward 04 (Saheed Nagar, Bhubaneswar)',
     impactScore: 86,
     severity: 'HIGH',
     signalCount: 184,
     status: 'ASSIGNED',
-    department: 'Electricity Supply (BESCOM)',
+    department: 'TP Central Odisha Distribution Limited (TPCODL)',
     createdAt: '2026-09-05T14:15:00Z',
     updatedAt: '2026-09-06T10:30:00Z',
     location: {
-      lat: 13.0031,
-      lng: 77.5643,
-      address: '8th Main, Margosa Road, Malleshwaram',
+      lat: 20.2882,
+      lng: 85.8436,
+      address: 'Janpath, Block B, Saheed Nagar, Bhubaneswar',
     },
     impactBreakdown: {
-      population: 24,
       severity: 23,
-      spread: 16,
-      duration: 14,
+      population: 18,
+      duration: 13,
+      concentration: 13,
       facilities: 9,
+      recurrence: 6,
+      evidence: 4,
       total: 86,
     },
     aiSummary:
-      'Heavy arcing on 11kV distribution pole threatening adjacent commercial buildings and street vendors.',
+      'Heavy arcing on 11kV distribution pole threatening adjacent commercial buildings and market vendors.',
     whyThisMatters: [
       'Commercial market area with high pedestrian footfall.',
       'Frequent voltage spikes reported burning household appliances.',
-      'Proximity to Government Girls High School.',
+      'Proximity to Government High School, Saheed Nagar.',
     ],
   },
   {
@@ -114,31 +140,33 @@ export const DEMO_PROBLEMS: MockProblem[] = [
     category: 'ROADS',
     subcategory: 'Sewer Sinkhole',
     wardId: 'WARD-022',
-    wardName: 'Ward 22 (Koramangala)',
+    wardName: 'Ward 22 (Patia, Bhubaneswar)',
     impactScore: 74,
     severity: 'HIGH',
     signalCount: 92,
     status: 'TRIAGED',
-    department: 'Roads & Infrastructure (BBMP)',
+    department: 'Works Department / BMC Road Division',
     createdAt: '2026-09-06T02:00:00Z',
     updatedAt: '2026-09-06T11:45:00Z',
     location: {
-      lat: 12.9352,
-      lng: 77.6245,
-      address: '80 Feet Road, 4th Block, Koramangala',
+      lat: 20.3533,
+      lng: 85.8193,
+      address: 'KIIT Road, Chandrasekharpur - Patia Corridor, Bhubaneswar',
     },
     impactBreakdown: {
-      population: 20,
-      severity: 21,
-      spread: 15,
+      severity: 20,
+      population: 15,
       duration: 11,
+      concentration: 11,
       facilities: 7,
+      recurrence: 6,
+      evidence: 4,
       total: 74,
     },
     aiSummary:
-      'Subsurface sewer erosion created an 8-foot cavity under the left lane of an arterial bus route.',
+      'Subsurface storm sewer erosion created an 8-foot cavity under the left lane of an arterial bus route.',
     whyThisMatters: [
-      'Critical transit route connecting Outer Ring Road to city center.',
+      'Critical transit route connecting Infocity to Bhubaneswar city center.',
       'Sewer backflow contaminating nearby stormwater drains.',
     ],
   },
@@ -148,32 +176,34 @@ export const DEMO_PROBLEMS: MockProblem[] = [
     category: 'STREETLIGHTS',
     subcategory: 'Circuit Fault',
     wardId: 'WARD-012',
-    wardName: 'Ward 12 (Rajajinagar)',
+    wardName: 'Ward 12 (Old Town, Bhubaneswar)',
     impactScore: 58,
     severity: 'MEDIUM',
     signalCount: 48,
     status: 'IN_PROGRESS',
-    department: 'Electricity Supply (BESCOM)',
+    department: 'TP Central Odisha Distribution Limited (TPCODL)',
     createdAt: '2026-09-05T19:00:00Z',
     updatedAt: '2026-09-06T08:00:00Z',
     location: {
-      lat: 12.9915,
-      lng: 77.5523,
-      address: 'Dr. Rajkumar Road, 2nd Stage, Rajajinagar',
+      lat: 20.2405,
+      lng: 85.8342,
+      address: 'Rath Road, Near Lingaraj Temple Area, Old Town, Bhubaneswar',
     },
     impactBreakdown: {
-      population: 16,
-      severity: 14,
-      spread: 12,
-      duration: 10,
+      severity: 15,
+      population: 12,
+      duration: 9,
+      concentration: 8,
       facilities: 6,
+      recurrence: 5,
+      evidence: 3,
       total: 58,
     },
     aiSummary:
       '1.2 km stretch of LED streetlights inactive due to severed underground feeder cable.',
     whyThisMatters: [
-      'Zero evening visibility along school crossing zone.',
-      'Citizen safety concerns for evening commuters.',
+      'Zero evening visibility along historic heritage school crossing zone.',
+      'Citizen safety concerns for evening pilgrims and commuters.',
     ],
   },
   {
@@ -182,31 +212,33 @@ export const DEMO_PROBLEMS: MockProblem[] = [
     category: 'SANITATION',
     subcategory: 'Drain Blockage',
     wardId: 'WARD-009',
-    wardName: 'Ward 09 (Jayanagar)',
+    wardName: 'Ward 09 (Khandagiri, Bhubaneswar)',
     impactScore: 42,
     severity: 'LOW',
     signalCount: 29,
-    status: 'VERIFIED_RESOLVED',
-    department: 'Solid Waste Management (BBMP)',
+    status: 'RESOLVED',
+    department: 'BMC Solid Waste & Sanitation',
     createdAt: '2026-09-04T08:00:00Z',
     updatedAt: '2026-09-06T09:30:00Z',
     location: {
-      lat: 12.9308,
-      lng: 77.5838,
-      address: '11th Main, 4th Block, Jayanagar',
+      lat: 20.2589,
+      lng: 85.7876,
+      address: 'Near Khandagiri Square, NH-16 Service Road, Bhubaneswar',
     },
     impactBreakdown: {
-      population: 12,
-      severity: 10,
-      spread: 8,
-      duration: 7,
+      severity: 11,
+      population: 8,
+      duration: 6,
+      concentration: 6,
       facilities: 5,
+      recurrence: 4,
+      evidence: 2,
       total: 42,
     },
     aiSummary:
-      'Illegal debris dumping blocking secondary storm outlet. Cleared and verified by field crew.',
+      'Illegal debris dumping blocking secondary storm outlet. Cleared and verified by BMC sanitary inspection crew.',
     whyThisMatters: [
-      'Risk of localized waterlogging during evening showers.',
+      'Risk of localized waterlogging during evening monsoon showers.',
     ],
   },
 ];
@@ -222,35 +254,35 @@ export const DEMO_KPIS = {
 
 export const DEMO_DEPARTMENTS = [
   {
-    name: 'Water Board (BWSSB)',
+    name: 'Water Corporation of Odisha (WATCO)',
     active: 82,
     highImpact: 17,
     medianResolution: '29 hrs',
     slaRisk: 4,
   },
   {
-    name: 'Electricity Supply (BESCOM)',
+    name: 'TP Central Odisha Distribution Limited (TPCODL)',
     active: 64,
     highImpact: 11,
     medianResolution: '18 hrs',
     slaRisk: 2,
   },
   {
-    name: 'Roads & Infrastructure (BBMP)',
+    name: 'Works Department / BMC Road Division',
     active: 114,
     highImpact: 26,
     medianResolution: '48 hrs',
     slaRisk: 9,
   },
   {
-    name: 'Solid Waste Management (BBMP)',
+    name: 'BMC Solid Waste & Sanitation',
     active: 52,
     highImpact: 6,
     medianResolution: '14 hrs',
     slaRisk: 1,
   },
   {
-    name: 'Health & Sanitation',
+    name: 'Public Health & Vector Control',
     active: 38,
     highImpact: 8,
     medianResolution: '22 hrs',
@@ -259,11 +291,11 @@ export const DEMO_DEPARTMENTS = [
 ];
 
 export const DEMO_AI_BRIEF = {
-  headline: 'Water disruptions remain the primary public impact driver across Eastern Divisions.',
+  headline: 'Water disruptions remain the primary public impact driver across Bhubaneswar North & Central divisions.',
   summary:
-    'Ward 18 Indiranagar accounts for 61% of all critical water impact, centering around a main line fracture on 4th Cross affecting ~14,200 residents.',
+    'Ward 18 Nayapalli accounts for 61% of all critical water impact, centering around a main line fracture on VIP Road affecting ~18,400 residents.',
   recommendedAction:
-    'Expedite BWSSB Valve 4B replacement and coordinate with BESCOM to prevent transformer flooding in adjacent basements.',
+    'Expedite WATCO Valve 4B replacement and coordinate with TPCODL to prevent transformer flooding in adjacent basements.',
   confidence: '94%',
   sourcesCount: 327,
 };

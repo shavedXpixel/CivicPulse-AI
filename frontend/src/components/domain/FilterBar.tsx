@@ -45,12 +45,12 @@ export function FilterBar({
           value={ward}
           onChange={(e) => onWardChange(e.target.value)}
           options={[
-            { value: 'ALL', label: 'All 198 Wards' },
-            { value: 'WARD-018', label: 'Ward 18 (Indiranagar)' },
-            { value: 'WARD-004', label: 'Ward 04 (Malleshwaram)' },
-            { value: 'WARD-022', label: 'Ward 22 (Koramangala)' },
-            { value: 'WARD-012', label: 'Ward 12 (Rajajinagar)' },
-            { value: 'WARD-009', label: 'Ward 09 (Jayanagar)' },
+            { value: 'ALL', label: 'All 67 Wards (BMC)' },
+            { value: 'WARD-018', label: 'Ward 18 (Nayapalli)' },
+            { value: 'WARD-004', label: 'Ward 04 (Saheed Nagar)' },
+            { value: 'WARD-022', label: 'Ward 22 (Patia)' },
+            { value: 'WARD-012', label: 'Ward 12 (Old Town)' },
+            { value: 'WARD-009', label: 'Ward 09 (Khandagiri)' },
           ]}
         />
 
@@ -87,10 +87,10 @@ export function FilterBar({
           onChange={(e) => onDepartmentChange(e.target.value)}
           options={[
             { value: 'ALL', label: 'All Departments' },
-            { value: 'BWSSB', label: 'Water Board (BWSSB)' },
-            { value: 'BESCOM', label: 'Electricity Supply (BESCOM)' },
-            { value: 'BBMP_ROADS', label: 'Roads & Infra (BBMP)' },
-            { value: 'BBMP_SWM', label: 'Solid Waste (BBMP)' },
+            { value: 'WATCO', label: 'Water Corporation (WATCO)' },
+            { value: 'TPCODL', label: 'Electricity (TPCODL)' },
+            { value: 'BMC_ROADS', label: 'Works / BMC Road Division' },
+            { value: 'BMC_SWM', label: 'BMC Solid Waste & Sanitation' },
           ]}
         />
       </div>

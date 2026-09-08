@@ -18,3 +18,26 @@ export const ERROR_CODES = {
 } as const;
 
 export type ErrorCode = typeof ERROR_CODES[keyof typeof ERROR_CODES];
+
+export interface AppErrorOptions {
+  statusCode: number;
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export class AppError extends Error {
+  public readonly statusCode: number;
+  public readonly code: string;
+  public readonly details?: Record<string, unknown>;
+
+  constructor({ statusCode, code, message, details }: AppErrorOptions) {
+    super(message);
+    this.name = 'AppError';
+    this.statusCode = statusCode;
+    this.code = code;
+    this.details = details;
+    Object.setPrototypeOf(this, AppError.prototype);
+  }
+}
+
