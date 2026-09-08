@@ -81,6 +81,7 @@ export interface IDatabaseProvider {
   listDepartments(): Promise<Department[]>;
   getDepartment(id: string): Promise<Department | null>;
   getDepartmentWorkload(id: string): Promise<DepartmentWorkload>;
+  listDepartmentOfficers(departmentId: string): Promise<UserProfile[]>;
 
   // Atomic Workflow Mutations (Concurrency & State Integrity)
   atomicAssignProblem(

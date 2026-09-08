@@ -17,6 +17,7 @@ export interface DashboardSummary {
   sla_at_risk_count: number;
   sla_breached_count: number;
   sla_compliance_rate: number;
+  median_resolution_time_hours?: number | null;
   department_id?: string;
   scope_description: string;
 }
@@ -49,11 +50,19 @@ export class DashboardService {
     let slaAtRisk = 0;
     let slaBreached = 0;
     let totalAssignedSla = 0;
+    const resolutionDurationsHours: number[] = [];
 
     for (const p of scopedProblems) {
       const isResolved = p.status === ProblemStatus.RESOLVED || p.status === ProblemStatus.CLOSED;
       if (isResolved) {
         resolvedCount++;
+        const resolvedTimestamp = p.resolved_at || p.closed_at || p.updated_at;
+        if (resolvedTimestamp && p.created_at) {
+          const durationMs = new Date(resolvedTimestamp).getTime() - new Date(p.created_at).getTime();
+          if (durationMs > 0) {
+            resolutionDurationsHours.push(durationMs / (1000 * 60 * 60));
+          }
+        }
       } else {
         activeCount++;
       }
@@ -81,6 +90,16 @@ export class DashboardService {
     const compliantCount = totalAssignedSla - slaBreached;
     const complianceRate = totalAssignedSla > 0 ? Math.round((compliantCount / totalAssignedSla) * 100) : 100;
 
+    let medianResolutionTimeHours: number | null = null;
+    if (resolutionDurationsHours.length > 0) {
+      resolutionDurationsHours.sort((a, b) => a - b);
+      const mid = Math.floor(resolutionDurationsHours.length / 2);
+      medianResolutionTimeHours =
+        resolutionDurationsHours.length % 2 !== 0
+          ? Math.round(resolutionDurationsHours[mid]! * 10) / 10
+          : Math.round(((resolutionDurationsHours[mid - 1]! + resolutionDurationsHours[mid]!) / 2) * 10) / 10;
+    }
+
     // Estimate signals from scoped problems
     const totalSignals = scopedProblems.reduce((sum, p) => sum + (p.signal_count || 1), 0);
 
@@ -93,6 +112,7 @@ export class DashboardService {
       sla_at_risk_count: slaAtRisk,
       sla_breached_count: slaBreached,
       sla_compliance_rate: complianceRate,
+      median_resolution_time_hours: medianResolutionTimeHours,
       department_id: user.department_id,
       scope_description: scopeDesc
     };
@@ -146,11 +166,19 @@ export class DashboardService {
 
   /**
    * Returns problems at risk of SLA breach or already breached, scoped to caller.
+   * Sorted with BREACHED first, then AT_RISK, then by impact_score descending.
    */
   public static async getSlaRiskProblems(user: UserProfile): Promise<ProblemCluster[]> {
     const problems = await this.getPriorityProblems(user, 100);
-    return problems.filter(
+    const filtered = problems.filter(
       (p) => p.sla_state?.status === 'AT_RISK' || p.sla_state?.status === 'BREACHED'
     );
+
+    return filtered.sort((a, b) => {
+      const statusWeight = (status?: string) => (status === 'BREACHED' ? 2 : status === 'AT_RISK' ? 1 : 0);
+      const weightDiff = statusWeight(b.sla_state?.status) - statusWeight(a.sla_state?.status);
+      if (weightDiff !== 0) return weightDiff;
+      return (b.impact_score || 0) - (a.impact_score || 0);
+    });
   }
 }

@@ -35,6 +35,8 @@ import {
   XCircle,
   UserCheck,
   Sliders,
+  AlertTriangle,
+  MessageSquare
 } from 'lucide-react';
 
 const PERSONAS = [
@@ -64,12 +66,19 @@ export default function ProblemDetailPage({
 
   // Operations Workflow State
   const [isAssignModalOpen, setIsAssignModalOpen] = useState<boolean>(false);
+  const [availableDepts, setAvailableDepts] = useState<{ id: string; name: string }[]>([]);
+  const [deptOfficers, setDeptOfficers] = useState<{ id: string; display_name: string; email?: string }[]>([]);
   const [assignDept, setAssignDept] = useState<string>('WATCO');
   const [assignOfficer, setAssignOfficer] = useState<string>('usr_officer_01');
-  const [assignNotes, setAssignNotes] = useState<string>('Dispatched emergency engineering team for valve replacement.');
+  const [assignPriority, setAssignPriority] = useState<string>('HIGH');
+  const [assignNotes, setAssignNotes] = useState<string>('Dispatched emergency engineering team for pipeline excavation and valve repair.');
+  
+  // Action Logging State
+  const [transitionNote, setTransitionNote] = useState<string>('');
   const [workflowLoading, setWorkflowLoading] = useState<boolean>(false);
   const [workflowSuccess, setWorkflowSuccess] = useState<string | null>(null);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
+  const [isConflict, setIsConflict] = useState<boolean>(false);
 
   const fetchDetails = useCallback(async () => {
     try {
@@ -79,32 +88,91 @@ export default function ProblemDetailPage({
       );
       if (res?.data) {
         setLiveProblem(res.data);
+        setIsConflict(false);
       }
     } catch (err) {
-      console.warn('Could not fetch live problem details, rendering client fallback data:', err);
+      console.warn('Could not fetch live problem details, rendering fallback:', err);
     }
   }, [id, activePersona.token]);
 
   const fetchActions = useCallback(async () => {
     try {
       const res = await apiClient.get<{ data: ProblemAction[] }>(
-        `/api/v1/problems/${id}/actions`,
+        `/api/v1/problems/${id}/timeline`,
         { Authorization: `Bearer ${activePersona.token}` }
+      ).catch(() =>
+        apiClient.get<{ data: ProblemAction[] }>(
+          `/api/v1/problems/${id}/actions`,
+          { Authorization: `Bearer ${activePersona.token}` }
+        )
       );
       if (res?.data) {
         setLiveActions(res.data);
       }
     } catch (err) {
-      console.warn('Could not fetch actions:', err);
+      console.warn('Could not fetch actions timeline:', err);
     }
   }, [id, activePersona.token]);
 
+  const fetchDepartments = useCallback(async () => {
+    try {
+      const res = await apiClient.get<{ data: any[] }>('/api/v1/departments', {
+        Authorization: `Bearer ${activePersona.token}`,
+      });
+      if (res?.data && res.data.length > 0) {
+        setAvailableDepts(res.data.map((d) => ({ id: d.id, name: d.name || d.id })));
+      } else {
+        setAvailableDepts([
+          { id: 'WATCO', name: 'WATCO — Water Corporation of Odisha' },
+          { id: 'BMC_DRAINAGE', name: 'BMC Drainage & Stormwater Division' },
+          { id: 'BMC_ROADS', name: 'BMC Roads & Engineering' },
+          { id: 'BMC_SAN', name: 'BMC Solid Waste Management' },
+          { id: 'TPCODL', name: 'TP Central Odisha Distribution Ltd (Power)' },
+        ]);
+      }
+    } catch {
+      setAvailableDepts([
+        { id: 'WATCO', name: 'WATCO — Water Corporation of Odisha' },
+        { id: 'BMC_DRAINAGE', name: 'BMC Drainage & Stormwater Division' },
+        { id: 'BMC_ROADS', name: 'BMC Roads & Engineering' },
+        { id: 'BMC_SAN', name: 'BMC Solid Waste Management' },
+        { id: 'TPCODL', name: 'TP Central Odisha Distribution Ltd (Power)' },
+      ]);
+    }
+  }, [activePersona.token]);
+
+  const fetchOfficersForDept = useCallback(async (deptId: string) => {
+    try {
+      const res = await apiClient.get<{ data: any[] }>(
+        `/api/v1/departments/${deptId}/officers`,
+        { Authorization: `Bearer ${activePersona.token}` }
+      );
+      if (res?.data && res.data.length > 0 && res.data[0]) {
+        setDeptOfficers(res.data);
+        setAssignOfficer(res.data[0].id);
+      } else {
+        // Fallback default officers
+        const fallbackOfficers = [
+          { id: 'usr_officer_01', display_name: 'Rajesh K. (Field Engineer)' },
+          { id: 'usr_field_drainage', display_name: 'Suresh P. (Field Officer)' },
+        ];
+        setDeptOfficers(fallbackOfficers);
+        setAssignOfficer(fallbackOfficers[0]!.id);
+      }
+    } catch {
+      setDeptOfficers([
+        { id: 'usr_officer_01', display_name: 'Rajesh K. (Field Engineer)' },
+        { id: 'usr_field_drainage', display_name: 'Suresh P. (Field Officer)' },
+      ]);
+      setAssignOfficer('usr_officer_01');
+    }
+  }, [activePersona.token]);
 
   useEffect(() => {
     let mounted = true;
     async function loadData() {
       setLoading(true);
-      await Promise.all([fetchDetails(), fetchActions()]);
+      await Promise.all([fetchDetails(), fetchActions(), fetchDepartments()]);
       if (mounted) setLoading(false);
     }
 
@@ -112,11 +180,18 @@ export default function ProblemDetailPage({
     return () => {
       mounted = false;
     };
-  }, [fetchDetails, fetchActions]);
+  }, [fetchDetails, fetchActions, fetchDepartments]);
+
+  useEffect(() => {
+    if (assignDept) {
+      fetchOfficersForDept(assignDept);
+    }
+  }, [assignDept, fetchOfficersForDept]);
 
   const handleRecalculateImpact = async () => {
     setRecalculating(true);
     setRecalcSuccess(null);
+    setWorkflowError(null);
     try {
       const res = await apiClient.post<{ data: ProblemClusterDetail }>(
         `/api/v1/problems/${id}/recalculate-impact`,
@@ -128,7 +203,7 @@ export default function ProblemDetailPage({
         setRecalcSuccess(`Impact recomputed deterministically: ${res.data.impact_score}/100 (${res.data.impact_level})`);
       }
     } catch (err: any) {
-      console.error('Impact recalculation error:', err);
+      setWorkflowError(err.message || 'Impact recalculation failed');
     } finally {
       setRecalculating(false);
     }
@@ -139,12 +214,26 @@ export default function ProblemDetailPage({
     setWorkflowLoading(true);
     setWorkflowSuccess(null);
     setWorkflowError(null);
+    setIsConflict(false);
     try {
+      // If problem is currently NEW, transition to TRIAGED first to satisfy canonical lifecycle
+      if (status === ProblemStatus.NEW) {
+        await apiClient.patch(
+          `/api/v1/problems/${id}/status`,
+          {
+            status: ProblemStatus.TRIAGED,
+            note: 'Automated triage before official assignment.',
+          },
+          { Authorization: `Bearer ${activePersona.token}` }
+        );
+      }
+
       await apiClient.post(
         `/api/v1/problems/${id}/assign`,
         {
           department_id: assignDept,
           assigned_to: assignOfficer,
+          priority: assignPriority,
           notes: assignNotes,
         },
         { Authorization: `Bearer ${activePersona.token}` }
@@ -153,35 +242,49 @@ export default function ProblemDetailPage({
       setIsAssignModalOpen(false);
       await Promise.all([fetchDetails(), fetchActions()]);
     } catch (err: any) {
-      setWorkflowError(err.message || 'Assignment failed');
+      if (err.status === 409 || err.message?.includes('409') || err.message?.includes('conflict') || err.message?.includes('concurrent')) {
+        setIsConflict(true);
+        setWorkflowError('The problem state changed while you were viewing it. Please refresh and try again.');
+      } else {
+        setWorkflowError(err.message || 'Assignment failed');
+      }
     } finally {
       setWorkflowLoading(false);
     }
   };
 
-  const handleStatusTransition = async (newStatus: ProblemStatus, notes?: string) => {
+  const handleStatusTransition = async (newStatus: ProblemStatus, defaultNote: string) => {
     setWorkflowLoading(true);
     setWorkflowSuccess(null);
     setWorkflowError(null);
+    setIsConflict(false);
+    const finalNote = transitionNote.trim() || defaultNote;
     try {
       await apiClient.patch(
         `/api/v1/problems/${id}/status`,
         {
           status: newStatus,
-          notes: notes || `Operational status transitioned to ${newStatus}.`,
+          note: finalNote,
+          notes: finalNote,
         },
         { Authorization: `Bearer ${activePersona.token}` }
       );
       setWorkflowSuccess(`Status transitioned to ${newStatus}.`);
+      setTransitionNote('');
       await Promise.all([fetchDetails(), fetchActions()]);
     } catch (err: any) {
-      setWorkflowError(err.message || 'Status transition failed');
+      if (err.status === 409 || err.message?.includes('409') || err.message?.includes('conflict') || err.message?.includes('concurrent')) {
+        setIsConflict(true);
+        setWorkflowError('The problem state changed while you were viewing it. Please refresh and try again.');
+      } else {
+        setWorkflowError(err.message || 'Status transition failed');
+      }
     } finally {
       setWorkflowLoading(false);
     }
   };
 
-  // Resolved values blending live API data with rich visual fallbacks
+  // Resolved values blending live API data with rich fallbacks
   const isDemo = liveProblem?.is_demo ?? (id === 'PRB-2026-0819');
   const title = liveProblem?.title || fallbackProblem.title;
   const status = (liveProblem?.status || fallbackProblem.status) as ProblemStatus;
@@ -242,7 +345,7 @@ export default function ProblemDetailPage({
 
   const members: ProblemClusterMember[] = liveProblem?.members || [];
 
-  // Map live actions to timeline events if available
+  // Map live actions to timeline events
   const timelineEvents = liveActions.length > 0
     ? liveActions.map((act) => ({
         id: act.id,
@@ -280,6 +383,11 @@ export default function ProblemDetailPage({
         },
       ];
 
+  // Format SLA display values
+  const slaStatus = sla?.status || (impactLevel === 'CRITICAL' ? 'AT_RISK' : 'ON_TRACK');
+  const slaTargetHours = sla?.target_hours ?? (impactLevel === 'CRITICAL' ? 24 : 48);
+  const slaRemainingHours = sla?.hours_remaining ?? 3.25;
+
   if (loading && !liveProblem) {
     return (
       <GovernmentShell>
@@ -302,14 +410,14 @@ export default function ProblemDetailPage({
               className="inline-flex items-center gap-1.5 text-xs text-ink-secondary hover:text-ink-primary font-medium"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back to Problems</span>
+              <span>Back to Problems Directory</span>
             </Link>
             <span className="text-ink-border">•</span>
             <Link
               href="/dashboard"
               className="text-xs text-ink-secondary hover:text-ink-primary font-medium"
             >
-              Command Center
+              Operations Overview
             </Link>
           </div>
 
@@ -341,7 +449,7 @@ export default function ProblemDetailPage({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-white border border-ink-border shadow-subtle text-xs gap-3">
           <div className="flex items-center gap-2">
             <UserCheck className="w-4 h-4 text-civic-blue" />
-            <span className="font-bold text-ink-primary">Testing Role Persona:</span>
+            <span className="font-bold text-ink-primary">Testing Persona:</span>
             <span className="font-mono text-ink-secondary">{activePersona.label}</span>
           </div>
 
@@ -370,23 +478,7 @@ export default function ProblemDetailPage({
           </div>
         </div>
 
-        {/* Demo Data Banner if synthetic */}
-        {isDemo && (
-          <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-950 flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-            <div className="space-y-0.5">
-              <p className="font-semibold text-amber-900">
-                Golden Demo Presentation Metadata (Phase 4 & 5)
-              </p>
-              <p className="text-amber-800 leading-relaxed">
-                Aggregate metadata represents <strong>{signalCount} citizen reports</strong> and <strong>{supportingMediaCount} media records</strong> across Nayapalli Ward 18.
-                Live operations state machine and deterministic SLA tracking are fully enabled.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Problem Header */}
+        {/* Problem Header (Section 1) */}
         <PageHeader
           title={title}
           description={`Incident ID: ${id} • Ward: ${wardName} • Department: ${department || 'Unassigned'}`}
@@ -398,13 +490,18 @@ export default function ProblemDetailPage({
           ]}
           actions={
             <div className="flex items-center gap-2">
-              <Link
-                href={`/dashboard/simulation?problemId=${id}`}
-                className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-civic-blue text-white hover:bg-civic-blueDark shadow-subtle transition-colors flex items-center gap-1.5"
+              <button
+                onClick={async () => {
+                  setLoading(true);
+                  await Promise.all([fetchDetails(), fetchActions()]);
+                  setLoading(false);
+                }}
+                className="px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-ink-border text-ink-primary hover:bg-canvas-subtle shadow-subtle transition-colors flex items-center gap-1.5"
+                title="Refresh problem details"
               >
-                <Sliders className="w-3.5 h-3.5" />
-                <span>Simulate Intervention</span>
-              </Link>
+                <RefreshCw className={`w-3.5 h-3.5 text-ink-tertiary ${loading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
               <button
                 onClick={handleRecalculateImpact}
                 disabled={recalculating}
@@ -417,23 +514,45 @@ export default function ProblemDetailPage({
           }
         />
 
+        {/* Concurrency / 409 Conflict Banner */}
+        {isConflict && (
+          <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 text-xs flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0" />
+              <div>
+                <strong className="block">Concurrency Conflict (409)</strong>
+                <span>The problem changed while you were viewing it. Refresh to inspect the latest state.</span>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                fetchDetails();
+                fetchActions();
+              }}
+              className="px-3 py-1.5 rounded-lg bg-amber-700 text-white font-semibold hover:bg-amber-800 transition-colors"
+            >
+              Refresh Now
+            </button>
+          </div>
+        )}
+
         {/* Workflow Alerts */}
         {workflowSuccess && (
-          <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
+          <div className="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{workflowSuccess}</span>
           </div>
         )}
 
-        {workflowError && (
-          <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center gap-2">
+        {workflowError && !isConflict && (
+          <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>{workflowError}</span>
           </div>
         )}
 
         {recalcSuccess && (
-          <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
+          <div className="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{recalcSuccess}</span>
           </div>
@@ -443,14 +562,14 @@ export default function ProblemDetailPage({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Main Column (8 cols) */}
           <div className="lg:col-span-8 space-y-8">
-            {/* Why This Matters Section */}
+            {/* Why This Matters Section (Section 5) */}
             <div className="p-6 rounded-xl border border-ink-border bg-white shadow-card space-y-4">
               <div className="flex items-center justify-between border-b border-ink-border/60 pb-3">
                 <h3 className="text-sm font-bold text-ink-primary uppercase tracking-wider">
-                  Why This Matters
+                  Why This Matters & AI Grounding
                 </h3>
                 <span className="text-xs text-civic-rose font-semibold">
-                  {impactLevel} Systemic Urgency ({impactScore}/100)
+                  {impactLevel} Urgency ({impactScore}/100)
                 </span>
               </div>
 
@@ -458,13 +577,13 @@ export default function ProblemDetailPage({
                 <div className="flex items-start gap-2.5 text-xs text-ink-primary">
                   <span className="w-1.5 h-1.5 rounded-full bg-civic-rose mt-1.5 shrink-0" />
                   <span className="leading-relaxed">
-                    Potable water distribution main rupture disrupting Nayapalli residential corridor and municipal schools.
+                    Municipal infrastructure cluster disrupting citizen mobility, water security, or public facilities.
                   </span>
                 </div>
                 <div className="flex items-start gap-2.5 text-xs text-ink-primary">
                   <span className="w-1.5 h-1.5 rounded-full bg-civic-rose mt-1.5 shrink-0" />
                   <span className="leading-relaxed">
-                    Direct water seepage threatening basement structures and adjacent DAV Public School gate entrance.
+                    Prioritized deterministically using the canonical 7-factor civic impact formula.
                   </span>
                 </div>
               </div>
@@ -478,7 +597,7 @@ export default function ProblemDetailPage({
               </AIInsight>
             </div>
 
-            {/* Resolution Evidence & AI Advisory Verification Workspace (Phase 6) */}
+            {/* Resolution Evidence & AI Advisory Verification Workspace */}
             <ResolutionWorkspace
               problemId={id}
               problemTitle={title}
@@ -494,18 +613,18 @@ export default function ProblemDetailPage({
               }}
             />
 
-            {/* Representative Clustered Citizen Signals Batch */}
+            {/* Supporting Correlated Signals Batch (Section 9) */}
             <div className="p-6 rounded-xl border border-ink-border bg-white shadow-card space-y-4">
               <div className="flex items-center justify-between border-b border-ink-border/60 pb-3">
                 <div>
                   <h3 className="text-sm font-bold text-ink-primary uppercase tracking-wider">
-                    Representative Clustered Signals ({members.length > 0 ? members.length : 3})
+                    Correlated Citizen Signals ({members.length > 0 ? members.length : signalCount})
                   </h3>
                   <p className="text-xs text-ink-secondary">
                     Linked using semantic cosine similarity, geographic proximity, and temporal decay
                   </p>
                 </div>
-                <span className="text-xs font-semibold text-civic-blue">Relationship Threshold &ge; 70%</span>
+                <span className="text-xs font-semibold text-civic-blue">Similarity &ge; 70%</span>
               </div>
 
               <div className="space-y-2.5">
@@ -531,7 +650,7 @@ export default function ProblemDetailPage({
                               {mem.relationship}
                             </span>
                             <span className="text-ink-tertiary">•</span>
-                            <span className="text-ink-secondary">{sig?.category?.replace(/_/g, ' ') || 'water supply'}</span>
+                            <span className="text-ink-secondary">{sig?.category?.replace(/_/g, ' ') || 'public service'}</span>
                           </div>
                           <span className="text-[11px] font-semibold text-civic-blue">
                             {simPct}% Similarity
@@ -554,66 +673,17 @@ export default function ProblemDetailPage({
                     );
                   })
                 ) : (
-                  <>
-                    <div className="p-3.5 rounded-lg bg-canvas-subtle border border-ink-border text-xs space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-ink-primary font-mono">sig_1001</span>
-                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-100 text-blue-800">DUPLICATE</span>
-                          <span className="text-ink-tertiary">•</span>
-                          <span className="text-ink-secondary">water supply</span>
-                        </div>
-                        <span className="text-[11px] font-semibold text-civic-blue">94% Similarity</span>
-                      </div>
-                      <p className="text-ink-primary font-medium italic">
-                        &ldquo;Water supply pipeline bursting on Nayapalli VIP Road, submerging basement driveways.&rdquo;
-                      </p>
-                      <div className="text-[11px] text-ink-secondary">
-                        Same water_supply category, identical corridor coordinates, matching rupture description
-                      </div>
-                    </div>
-
-                    <div className="p-3.5 rounded-lg bg-canvas-subtle border border-ink-border text-xs space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-ink-primary font-mono">sig_1003</span>
-                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-100 text-blue-800">DUPLICATE</span>
-                          <span className="text-ink-tertiary">•</span>
-                          <span className="text-ink-secondary">water supply</span>
-                        </div>
-                        <span className="text-[11px] font-semibold text-civic-blue">89% Similarity</span>
-                      </div>
-                      <p className="text-ink-primary font-medium italic">
-                        &ldquo;Basement flooding and zero drinking water pressure on VIP Road Nayapalli for two days.&rdquo;
-                      </p>
-                      <div className="text-[11px] text-ink-secondary">
-                        Matching basement flooding and zero potable water pressure within 180m
-                      </div>
-                    </div>
-
-                    <div className="p-3.5 rounded-lg bg-canvas-subtle border border-ink-border text-xs space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-ink-primary font-mono">sig_1004</span>
-                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">RELATED</span>
-                          <span className="text-ink-tertiary">•</span>
-                          <span className="text-ink-secondary">water supply</span>
-                        </div>
-                        <span className="text-[11px] font-semibold text-civic-blue">92% Similarity</span>
-                      </div>
-                      <p className="text-ink-primary font-medium italic">
-                        &ldquo;Drinking water pipeline leakage impacting DAV Public School gate entrance Nayapalli.&rdquo;
-                      </p>
-                      <div className="text-[11px] text-amber-800 font-semibold">
-                        Critical facility exposure: DAV Public School Gate 2
-                      </div>
-                    </div>
-                  </>
+                  <div className="p-4 rounded-lg bg-canvas-subtle border border-ink-border text-xs text-ink-secondary space-y-1">
+                    <p className="font-semibold text-ink-primary">
+                      {signalCount} citizen signals correlated in cluster #{id}
+                    </p>
+                    <p>Supporting media assets: {supportingMediaCount} verified photos/videos.</p>
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Operational Event Audit Timeline */}
+            {/* Operational Event Audit Timeline (Section 8) */}
             <div className="p-6 rounded-xl border border-ink-border bg-white shadow-card space-y-4">
               <div className="flex items-center justify-between border-b border-ink-border/60 pb-3">
                 <h3 className="text-sm font-bold text-ink-primary uppercase tracking-wider">
@@ -627,9 +697,9 @@ export default function ProblemDetailPage({
             </div>
           </div>
 
-          {/* Right Rail Details (4 cols) */}
+          {/* Right Rail Operations (4 cols) */}
           <div className="lg:col-span-4 space-y-6">
-            {/* Government Lifecycle Controls Card */}
+            {/* Operations Lifecycle & Assignment Card (Sections 2 & 6) */}
             <div className="p-6 rounded-xl border border-civic-blue/30 bg-white shadow-card space-y-4">
               <div className="flex items-center justify-between border-b border-ink-border/60 pb-3">
                 <span className="text-xs uppercase tracking-wider text-ink-secondary font-bold flex items-center gap-1.5">
@@ -639,8 +709,8 @@ export default function ProblemDetailPage({
                 <StatusBadge status={status} />
               </div>
 
-              {/* Current Assignment Status */}
-              <div className="p-3.5 rounded-lg bg-canvas-subtle border border-ink-border text-xs space-y-1.5">
+              {/* Current Assignment Status Bar (Section 2) */}
+              <div className="p-3.5 rounded-lg bg-canvas-subtle border border-ink-border text-xs space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-ink-tertiary uppercase font-semibold text-[10px]">DEPARTMENT</span>
                   <span className="font-bold text-ink-primary">{department || 'Not Assigned'}</span>
@@ -651,93 +721,114 @@ export default function ProblemDetailPage({
                 </div>
               </div>
 
-              {/* Actions based on 8-step state machine */}
+              {/* Action Note Input (Section 6) */}
+              <div className="space-y-1 pt-1">
+                <label className="text-[11px] font-semibold text-ink-secondary flex items-center gap-1">
+                  <MessageSquare className="w-3 h-3 text-ink-tertiary" />
+                  <span>Audit Action Note (Optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={transitionNote}
+                  onChange={(e) => setTransitionNote(e.target.value)}
+                  placeholder="Reason for state transition or dispatch..."
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-ink-border bg-white text-xs text-ink-primary focus:ring-1 focus:ring-civic-blue"
+                />
+              </div>
+
+              {/* Lifecycle Step Actions (Section 6) */}
               <div className="space-y-2 pt-1">
                 <div className="text-[11px] font-semibold text-ink-secondary">Available State Actions:</div>
+
+                {/* Triage Action (for NEW problems) */}
+                {status === ProblemStatus.NEW && (
+                  <button
+                    onClick={() => handleStatusTransition(ProblemStatus.TRIAGED, 'Problem triaged by department dispatcher.')}
+                    disabled={workflowLoading}
+                    className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-civic-blue text-white hover:bg-blue-700 shadow-subtle flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" />
+                    <span>Triage Problem (Mark TRIAGED)</span>
+                  </button>
+                )}
 
                 {/* Assign / Reassign Button */}
                 {(status === ProblemStatus.NEW || status === ProblemStatus.TRIAGED || status === ProblemStatus.ASSIGNED || status === ProblemStatus.IN_PROGRESS) && (
                   <button
                     onClick={() => setIsAssignModalOpen(true)}
-                    className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-civic-blue text-white hover:bg-blue-700 shadow-subtle flex items-center justify-center gap-1.5"
+                    className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-white border border-civic-blue text-civic-blue hover:bg-civic-blueLight/40 shadow-subtle flex items-center justify-center gap-1.5"
                   >
                     <UserPlus className="w-3.5 h-3.5" />
-                    <span>{assignedTo ? 'Reassign Problem' : 'Assign Department & Officer'}</span>
+                    <span>{assignedTo ? 'Reassign Department & Officer' : 'Assign Department & Officer'}</span>
                   </button>
                 )}
 
-                {/* State Machine Step Buttons */}
-                {status === ProblemStatus.NEW && (
-                  <button
-                    onClick={() => handleStatusTransition(ProblemStatus.TRIAGED, 'Problem triaged by department dispatcher.')}
-                    disabled={workflowLoading}
-                    className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-white border border-ink-border text-ink-primary hover:bg-canvas-subtle flex items-center justify-center gap-1.5"
-                  >
-                    <ArrowRight className="w-3.5 h-3.5 text-civic-blue" />
-                    <span>Mark as TRIAGED</span>
-                  </button>
-                )}
-
+                {/* Start Work Action */}
                 {status === ProblemStatus.ASSIGNED && (
                   <button
-                    onClick={() => handleStatusTransition(ProblemStatus.IN_PROGRESS, 'Field crew dispatched and commenced excavation.')}
+                    onClick={() => handleStatusTransition(ProblemStatus.IN_PROGRESS, 'Field crew dispatched and commenced site intervention.')}
                     disabled={workflowLoading}
-                    className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-white border border-ink-border text-ink-primary hover:bg-canvas-subtle flex items-center justify-center gap-1.5"
+                    className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-civic-blue text-white hover:bg-blue-700 shadow-subtle flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
-                    <Play className="w-3.5 h-3.5 text-civic-blue" />
-                    <span>Mark as IN PROGRESS</span>
+                    <Play className="w-3.5 h-3.5" />
+                    <span>Start Work (IN PROGRESS)</span>
                   </button>
                 )}
 
+                {/* Request Verification Action */}
                 {status === ProblemStatus.IN_PROGRESS && (
                   <button
-                    onClick={() => handleStatusTransition(ProblemStatus.AWAITING_VERIFICATION, 'Repairs completed on site. Awaiting verification review.')}
+                    onClick={() => handleStatusTransition(ProblemStatus.AWAITING_VERIFICATION, 'Field repairs completed. Requesting supervisory inspection.')}
                     disabled={workflowLoading}
-                    className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-white border border-ink-border text-ink-primary hover:bg-canvas-subtle flex items-center justify-center gap-1.5"
+                    className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-civic-amber text-white hover:bg-amber-600 shadow-subtle flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
-                    <Check className="w-3.5 h-3.5 text-civic-amber" />
-                    <span>Request Verification</span>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Submit for Verification</span>
                   </button>
                 )}
 
+                {/* Resolve Action */}
                 {status === ProblemStatus.AWAITING_VERIFICATION && (
                   <button
                     onClick={() => handleStatusTransition(ProblemStatus.RESOLVED, 'Repairs inspected and officially validated by supervisor.')}
                     disabled={workflowLoading}
-                    className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-civic-emerald text-white hover:bg-emerald-700 shadow-subtle flex items-center justify-center gap-1.5"
+                    className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-civic-emerald text-white hover:bg-emerald-700 shadow-subtle flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Mark as RESOLVED</span>
+                    <span>Verify & Resolve (RESOLVED)</span>
                   </button>
                 )}
 
+                {/* Close Action */}
                 {status === ProblemStatus.RESOLVED && (
                   <button
                     onClick={() => handleStatusTransition(ProblemStatus.CLOSED, 'Incident administrative audit complete. Case closed.')}
                     disabled={workflowLoading}
-                    className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-white border border-ink-border text-ink-primary hover:bg-canvas-subtle flex items-center justify-center gap-1.5"
+                    className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-white border border-ink-border text-ink-primary hover:bg-canvas-subtle flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
                     <XCircle className="w-3.5 h-3.5 text-ink-tertiary" />
-                    <span>Close Incident (CLOSED)</span>
+                    <span>Close Case (CLOSED)</span>
                   </button>
                 )}
 
+                {/* Reopen Action */}
                 {status === ProblemStatus.CLOSED && (
                   <button
                     onClick={() => handleStatusTransition(ProblemStatus.REOPENED, 'Recurring failure reported. Problem reopened for investigation.')}
                     disabled={workflowLoading}
-                    className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-white border border-ink-border text-civic-rose hover:bg-rose-50 flex items-center justify-center gap-1.5"
+                    className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-white border border-rose-300 text-civic-rose hover:bg-rose-50 flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>Reopen Incident (REOPENED)</span>
                   </button>
                 )}
 
+                {/* Re-triage Action */}
                 {status === ProblemStatus.REOPENED && (
                   <button
-                    onClick={() => handleStatusTransition(ProblemStatus.TRIAGED, 'Reopened problem triaged for fresh remediation.')}
+                    onClick={() => handleStatusTransition(ProblemStatus.TRIAGED, 'Reopened problem triaged for remediation.')}
                     disabled={workflowLoading}
-                    className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-white border border-ink-border text-ink-primary hover:bg-canvas-subtle flex items-center justify-center gap-1.5"
+                    className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-white border border-ink-border text-ink-primary hover:bg-canvas-subtle flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
                     <ArrowRight className="w-3.5 h-3.5 text-civic-blue" />
                     <span>Re-triage Incident</span>
@@ -746,31 +837,31 @@ export default function ProblemDetailPage({
               </div>
             </div>
 
-            {/* SLA Tracking & Historical Breach Card */}
+            {/* Deterministic SLA Tracking Card (Section 3) */}
             <div className="p-6 rounded-xl border border-ink-border bg-white shadow-card space-y-4 text-xs">
               <div className="flex items-center justify-between border-b border-ink-border/60 pb-3">
                 <span className="uppercase tracking-wider text-ink-secondary font-semibold flex items-center gap-1.5">
                   <Clock className="w-4 h-4 text-civic-amber" />
-                  <span>SLA Performance</span>
+                  <span>SLA Countdown & Status</span>
                 </span>
                 <span
                   className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    sla?.status === 'BREACHED'
+                    slaStatus === 'BREACHED'
                       ? 'bg-civic-roseLight text-civic-rose'
-                      : sla?.status === 'AT_RISK'
+                      : slaStatus === 'AT_RISK'
                       ? 'bg-civic-amberLight text-amber-900'
                       : 'bg-civic-emeraldLight text-emerald-800'
                   }`}
                 >
-                  {sla?.status || (impactLevel === 'CRITICAL' ? 'AT_RISK' : 'ON_TRACK')}
+                  {slaStatus}
                 </span>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-ink-secondary">Deterministic Target:</span>
+                  <span className="text-ink-secondary">Deterministic SLA Target:</span>
                   <span className="font-mono font-bold text-ink-primary">
-                    {sla?.target_hours ?? (impactLevel === 'CRITICAL' ? 24 : 48)} hours
+                    {slaTargetHours} hours
                   </span>
                 </div>
 
@@ -779,14 +870,26 @@ export default function ProblemDetailPage({
                   <span className="font-mono text-ink-primary">
                     {sla?.due_at
                       ? new Date(sla.due_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })
-                      : 'Today, 04:00 PM'}
+                      : 'Deterministic 24h'}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-ink-secondary">Remaining Time:</span>
-                  <span className="font-mono font-bold text-civic-amber">
-                    {sla ? `${Math.max(0, Math.round(sla.hours_remaining))}h remaining` : '3h 15m remaining'}
+                  <span className="text-ink-secondary">Remaining / Overdue:</span>
+                  <span
+                    className={`font-mono font-bold ${
+                      slaStatus === 'BREACHED'
+                        ? 'text-civic-rose'
+                        : slaStatus === 'AT_RISK'
+                        ? 'text-amber-700'
+                        : 'text-civic-emerald'
+                    }`}
+                  >
+                    {slaStatus === 'BREACHED'
+                      ? `Breached by ${Math.abs(Math.round(slaRemainingHours))}h`
+                      : slaStatus === 'MET'
+                      ? 'SLA Met'
+                      : `${Math.max(0, Math.round(slaRemainingHours))}h remaining`}
                   </span>
                 </div>
               </div>
@@ -796,20 +899,20 @@ export default function ProblemDetailPage({
                 <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 space-y-1">
                   <div className="flex items-center gap-1.5 font-bold text-rose-700">
                     <ShieldAlert className="w-4 h-4" />
-                    <span>Historical Breach Retained</span>
+                    <span>Permanent Breach Recorded</span>
                   </div>
                   <p className="text-[11px] text-rose-800 leading-snug">
-                    SLA deadline was exceeded prior to resolution. Retained in historical audit records for performance metrics and compliance.
+                    SLA target was exceeded prior to resolution. Retained permanently in immutable municipal audit records.
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Impact Rating Card */}
+            {/* 7-Factor Deterministic Impact Card (Section 4) */}
             <div className="p-6 rounded-xl border border-ink-border bg-white shadow-card space-y-5">
               <div className="flex items-center justify-between">
                 <span className="text-xs uppercase tracking-wider text-ink-secondary font-semibold">
-                  Deterministic Impact Score
+                  Deterministic Public Impact
                 </span>
                 <span className="text-xs text-civic-rose font-bold">
                   {impactScore}/100 ({impactLevel})
@@ -828,7 +931,7 @@ export default function ProblemDetailPage({
                 evidence={breakdown.evidence}
               />
 
-              {/* Provenance Indicator for Enrichment-Dependent Factors */}
+              {/* Provenance Indicator for Enrichment Factors */}
               <div className="pt-3 border-t border-ink-border/60 flex items-center justify-between text-[11px]">
                 <span className="text-ink-secondary font-medium">Data Provenance:</span>
                 <div className="flex items-center gap-2">
@@ -852,21 +955,21 @@ export default function ProblemDetailPage({
 
               <div className="flex items-start gap-2 text-ink-primary font-medium">
                 <MapPin className="w-4 h-4 text-civic-rose shrink-0 mt-0.5" />
-                <span>VIP Road, Jayadev Vihar Crossing, Nayapalli, Bhubaneswar</span>
+                <span>Nayapalli Ward 18, Bhubaneswar</span>
               </div>
 
-              <div className="h-28 rounded-lg bg-canvas-subtle border border-ink-border flex flex-col items-center justify-center p-3 text-center text-ink-tertiary">
-                <MapPin className="w-6 h-6 text-civic-rose mb-1" />
+              <div className="h-24 rounded-lg bg-canvas-subtle border border-ink-border flex flex-col items-center justify-center p-3 text-center text-ink-tertiary">
+                <MapPin className="w-5 h-5 text-civic-rose mb-1" />
                 <span className="font-mono text-[11px] text-ink-secondary">
                   Lat: 20.2961 • Lng: 85.8245
                 </span>
-                <span className="text-[10px]">Nayapalli Ward 18 Corridor, Bhubaneswar</span>
+                <span className="text-[10px]">Nayapalli Corridor, Bhubaneswar</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Modal: Assign Problem */}
+        {/* Modal: Real Assignment Workflow (Section 7) */}
         {isAssignModalOpen && (
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-modal border border-ink-border space-y-4">
@@ -883,46 +986,73 @@ export default function ProblemDetailPage({
                 </button>
               </div>
 
+              {status === ProblemStatus.NEW && (
+                <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 text-xs">
+                  <strong>Note:</strong> This incident is currently in state <strong>NEW</strong>. Triage step will automatically be recorded with this assignment.
+                </div>
+              )}
+
               <form onSubmit={handleAssign} className="space-y-4 text-xs">
+                {/* Department Selection */}
                 <div className="space-y-1">
-                  <label className="font-semibold text-ink-primary">Department</label>
+                  <label className="font-semibold text-ink-primary">Responsible Department</label>
                   <select
                     value={assignDept}
                     onChange={(e) => setAssignDept(e.target.value)}
                     className="w-full p-2 rounded-lg border border-ink-border bg-white text-ink-primary focus:ring-1 focus:ring-civic-blue"
                   >
-                    <option value="WATCO">WATCO — Water Corporation of Odisha</option>
-                    <option value="BMC_DRAINAGE">BMC Drainage & Stormwater Division</option>
-                    <option value="BMC_ROADS">BMC Roads & Engineering Department</option>
-                    <option value="BMC_SAN">BMC Solid Waste Management & Sanitation</option>
-                    <option value="TPCODL">TP Central Odisha Distribution Ltd (Power)</option>
+                    {availableDepts.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
+                {/* Eligible Officer Selection */}
                 <div className="space-y-1">
-                  <label className="font-semibold text-ink-primary">Field Officer</label>
+                  <label className="font-semibold text-ink-primary">Eligible Field Officer</label>
                   <select
                     value={assignOfficer}
                     onChange={(e) => setAssignOfficer(e.target.value)}
                     className="w-full p-2 rounded-lg border border-ink-border bg-white text-ink-primary focus:ring-1 focus:ring-civic-blue font-mono"
                   >
-                    <option value="usr_officer_01">usr_officer_01 (Rajesh K. — Senior Field Engineer)</option>
-                    <option value="usr_field_drainage">usr_field_drainage (Suresh P. — Drainage Officer)</option>
+                    {deptOfficers.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.id} — {o.display_name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
+                {/* Priority */}
                 <div className="space-y-1">
-                  <label className="font-semibold text-ink-primary">Dispatch Notes / Instructions</label>
+                  <label className="font-semibold text-ink-primary">Work Order Priority</label>
+                  <select
+                    value={assignPriority}
+                    onChange={(e) => setAssignPriority(e.target.value)}
+                    className="w-full p-2 rounded-lg border border-ink-border bg-white text-ink-primary focus:ring-1 focus:ring-civic-blue font-medium"
+                  >
+                    <option value="CRITICAL">Critical (Immediate dispatch)</option>
+                    <option value="HIGH">High (Within SLA target)</option>
+                    <option value="MEDIUM">Medium (Standard queue)</option>
+                    <option value="LOW">Low (Routine maintenance)</option>
+                  </select>
+                </div>
+
+                {/* Notes */}
+                <div className="space-y-1">
+                  <label className="font-semibold text-ink-primary">Dispatch Instructions & Notes</label>
                   <textarea
                     rows={3}
                     value={assignNotes}
                     onChange={(e) => setAssignNotes(e.target.value)}
                     className="w-full p-2 rounded-lg border border-ink-border bg-white text-ink-primary focus:ring-1 focus:ring-civic-blue"
-                    placeholder="Provide specific engineering instructions..."
+                    placeholder="Provide specific engineering instructions for field officer..."
                   />
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2">
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-ink-border/60">
                   <button
                     type="button"
                     onClick={() => setIsAssignModalOpen(false)}

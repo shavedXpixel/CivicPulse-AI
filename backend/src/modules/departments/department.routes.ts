@@ -16,4 +16,7 @@ router.get('/:id', DepartmentController.getDepartment);
 // GET /api/v1/departments/:id/workload -> workload metrics for that department
 router.get('/:id/workload', DepartmentController.getWorkload);
 
+// GET /api/v1/departments/:id/officers -> eligible officers for assignment
+router.get('/:id/officers', DepartmentController.getDepartmentOfficers);
+
 export { router as departmentRouter };

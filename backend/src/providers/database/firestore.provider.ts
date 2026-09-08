@@ -1,6 +1,7 @@
 import { Firestore, Query, DocumentSnapshot, Transaction } from 'firebase-admin/firestore';
 import {
   UserProfile,
+  UserRole,
   CitizenProfile,
   Signal,
   SignalMediaItem,
@@ -481,6 +482,16 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
       sla_at_risk: slaAtRisk,
       capacity_rating: activeInProgress > 10 ? 'CONGESTED' : activeInProgress > 5 ? 'MODERATE' : 'OPTIMAL'
     };
+  }
+
+  async listDepartmentOfficers(departmentId: string): Promise<UserProfile[]> {
+    const snap = await this.db
+      .collection('users')
+      .where('department_id', '==', departmentId)
+      .get();
+    return snap.docs
+      .map((d: DocumentSnapshot) => d.data() as UserProfile)
+      .filter((u) => u.role === UserRole.FIELD_OFFICER || u.role === UserRole.DEPARTMENT_OFFICER);
   }
 
   // Atomic Workflow Mutations

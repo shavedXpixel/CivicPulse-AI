@@ -64,15 +64,19 @@ export default function OfficerPage() {
       await apiClient.post(
         `/api/v1/problems/${problemId}/actions`,
         {
-          action_type: 'STARTED_WORK',
-          notes: 'Field crew deployed on site and initiated maintenance protocol.',
+          action: 'STARTED_WORK',
+          note: 'Field crew deployed on site and initiated maintenance protocol.',
         },
         { Authorization: `Bearer ${officerToken}` }
       );
       setActionSuccess(`Work successfully commenced on problem ${problemId}! State transitioned to IN_PROGRESS.`);
       await fetchAssignments();
     } catch (err: any) {
-      setActionError(err.message || 'Failed to start work');
+      if (err.status === 409 || err.message?.includes('409') || err.message?.includes('conflict')) {
+        setActionError('The task state changed concurrently. Please refresh.');
+      } else {
+        setActionError(err.message || 'Failed to start work');
+      }
     } finally {
       setActionLoading(null);
     }
@@ -86,15 +90,19 @@ export default function OfficerPage() {
       await apiClient.post(
         `/api/v1/problems/${problemId}/actions`,
         {
-          action_type: 'VERIFICATION_REQUESTED',
-          notes: 'Field repairs completed. Restored infrastructure submitted for supervisory verification.',
+          action: 'VERIFICATION_REQUESTED',
+          note: 'Field repairs completed. Restored infrastructure submitted for supervisory verification.',
         },
         { Authorization: `Bearer ${officerToken}` }
       );
       setActionSuccess(`Verification requested for ${problemId}! State transitioned to AWAITING_VERIFICATION.`);
       await fetchAssignments();
     } catch (err: any) {
-      setActionError(err.message || 'Failed to request verification');
+      if (err.status === 409 || err.message?.includes('409') || err.message?.includes('conflict')) {
+        setActionError('The task state changed concurrently. Please refresh.');
+      } else {
+        setActionError(err.message || 'Failed to request verification');
+      }
     } finally {
       setActionLoading(null);
     }

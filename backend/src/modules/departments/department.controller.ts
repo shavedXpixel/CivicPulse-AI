@@ -61,4 +61,22 @@ export class DepartmentController {
       next(err);
     }
   }
+
+  /**
+   * Standardized: GET /api/v1/departments/:id/officers
+   * Returns list of eligible officers for this department.
+   */
+  public static async getDepartmentOfficers(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const db = getDatabaseProvider();
+      const deptId = Array.isArray(req.params.id) ? req.params.id[0]! : req.params.id!;
+      const officers = await db.listDepartmentOfficers(deptId);
+      res.status(200).json({
+        data: officers
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
+

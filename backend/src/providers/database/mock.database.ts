@@ -911,6 +911,12 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     };
   }
 
+  async listDepartmentOfficers(departmentId: string): Promise<UserProfile[]> {
+    return Array.from(this.users.values()).filter(
+      (u) => u.department_id === departmentId && (u.role === UserRole.FIELD_OFFICER || u.role === UserRole.DEPARTMENT_OFFICER)
+    );
+  }
+
   // Atomic Workflow Mutations (Concurrency & State Integrity)
   async atomicAssignProblem(
     problemId: string,
