@@ -52,6 +52,7 @@ vi.mock('../src/lib/api-client', () => ({
 
 // Import components
 import GovernmentDashboardPage from '../src/app/dashboard/page';
+import ProblemsPage from '../src/app/dashboard/problems/page';
 import { GovernmentShell } from '../src/components/shells/GovernmentShell';
 import { DEMO_PROBLEMS, DEMO_DEPARTMENTS, DEMO_KPIS } from '../src/lib/mockData';
 
@@ -168,14 +169,33 @@ describe('Phase 11 Regression: Dashboard Data Consistency & Authoritative Counts
       );
       expect(htmlWith7).toContain('>7<');
       expect(htmlWith7).not.toMatch(/>14</);
+    });
 
-      const htmlWith0 = renderToStaticMarkup(
-        <GovernmentShell problemCount={0}>
-          <div>Zero Count</div>
+    it('ensures in REAL_MODE with 2 problems that GovernmentShell Problems badge equals 2', () => {
+      mockAuthState.isDemoMode = false;
+      const htmlWith2 = renderToStaticMarkup(
+        <GovernmentShell problemCount={2}>
+          <div>Problems Content</div>
         </GovernmentShell>
       );
-      expect(htmlWith0).toContain('>0<');
-      expect(htmlWith0).not.toMatch(/>14</);
+      expect(htmlWith2).toContain('Problems');
+      expect(htmlWith2).toContain('>2<');
+      expect(htmlWith2).not.toMatch(/>0</);
+      expect(htmlWith2).not.toMatch(/>14</);
+    });
+
+    it('ensures ProblemsPage passes Golden Demo count to GovernmentShell in DEMO_MODE', () => {
+      mockAuthState.isDemoMode = true;
+      const html = renderToStaticMarkup(<ProblemsPage />);
+
+      // Sidebar Problems badge matches Golden Demo count
+      expect(html).toContain('Problems');
+      expect(html).toContain(`>${DEMO_PROBLEMS.length}<`);
+      expect(html).not.toMatch(/>0</);
+      expect(html).not.toMatch(/>14</);
+
+      // Page header badge matches Golden Demo count
+      expect(html).toContain(`${DEMO_PROBLEMS.length} Incidents Available`);
     });
   });
 });

@@ -110,7 +110,8 @@ describe('Phase 10 Step 4: Real-Mode Signal → Analysis → Clustering → Prob
       .send({
         original_text: 'Massive garbage pile accumulating near Patia market, spreading across road',
         location: { lat: 20.3550, lng: 85.8150 },
-        location_reference: 'Near Patia Big Bazaar Lane'
+        location_reference: 'Near Patia Big Bazaar Lane',
+        auto_process: false
       });
 
     expect(createRes.status).toBe(201);
@@ -227,7 +228,8 @@ describe('Phase 10 Step 4: Real-Mode Signal → Analysis → Clustering → Prob
       .send({
         original_text: 'Overflowing trash and solid waste blocking footpath near Patia lane',
         location: { lat: 20.3552, lng: 85.8152 }, // ~25 meters away
-        location_reference: 'Patia Market Footpath'
+        location_reference: 'Patia Market Footpath',
+        auto_process: false
       });
 
     expect(createRes2.status).toBe(201);

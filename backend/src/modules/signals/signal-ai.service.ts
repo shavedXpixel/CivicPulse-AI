@@ -88,12 +88,13 @@ export class SignalAIService {
       });
 
       // 5. Persist AI Operation Audit Record
+      const actualModel = (analysisOutput as any).resolved_model || aiProvider.getModelName();
       const opRecord: AIOperationRecord = {
         id: operationId,
         operation_type: AIOperationType.SIGNAL_UNDERSTANDING,
         entity_type: 'signal',
         entity_id: signalId,
-        model: aiProvider.getModelName(),
+        model: actualModel,
         prompt_version: aiProvider.getPromptVersion(),
         status: AIOperationStatus.SUCCESS,
         confidence: analysis.confidence,
@@ -123,7 +124,7 @@ export class SignalAIService {
         operation_type: AIOperationType.SIGNAL_UNDERSTANDING,
         entity_type: 'signal',
         entity_id: signalId,
-        model: aiProvider.getModelName(),
+        model: (err as any).model || aiProvider.getModelName(),
         prompt_version: aiProvider.getPromptVersion(),
         status: AIOperationStatus.FAILED,
         error_code: errorCode,

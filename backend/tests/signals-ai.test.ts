@@ -25,7 +25,8 @@ describe('Phase 3: Signal AI Pipeline & Explicit Processing', () => {
       .send({
         original_text: 'Open manhole posing severe hazard near DAV Public School, Unit 8',
         ward_id: 'WARD-018',
-        location_reference: 'Near DAV Public School Gate 2'
+        location_reference: 'Near DAV Public School Gate 2',
+        auto_process: false
       });
 
     expect(res.status).toBe(201);
@@ -46,7 +47,8 @@ describe('Phase 3: Signal AI Pipeline & Explicit Processing', () => {
       .send({
         original_text: 'Burst drinking water pipeline flooding VIP Road near Nayapalli for 3 days',
         ward_id: 'WARD-018',
-        location_reference: 'VIP Road Crossing'
+        location_reference: 'VIP Road Crossing',
+        auto_process: false
       });
 
     expect(createRes.status).toBe(201);

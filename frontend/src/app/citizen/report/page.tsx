@@ -72,6 +72,9 @@ export default function CitizenReportPage() {
     ward_name?: string;
     created_at: string;
     status: string;
+    problem_cluster_id?: string;
+    cluster?: any;
+    ai_analysis?: any;
   } | null>(null);
 
   const handleRequestGeolocation = useCallback(() => {
@@ -201,18 +204,34 @@ export default function CitizenReportPage() {
         wardId = undefined;
       }
 
-      // 1. Create Signal (Strictly text & coordinates, decoupled payload)
-      const signalRes = await apiClient.post<{ data: { id: string; status: string; ward_id?: string; ward_name?: string; created_at: string } }>(
+      // 1. Create Signal & Run Automated Ingestion Pipeline
+      const signalRes = await apiClient.post<{
+        data: {
+          id: string;
+          status: string;
+          ward_id?: string;
+          ward_name?: string;
+          created_at: string;
+          problem_cluster_id?: string;
+          cluster?: any;
+          ai_analysis?: any;
+        };
+        cluster?: any;
+      }>(
         '/api/v1/signals',
         {
           original_text: description.trim(),
           ward_id: wardId,
           location: activeCoords,
           location_reference: locationRef,
+          auto_process: true,
         }
       );
 
-      const signal = signalRes.data;
+      const signal = {
+        ...signalRes.data,
+        cluster: signalRes.cluster || signalRes.data.cluster,
+      };
 
       // 2. Decoupled Media Upload (if photo attached)
       if (photoFile) {
@@ -295,17 +314,67 @@ export default function CitizenReportPage() {
               <CheckCircle2 className="w-6 h-6" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-lg font-bold text-ink-primary">Signal Submitted</h3>
+              <h3 className="text-lg font-bold text-ink-primary">
+                {createdSignal.cluster?.isNewCluster
+                  ? 'Problem Cluster Established'
+                  : createdSignal.cluster?.matched
+                  ? 'Signal Correlated with Problem'
+                  : 'Signal Submitted'}
+              </h3>
               <p className="text-xs text-ink-secondary">
-                Your report has been logged and queued for AI intelligence processing.
+                {createdSignal.cluster?.isNewCluster
+                  ? 'Your report established a new verified public problem cluster in the municipal directory.'
+                  : createdSignal.cluster?.matched
+                  ? 'Your report was correlated with an existing municipal problem cluster.'
+                  : 'Your report has been logged and queued for AI intelligence processing.'}
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-canvas-subtle border border-ink-border text-left text-xs space-y-2">
+            <div className="p-4 rounded-xl bg-canvas-subtle border border-ink-border text-left text-xs space-y-2.5">
               <div className="flex justify-between items-center">
                 <span className="text-ink-secondary">Signal Reference:</span>
                 <span className="font-mono font-bold text-ink-primary">#{createdSignal.id}</span>
               </div>
+
+              {/* Public Problem Status */}
+              <div className="flex justify-between items-center">
+                <span className="text-ink-secondary">Public Problem:</span>
+                {createdSignal.cluster?.problem ? (
+                  <span className="font-mono font-bold text-civic-blue text-right">
+                    #{createdSignal.cluster.problem.id}
+                    <span className="block text-[11px] font-sans font-normal text-ink-primary truncate max-w-[200px]">
+                      {createdSignal.cluster.problem.title}
+                    </span>
+                  </span>
+                ) : createdSignal.problem_cluster_id ? (
+                  <span className="font-mono font-bold text-civic-blue">#{createdSignal.problem_cluster_id}</span>
+                ) : (
+                  <span className="text-amber-700 font-semibold text-[11px]">Triage in progress</span>
+                )}
+              </div>
+
+              {/* Correlation Type if available */}
+              {createdSignal.cluster && (
+                <div className="flex justify-between items-center">
+                  <span className="text-ink-secondary">Correlation Type:</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+                    {createdSignal.cluster.isNewCluster
+                      ? 'New Public Problem Created'
+                      : `Correlated (${createdSignal.cluster.relationship || 'Related'})`}
+                  </span>
+                </div>
+              )}
+
+              {/* Public Impact Score if calculated */}
+              {createdSignal.cluster?.problem?.impact_score !== undefined && (
+                <div className="flex justify-between items-center">
+                  <span className="text-ink-secondary">Public Impact Score:</span>
+                  <span className="font-mono font-bold text-civic-rose">
+                    {createdSignal.cluster.problem.impact_score}/100 ({createdSignal.cluster.problem.impact_level || 'EVALUATED'})
+                  </span>
+                </div>
+              )}
+
               <div className="flex justify-between items-center">
                 <span className="text-ink-secondary">Location / Partition:</span>
                 <span className="font-semibold text-ink-primary">
@@ -314,12 +383,14 @@ export default function CitizenReportPage() {
                     : createdSignal.ward_name || createdSignal.ward_id || (customCoordinates ? `${customCoordinates.lat.toFixed(4)}° N, ${customCoordinates.lng.toFixed(4)}° E` : 'Bhubaneswar')}
                 </span>
               </div>
+
               <div className="flex justify-between items-center">
                 <span className="text-ink-secondary">Processing Status:</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-900 border border-amber-200">
-                  Pending Analysis
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  Processed & Correlated
                 </span>
               </div>
+
               <div className="flex justify-between items-center">
                 <span className="text-ink-secondary">Submission Time:</span>
                 <span className="font-mono text-ink-secondary text-[11px]">
@@ -328,11 +399,12 @@ export default function CitizenReportPage() {
               </div>
             </div>
 
-            {/* Explicit Phase 3 AI Analysis Execution & Preview */}
+            {/* AI Analysis Preview */}
             <div className="text-left">
               <SignalAIPreview
                 signalId={createdSignal.id}
-                initialProcessingStatus="PENDING"
+                initialProcessingStatus={createdSignal.ai_analysis ? 'COMPLETED' : 'PENDING'}
+                initialAnalysis={createdSignal.ai_analysis || null}
               />
             </div>
 

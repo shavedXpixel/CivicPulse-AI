@@ -16,7 +16,8 @@ export const CreateSignalSchema = z.object({
   location: CoordinatesSchema.optional().nullable(),
   ward_id: z.string().optional().nullable(),
   location_reference: z.string().max(500).optional().nullable(),
-  media_ids: z.array(z.string()).optional().default([])
+  media_ids: z.array(z.string()).optional().default([]),
+  auto_process: z.boolean().optional().default(false)
 });
 
 export const MAX_MEDIA_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB canonical limit
@@ -49,7 +50,8 @@ export const SignalAnalysisOutputSchema = z.object({
   critical_facility: z.string().optional().nullable(),
   confidence: z.number().min(0).max(1).default(0.85),
   explanation: z.string().min(1, 'Explanation is required for transparency').default('Assessment derived from citizen description and report context.'),
-  image_findings: z.array(z.string()).optional().default([])
+  image_findings: z.array(z.string()).optional().default([]),
+  resolved_model: z.string().optional()
 });
 
 export type SignalAnalysisOutput = z.infer<typeof SignalAnalysisOutputSchema>;

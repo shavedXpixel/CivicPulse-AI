@@ -13,7 +13,9 @@ const EnvSchema = z.object({
   DEMO_MODE: z.preprocess((val) => val === 'true' || val === true, z.boolean()).default(true),
   LOG_LEVEL: z.string().default('info'),
   GEMINI_API_KEY: z.string().optional().default(''),
-  AI_MODEL_GENERAL: z.string().default('gemini-3.5-flash'),
+  GEMINI_PRIMARY_MODEL: z.string().optional(),
+  GEMINI_FALLBACK_MODEL: z.string().optional().default('gemini-3.5-flash'),
+  AI_MODEL_GENERAL: z.string().default('gemini-3.6-flash'),
   AI_MODEL_EMBEDDING: z.string().default('gemini-embedding-001'),
   AI_EMBEDDING_MODEL: z.string().optional(),
   FIREBASE_PROJECT_ID: z.string().optional().default(''),
@@ -25,6 +27,8 @@ const parsed = EnvSchema.parse(process.env);
 
 export const env = {
   ...parsed,
+  GEMINI_PRIMARY_MODEL: parsed.GEMINI_PRIMARY_MODEL || parsed.AI_MODEL_GENERAL || 'gemini-3.6-flash',
+  GEMINI_FALLBACK_MODEL: parsed.GEMINI_FALLBACK_MODEL || 'gemini-3.5-flash',
   AI_EMBEDDING_MODEL: parsed.AI_EMBEDDING_MODEL || parsed.AI_MODEL_EMBEDDING || 'text-embedding-004'
 };
 

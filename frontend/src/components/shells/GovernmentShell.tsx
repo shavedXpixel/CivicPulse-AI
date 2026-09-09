@@ -20,6 +20,7 @@ import {
 
 import { useAuth } from '../../context/AuthContext';
 import { DEMO_PROBLEMS } from '../../lib/mockData';
+import { apiClient } from '../../lib/api-client';
 
 export interface GovernmentShellProps {
   children: ReactNode;
@@ -30,10 +31,30 @@ export function GovernmentShell({ children, problemCount }: GovernmentShellProps
   const pathname = usePathname();
   const { isDemoMode } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [resolvedCount, setResolvedCount] = useState<number | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    if (problemCount === undefined && !isDemoMode) {
+      apiClient
+        .get<{ data: any[] }>('/api/v1/problems')
+        .then((res) => {
+          if (active && res?.data && Array.isArray(res.data)) {
+            setResolvedCount(res.data.length);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      active = false;
+    };
+  }, [problemCount, isDemoMode]);
 
   const effectiveProblemCount =
     problemCount !== undefined
       ? problemCount
+      : resolvedCount !== null
+      ? resolvedCount
       : isDemoMode
       ? DEMO_PROBLEMS.length
       : 0;
@@ -155,8 +176,8 @@ export function GovernmentShell({ children, problemCount }: GovernmentShellProps
 
           <div className="flex items-center gap-3">
             <div className="hidden sm:inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-mono bg-canvas-subtle border border-ink-border text-ink-secondary">
-              <span className="w-2 h-2 rounded-full bg-civic-emerald" />
-              <span>DEMO_MODE: Bhubaneswar Ward 18 Scenario</span>
+              <span className={`w-2 h-2 rounded-full ${isDemoMode ? 'bg-civic-emerald' : 'bg-civic-blue'}`} />
+              <span>{isDemoMode ? 'DEMO_MODE: Bhubaneswar Ward 18 Scenario' : 'REAL_MODE: Live Operations Command'}</span>
             </div>
 
             <button

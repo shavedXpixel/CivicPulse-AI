@@ -92,6 +92,7 @@ export interface CreateSignalInput {
   ward_id?: string | null;
   location_reference?: string | null;
   media_ids?: string[];
+  auto_process?: boolean;
 }
 
 export interface RegisterMediaInput {

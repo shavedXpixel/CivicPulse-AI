@@ -21,6 +21,29 @@ export class SignalService {
   constructor(private repo: SignalRepository = new SignalRepository()) {}
 
   async createSignal(user: UserProfile, input: CreateSignalInput): Promise<Signal> {
+    // Duplicate submission cooldown check for pipeline submissions
+    if (user.role === UserRole.CITIZEN && input.auto_process) {
+      const recentSignals = await this.repo.list({
+        citizen_id: user.id,
+        limit: 5
+      });
+      const nowMs = Date.now();
+      const isDuplicate = recentSignals.data.some((s) => {
+        if (s.original_text?.trim().toLowerCase() === input.original_text?.trim().toLowerCase()) {
+          const createdAtMs = new Date(s.created_at).getTime();
+          return (nowMs - createdAtMs) < 60000; // 60-second cooldown window
+        }
+        return false;
+      });
+      if (isDuplicate) {
+        throw new AppError({
+          statusCode: 409,
+          code: ERROR_CODES.CONFLICT,
+          message: 'Duplicate report submission detected within cooldown window. Please wait before submitting identical reports.'
+        });
+      }
+    }
+
     const id = `sig_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const now = new Date().toISOString();
 

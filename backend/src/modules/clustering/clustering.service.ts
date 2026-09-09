@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import {
   Signal,
   SignalStatus,
+  SignalProcessingStatus,
   ProblemCluster,
   ProblemClusterMember,
   ClusterRelationshipType,
@@ -14,6 +15,7 @@ import { SignalRepository } from '../signals/signal.repository';
 import { calculateSignalRelationship, cosineSimilarity } from './similarity.math';
 import { impactService } from '../impact/impact.service';
 import { env } from '../../config/env';
+import { AppError } from '../../middleware/error.middleware';
 
 export interface ClusterMatchResult {
   matched: boolean;
@@ -44,21 +46,37 @@ export class ClusteringService {
    */
   async clusterSignal(
     signalId: string,
-    options?: { autoCreate?: boolean }
+    options?: { autoCreate?: boolean; failOnEmbeddingError?: boolean }
   ): Promise<ClusterMatchResult> {
     const signal = await this.signalRepo.findById(signalId);
     if (!signal) {
       throw new Error(`Signal not found: ${signalId}`);
     }
 
+    if (signal.processing_status !== SignalProcessingStatus.COMPLETED) {
+      throw new AppError({
+        statusCode: 400,
+        code: 'SIGNAL_AI_INCOMPLETE',
+        message: `Cannot cluster signal ${signalId}: AI analysis has not completed (status: ${signal.processing_status}).`
+      });
+    }
+
     // 1. Generate or retrieve embedding for signal text
     let signalEmbedding: number[];
     try {
+      const textToEmbed = signal.normalized_text || signal.original_text || '';
       signalEmbedding = await this.aiProvider.generateEmbedding(
-        `${signal.category || ''}: ${signal.original_text}`
+        `${signal.category || ''}: ${textToEmbed}`
       );
-    } catch {
-      // Fallback zero vector if embedding service is unavailable
+    } catch (err: any) {
+      if (options?.failOnEmbeddingError) {
+        throw new AppError({
+          statusCode: 502,
+          code: 'EMBEDDING_FAILED',
+          message: `Semantic vector embedding generation failed: ${err.message || 'Unknown error'}`
+        });
+      }
+      // Fallback zero vector if embedding service is unavailable and failOnEmbeddingError is not true
       signalEmbedding = [];
     }
 
@@ -144,7 +162,9 @@ export class ClusteringService {
     // If no candidate reached the relationship threshold (>= 0.70)
     if (!bestMatch) {
       if (options?.autoCreate) {
-        const { problem, member } = await this.createClusterFromSignal(signalId);
+        const { problem, member } = await this.createClusterFromSignal(signalId, {
+          failOnEmbeddingError: options?.failOnEmbeddingError
+        });
         return {
           matched: true,
           isNewCluster: true,
@@ -199,6 +219,7 @@ export class ClusteringService {
 
     return {
       matched: true,
+      isNewCluster: false,
       problem: updatedProblem,
       member,
       relationship: bestMatch.relationship,
@@ -213,11 +234,19 @@ export class ClusteringService {
    */
   async createClusterFromSignal(
     signalId: string,
-    options?: { customTitle?: string }
+    options?: { customTitle?: string; failOnEmbeddingError?: boolean }
   ): Promise<{ problem: ProblemCluster; member: ProblemClusterMember }> {
     const signal = await this.signalRepo.findById(signalId);
     if (!signal) {
       throw new Error(`Signal not found: ${signalId}`);
+    }
+
+    if (signal.processing_status !== SignalProcessingStatus.COMPLETED) {
+      throw new AppError({
+        statusCode: 400,
+        code: 'SIGNAL_AI_INCOMPLETE',
+        message: `Cannot create cluster from signal ${signalId}: AI analysis has not completed (status: ${signal.processing_status}).`
+      });
     }
 
     const textForEmbedding = signal.normalized_text || signal.original_text || signal.category || 'Civic issue';
@@ -226,7 +255,14 @@ export class ClusteringService {
       signalEmbedding = await this.aiProvider.generateEmbedding(
         `${signal.category || ''}: ${textForEmbedding}`
       );
-    } catch {
+    } catch (err: any) {
+      if (options?.failOnEmbeddingError) {
+        throw new AppError({
+          statusCode: 502,
+          code: 'EMBEDDING_FAILED',
+          message: `Semantic vector embedding generation failed: ${err.message || 'Unknown error'}`
+        });
+      }
       signalEmbedding = [];
     }
 

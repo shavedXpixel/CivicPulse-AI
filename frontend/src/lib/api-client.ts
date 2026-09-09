@@ -41,6 +41,8 @@ export async function getAuthTokenAsync(): Promise<string> {
     } catch {
       // Fall through if token retrieval fails
     }
+    // Fallback to stored token (e.g. demo persona or session token)
+    return getAuthToken();
   }
 
   return '';

@@ -59,7 +59,7 @@ router.get('/:id/ai', SignalController.getSignalAI);
 // Explicit Phase 4 Clustering operation
 router.post(
   '/:id/cluster',
-  requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN, UserRole.DEPARTMENT_OFFICER, UserRole.FIELD_OFFICER),
+  requireRole(UserRole.CITIZEN, UserRole.ADMIN, UserRole.SYSTEM_ADMIN, UserRole.DEPARTMENT_OFFICER, UserRole.FIELD_OFFICER),
   SignalController.clusterSignal
 );
 

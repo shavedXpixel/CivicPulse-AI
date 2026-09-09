@@ -35,6 +35,7 @@ interface CitizenSignal {
   created_at: string;
   media_ids?: string[];
   recommended_department?: string;
+  problem_cluster_id?: string;
   ai_analysis?: SignalAIPreviewData;
 }
 
@@ -258,6 +259,17 @@ export default function CitizenIssuesPage() {
                               : 'Awaiting AI intelligence pipeline'}
                           </span>
                         </div>
+
+                        {sig.problem_cluster_id && (
+                          <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 rounded-full bg-civic-blue text-white flex items-center justify-center text-[9px]">
+                              <Check className="w-2.5 h-2.5" />
+                            </div>
+                            <span className="text-[11px] font-medium text-civic-blueDark">
+                              Public Problem Correlated: <span className="font-mono font-bold">#{sig.problem_cluster_id}</span>
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {/* AI Intelligence Inspection Toggle */}

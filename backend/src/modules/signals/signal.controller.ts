@@ -25,8 +25,34 @@ export class SignalController {
         );
       }
 
+      // 1. Create and persist raw signal to database
       const signal = await signalService.createSignal(user, validationResult.data);
 
+      // If auto_process is enabled, execute the automated end-to-end pipeline
+      if (validationResult.data.auto_process) {
+        // 2. Automated AI Analysis
+        await signalAIService.analyzeSignal(user, signal.id);
+
+        // 3. Automated Embedding & Clustering (Promote to cluster or attach to existing)
+        const clusterResult = await clusteringService.clusterSignal(signal.id, {
+          autoCreate: true,
+          failOnEmbeddingError: true
+        });
+
+        // 4. Retrieve updated signal with latest state and link
+        const updatedSignal = await signalService.getSignal(user, signal.id);
+
+        res.status(201).json({
+          data: {
+            ...updatedSignal,
+            cluster: clusterResult
+          },
+          cluster: clusterResult
+        });
+        return;
+      }
+
+      // Default: Return persisted raw signal
       res.status(201).json({
         data: signal
       });

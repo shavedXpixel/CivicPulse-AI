@@ -15,11 +15,15 @@ export interface ClusterSummaryInput {
   sample_descriptions?: string[];
 }
 
+export interface SignalAnalysisResult extends SignalAnalysisOutput {
+  resolved_model?: string;
+}
+
 export interface IAIProvider {
   /**
    * Analyzes an unstructured citizen signal and returns structured, schema-validated intelligence.
    */
-  analyzeSignal(input: SignalAnalysisInput): Promise<SignalAnalysisOutput>;
+  analyzeSignal(input: SignalAnalysisInput): Promise<SignalAnalysisResult>;
   generateEmbedding(text: string): Promise<number[]>;
   summarizeCluster(input: ClusterSummaryInput): Promise<string>;
   getModelName(): string;
