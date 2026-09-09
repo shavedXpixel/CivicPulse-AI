@@ -18,17 +18,34 @@ import {
   Sliders,
 } from 'lucide-react';
 
+import { useAuth } from '../../context/AuthContext';
+import { DEMO_PROBLEMS } from '../../lib/mockData';
+
 export interface GovernmentShellProps {
   children: ReactNode;
+  problemCount?: number;
 }
 
-export function GovernmentShell({ children }: GovernmentShellProps) {
+export function GovernmentShell({ children, problemCount }: GovernmentShellProps) {
   const pathname = usePathname();
+  const { isDemoMode } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const effectiveProblemCount =
+    problemCount !== undefined
+      ? problemCount
+      : isDemoMode
+      ? DEMO_PROBLEMS.length
+      : 0;
 
   const navigation = [
     { name: 'Command Center', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Problems', href: '/dashboard/problems', icon: AlertOctagon, badge: '14' },
+    {
+      name: 'Problems',
+      href: '/dashboard/problems',
+      icon: AlertOctagon,
+      badge: String(effectiveProblemCount),
+    },
     { name: 'Map Workspace', href: '/dashboard/map', icon: Map },
     { name: 'Departments', href: '/dashboard/departments', icon: Building2 },
     { name: 'Trends & Velocity', href: '/dashboard/trends', icon: TrendingUp },

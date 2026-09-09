@@ -98,10 +98,44 @@ export default function GovernmentDashboardPage() {
     loadDashboard();
   }, [loadDashboard]);
 
-  // Determine working problem set:
-  // In demo mode, fallback to DEMO_PROBLEMS if live API returns empty.
-  // In real mode, use liveProblems exclusively (truthful empty state).
-  const rawProblems = liveProblems.length > 0 ? liveProblems : (isDemoMode ? DEMO_PROBLEMS : []);
+  // Single Authoritative Dataset Resolution:
+  // In DEMO_MODE:
+  // Use liveProblems if available and non-empty, otherwise use DEMO_PROBLEMS.
+  // In REAL_MODE:
+  // Strictly use liveProblems (truthful empty [] if none in database).
+  const rawProblems = isDemoMode
+    ? (liveProblems.length > 0 ? liveProblems : DEMO_PROBLEMS)
+    : liveProblems;
+
+  // Effective departments list:
+  // In DEMO_MODE:
+  // Use liveDepartments if available and non-empty, otherwise use DEMO_DEPARTMENTS.
+  // In REAL_MODE:
+  // Strictly use liveDepartments (truthful empty [] if none in database).
+  const displayDepartments = isDemoMode
+    ? (liveDepartments.length > 0 ? liveDepartments : DEMO_DEPARTMENTS)
+    : liveDepartments;
+
+  // Single Authoritative Counts (Invariant: problem count, badge, quick nav, and KPIs derived from same dataset):
+  const authoritativeProblemCount = rawProblems.length;
+  const authoritativeDepartmentCount = displayDepartments.length;
+
+  const authoritativeActiveCount = isDemoMode && liveProblems.length === 0
+    ? DEMO_KPIS.activeProblems
+    : (liveSummary?.active_problems ?? rawProblems.filter((p) => p.status !== 'RESOLVED' && p.status !== 'CLOSED').length);
+
+  const authoritativeCriticalCount = isDemoMode && liveProblems.length === 0
+    ? DEMO_KPIS.highImpact
+    : (liveSummary?.critical_problems ?? rawProblems.filter((p) => {
+        const sev = p.impact_level || p.severity;
+        return sev === 'CRITICAL' || sev === 'HIGH';
+      }).length);
+
+  const authoritativeSignalCount = isDemoMode
+    ? (liveSummary && liveProblems.length > 0 && liveSummary.total_signals > 0
+        ? liveSummary.total_signals
+        : rawProblems.reduce((sum, p) => sum + (p.signalCount ?? p.signal_count ?? 0), 0))
+    : (liveSummary?.total_signals ?? rawProblems.reduce((sum, p) => sum + (p.signal_count ?? p.signalCount ?? 0), 0));
 
   // Determine highest impact problem for primary contextual navigation
   const highestProblem = rawProblems.slice().sort((a, b) => {
@@ -129,13 +163,54 @@ export default function GovernmentDashboardPage() {
         ? DEMO_PROBLEMS.filter((p) => p.severity === 'CRITICAL')
         : rawProblems.filter((p) => p.sla_state?.status === 'AT_RISK' || p.sla_state?.status === 'BREACHED'));
 
-  // Effective departments list:
-  const displayDepartments = liveDepartments.length > 0
-    ? liveDepartments
-    : (isDemoMode ? DEMO_DEPARTMENTS : []);
+  // Authoritative Intelligence Brief Data
+  let briefData: {
+    headline: string;
+    summary: string;
+    recommendedAction: string;
+    confidence: string;
+    sourcesCount: number;
+    problemLink: string;
+  };
+
+  if (isDemoMode) {
+    const demoSourcesCount = highestProblem?.signalCount ?? highestProblem?.signal_count ?? 327;
+    briefData = {
+      headline: DEMO_AI_BRIEF.headline,
+      summary: DEMO_AI_BRIEF.summary,
+      recommendedAction: DEMO_AI_BRIEF.recommendedAction,
+      confidence: DEMO_AI_BRIEF.confidence,
+      sourcesCount: demoSourcesCount,
+      problemLink: primaryProblemId ? `/dashboard/problems/${primaryProblemId}` : '/dashboard/problems',
+    };
+  } else {
+    // In REAL_MODE: Never render hardcoded Golden Demo intelligence
+    if (authoritativeProblemCount === 0 || authoritativeSignalCount === 0) {
+      briefData = {
+        headline: 'District Operational Calm — No Incident Signals',
+        summary: 'No citizen signals or correlated problem clusters currently require executive remediation in the municipal database.',
+        recommendedAction: 'Continue monitoring automated DPI ingestion and IoT telemetry streams.',
+        confidence: '100%',
+        sourcesCount: 0,
+        problemLink: '/dashboard/problems',
+      };
+    } else {
+      const topSigCount = highestProblem?.signal_count ?? highestProblem?.signalCount ?? 1;
+      const topImpact = highestProblem?.impact_score ?? highestProblem?.impactScore ?? 0;
+      const topWard = highestProblem?.ward_id ?? highestProblem?.wardId ?? 'Ward 18';
+      briefData = {
+        headline: `Priority Incident Cluster: #${highestProblem?.id} (${highestProblem?.title})`,
+        summary: highestProblem?.impact_explanation || highestProblem?.description || `High-impact municipal incident localized in ${topWard}. Auditable impact score: ${topImpact}/100.`,
+        recommendedAction: `Coordinate with ${highestProblem?.department_id || highestProblem?.department || 'assigned department'} to dispatch field verification team and track SLA countdown.`,
+        confidence: `${Math.round((highestProblem?.confidence || 0.92) * 100)}%`,
+        sourcesCount: topSigCount,
+        problemLink: `/dashboard/problems/${highestProblem?.id}`,
+      };
+    }
+  }
 
   return (
-    <GovernmentShell>
+    <GovernmentShell problemCount={authoritativeProblemCount}>
       <div className="space-y-8 max-w-7xl mx-auto">
         {/* Page Header */}
         <PageHeader
@@ -203,7 +278,7 @@ export default function GovernmentDashboardPage() {
               href="/dashboard/problems"
               className="px-3 py-1.5 rounded-lg border border-ink-border bg-canvas-subtle hover:bg-white text-ink-primary font-medium transition-colors"
             >
-              All Problems ({rawProblems.length})
+              All Problems ({authoritativeProblemCount})
             </Link>
             {primaryProblemId && (
               <Link
@@ -235,7 +310,7 @@ export default function GovernmentDashboardPage() {
               href="/dashboard/departments"
               className="px-3 py-1.5 rounded-lg border border-ink-border bg-canvas-subtle hover:bg-white text-ink-primary font-medium transition-colors"
             >
-              Departments ({displayDepartments.length})
+              Departments ({authoritativeDepartmentCount})
             </Link>
           </div>
         </div>
@@ -262,13 +337,7 @@ export default function GovernmentDashboardPage() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
           <KPIStat
             label="Citizen Signals"
-            value={
-              liveSummary
-                ? liveSummary.total_signals.toLocaleString()
-                : isDemoMode
-                ? DEMO_KPIS.totalSignals.toLocaleString()
-                : '0'
-            }
+            value={authoritativeSignalCount.toLocaleString()}
             comparison={isDemoMode ? '+384 today' : 'Correlated signals'}
             trend="up"
             trendValue={isDemoMode ? '+12%' : ''}
@@ -277,13 +346,7 @@ export default function GovernmentDashboardPage() {
           />
           <KPIStat
             label="Active Problems"
-            value={
-              liveSummary
-                ? liveSummary.active_problems.toLocaleString()
-                : isDemoMode
-                ? DEMO_KPIS.activeProblems.toLocaleString()
-                : '0'
-            }
+            value={authoritativeActiveCount.toLocaleString()}
             comparison="Clustered from signals"
             trend="down"
             trendValue={isDemoMode ? '-4%' : ''}
@@ -292,13 +355,7 @@ export default function GovernmentDashboardPage() {
           />
           <KPIStat
             label="Critical / High"
-            value={
-              liveSummary
-                ? liveSummary.critical_problems
-                : isDemoMode
-                ? DEMO_KPIS.highImpact
-                : 0
-            }
+            value={authoritativeCriticalCount}
             comparison="Urgent municipal focus"
             trend="up"
             trendValue=""
@@ -471,12 +528,12 @@ export default function GovernmentDashboardPage() {
               <p className="text-xs text-ink-secondary">Real-time cross-district synthesis</p>
             </div>
             <AIBrief
-              headline={DEMO_AI_BRIEF.headline}
-              summary={DEMO_AI_BRIEF.summary}
-              recommendedAction={DEMO_AI_BRIEF.recommendedAction}
-              confidence={DEMO_AI_BRIEF.confidence}
-              sourcesCount={DEMO_AI_BRIEF.sourcesCount}
-              problemLink={primaryProblemId ? `/dashboard/problems/${primaryProblemId}` : '/dashboard/problems'}
+              headline={briefData.headline}
+              summary={briefData.summary}
+              recommendedAction={briefData.recommendedAction}
+              confidence={briefData.confidence}
+              sourcesCount={briefData.sourcesCount}
+              problemLink={briefData.problemLink}
             />
           </div>
         </div>
@@ -515,69 +572,79 @@ export default function GovernmentDashboardPage() {
               href="/dashboard/departments"
               className="text-xs font-semibold text-civic-blue hover:underline"
             >
-              All Departments ({displayDepartments.length}) →
+              All Departments ({authoritativeDepartmentCount}) →
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {displayDepartments.slice(0, 3).map((dept: any) => {
-              const deptId = dept.id || dept.name;
-              const deptName = dept.name || dept.short_name;
-              const activeCount = dept.workload?.active_in_progress ?? dept.active ?? 0;
-              const highImpactCount = dept.workload?.critical_or_high ?? dept.highImpact ?? 0;
-              const slaRiskCount = dept.workload?.sla_at_risk ?? dept.slaRisk ?? 0;
-              const medianRes = dept.medianResolution || '4.2 hrs';
+          {displayDepartments.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {displayDepartments.slice(0, 3).map((dept: any) => {
+                const deptId = dept.id || dept.name;
+                const deptName = dept.name || dept.short_name;
+                const activeCount = dept.workload?.active_in_progress ?? dept.active ?? 0;
+                const highImpactCount = dept.workload?.critical_or_high ?? dept.highImpact ?? 0;
+                const slaRiskCount = dept.workload?.sla_at_risk ?? dept.slaRisk ?? 0;
+                const medianRes = dept.medianResolution || '4.2 hrs';
 
-              return (
-                <div
-                  key={deptId}
-                  className="p-5 rounded-xl border border-ink-border bg-white shadow-card space-y-3 hover:border-civic-blue/40 transition-colors"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <Building2 className="w-4 h-4 text-civic-blue shrink-0" />
-                        <h3 className="text-sm font-bold text-ink-primary">{deptName}</h3>
+                return (
+                  <div
+                    key={deptId}
+                    className="p-5 rounded-xl border border-ink-border bg-white shadow-card space-y-3 hover:border-civic-blue/40 transition-colors"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <Building2 className="w-4 h-4 text-civic-blue shrink-0" />
+                          <h3 className="text-sm font-bold text-ink-primary">{deptName}</h3>
+                        </div>
+                        <span className="text-xs text-ink-secondary font-mono">
+                          {activeCount} active problems
+                        </span>
                       </div>
-                      <span className="text-xs text-ink-secondary font-mono">
-                        {activeCount} active problems
-                      </span>
+                      {slaRiskCount > 0 && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-civic-amberLight text-amber-900">
+                          {slaRiskCount} SLA At Risk
+                        </span>
+                      )}
                     </div>
-                    {slaRiskCount > 0 && (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-civic-amberLight text-amber-900">
-                        {slaRiskCount} SLA At Risk
-                      </span>
-                    )}
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="p-2 rounded bg-canvas-subtle border border-ink-border">
-                      <span className="text-ink-tertiary block text-[10px] uppercase font-semibold">
-                        High Impact
-                      </span>
-                      <span className="font-bold text-civic-rose">{highImpactCount}</span>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="p-2 rounded bg-canvas-subtle border border-ink-border">
+                        <span className="text-ink-tertiary block text-[10px] uppercase font-semibold">
+                          High Impact
+                        </span>
+                        <span className="font-bold text-civic-rose">{highImpactCount}</span>
+                      </div>
+                      <div className="p-2 rounded bg-canvas-subtle border border-ink-border">
+                        <span className="text-ink-tertiary block text-[10px] uppercase font-semibold">
+                          Median Res.
+                        </span>
+                        <span className="font-bold text-ink-primary">{medianRes}</span>
+                      </div>
                     </div>
-                    <div className="p-2 rounded bg-canvas-subtle border border-ink-border">
-                      <span className="text-ink-tertiary block text-[10px] uppercase font-semibold">
-                        Median Res.
-                      </span>
-                      <span className="font-bold text-ink-primary">{medianRes}</span>
-                    </div>
-                  </div>
 
-                  <div className="pt-2 border-t border-ink-border/60 flex items-center justify-end">
-                    <Link
-                      href={`/dashboard/problems?department=${dept.id || dept.name}`}
-                      className="text-xs font-semibold text-civic-blue hover:underline flex items-center gap-1"
-                    >
-                      <span>View Department Queue</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </Link>
+                    <div className="pt-2 border-t border-ink-border/60 flex items-center justify-end">
+                      <Link
+                        href={`/dashboard/problems?department=${dept.id || dept.name}`}
+                        className="text-xs font-semibold text-civic-blue hover:underline flex items-center gap-1"
+                      >
+                        <span>View Department Queue</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-8 rounded-xl border border-ink-border bg-white text-center space-y-2">
+              <Building2 className="w-8 h-8 text-ink-tertiary mx-auto" />
+              <p className="text-sm font-semibold text-ink-primary">No department records available</p>
+              <p className="text-xs text-ink-secondary">
+                Department metadata directory has not been populated in the active database.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </GovernmentShell>

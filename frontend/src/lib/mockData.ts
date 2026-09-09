@@ -244,12 +244,12 @@ export const DEMO_PROBLEMS: MockProblem[] = [
 ];
 
 export const DEMO_KPIS = {
-  totalSignals: 12842,
-  activeProblems: 1284,
-  highImpact: 426,
-  resolutionRate: '82%',
-  medianResponse: '31 hrs',
-  signalsToday: 384,
+  totalSignals: DEMO_PROBLEMS.reduce((acc, p) => acc + (p.signalCount || 0), 0),
+  activeProblems: DEMO_PROBLEMS.filter((p) => p.status !== 'RESOLVED' && p.status !== 'CLOSED').length,
+  highImpact: DEMO_PROBLEMS.filter((p) => p.severity === 'CRITICAL' || p.severity === 'HIGH').length,
+  resolutionRate: '80%',
+  medianResponse: '29 hrs',
+  signalsToday: 327,
 };
 
 export const DEMO_DEPARTMENTS = [

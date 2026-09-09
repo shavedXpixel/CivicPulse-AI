@@ -16,7 +16,7 @@ export function AIBrief({
   summary,
   recommendedAction,
   confidence = '94%',
-  sourcesCount = 327,
+  sourcesCount = 0,
   problemLink,
 }: AIBriefProps) {
   return (
