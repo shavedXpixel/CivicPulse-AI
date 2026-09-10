@@ -1,124 +1,384 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { CitizenShell } from '../../components/shells/CitizenShell';
-import { Mic, Camera, FileText, ArrowRight, CheckCircle2, Clock, MapPin } from 'lucide-react';
+import {
+  Mic,
+  Camera,
+  FileText,
+  ArrowRight,
+  Clock,
+  MapPin,
+  AlertCircle,
+  Loader2,
+  Lock,
+  PlusCircle,
+  ShieldCheck,
+  Building2
+} from 'lucide-react';
+import { Button } from '../../components/ui/Button';
+import { apiClient } from '../../lib/api-client';
+import { useAuth } from '../../context/AuthContext';
+
+interface CitizenSignal {
+  id: string;
+  original_text?: string;
+  category?: string;
+  ward_id?: string;
+  ward_name?: string;
+  location_reference?: string;
+  location?: { lat: number; lng: number };
+  status: string;
+  processing_status: string;
+  created_at: string;
+  problem_cluster_id?: string;
+  ai_analysis?: any;
+}
 
 export default function CitizenHomePage() {
+  const { user, isDemoMode, loading: authLoading } = useAuth();
+
+  const [signals, setSignals] = useState<CitizenSignal[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setLoadError(null);
+      const res = await apiClient.get<{ data: CitizenSignal[] }>('/api/v1/signals/me');
+      setSignals(res.data || []);
+    } catch (err: any) {
+      if (err.status === 401 || err.code === 'UNAUTHORIZED') {
+        setLoadError('Session expired or authentication required. Please sign in to view your reports.');
+      } else {
+        setLoadError(err.message || 'Unable to fetch citizen reports from server.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isDemoMode && !user) {
+      setIsLoading(false);
+      return;
+    }
+    loadData();
+  }, [isDemoMode, user, authLoading, loadData]);
+
+  // Derived real metrics
+  const totalReports = signals.length;
+  const inProgressReports = signals.filter(
+    (s) => s.status === 'ACTIVE' || s.status === 'ATTACHED_TO_PROBLEM'
+  ).length;
+  const resolvedReports = signals.filter(
+    (s) => s.status === 'RESOLVED' || s.status === 'CLOSED'
+  ).length;
+  const correlatedProblems = signals.filter((s) => Boolean(s.problem_cluster_id)).length;
+
+  const citizenName =
+    user?.displayName ||
+    (user?.email ? user.email.split('@')[0] : isDemoMode ? 'Demo Citizen' : 'Citizen');
+
   return (
     <CitizenShell>
-      <div className="space-y-8">
-        {/* Welcome & Prompt */}
+      <div className="space-y-8 max-w-2xl mx-auto">
+        {/* Citizen Identity & Header */}
         <div className="space-y-2 text-left">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-mono bg-civic-blueLight text-civic-blueDark">
-            <MapPin className="w-3.5 h-3.5" />
-            <span>Ward 18 • Nayapalli, Bhubaneswar</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-mono bg-civic-blueLight text-civic-blueDark">
+              <ShieldCheck className="w-3.5 h-3.5 text-civic-blue" />
+              <span>Verified Citizen Portal</span>
+            </div>
+            {!isDemoMode && user && (
+              <span className="text-xs text-ink-secondary font-mono">
+                {user.email}
+              </span>
+            )}
+            {isDemoMode && (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200">
+                Demo Mode
+              </span>
+            )}
           </div>
+
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink-primary">
-            Report a problem in your neighborhood
+            {user || isDemoMode ? `Welcome, ${citizenName}` : 'Civic Problem Reporting'}
           </h1>
-          <p className="text-xs sm:text-sm text-ink-secondary">
-            No department codes or forms required. Speak, take a photo, or write in plain language.
+          <p className="text-xs sm:text-sm text-ink-secondary leading-relaxed">
+            Report civic issues in your neighborhood. CivicPulse analyzes plain language, detects categories, correlates public problems, and routes actions to municipal authorities.
           </p>
         </div>
 
-        {/* Quick Actions Grid */}
+        {/* REAL_MODE Unauthenticated Notice */}
+        {!isDemoMode && !authLoading && !user && (
+          <div className="p-6 rounded-2xl border border-amber-200 bg-amber-50/70 text-xs text-amber-950 space-y-3 shadow-sm">
+            <div className="flex items-center gap-2 font-bold text-amber-900 text-sm">
+              <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+              <span>Sign In to Track Your Neighborhood Reports</span>
+            </div>
+            <p className="leading-relaxed text-xs text-amber-900/90">
+              Sign in with your citizen profile to file verified civic reports, receive real-time updates on municipal triage, and track resolution timelines with DPDP privacy protections.
+            </p>
+            <div className="pt-1 flex items-center gap-3">
+              <Link href="/login">
+                <Button variant="primary" size="sm" className="text-xs gap-1.5">
+                  <span>Sign In as Citizen</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Button>
+              </Link>
+              <Link href="/citizen/report">
+                <Button variant="secondary" size="sm" className="text-xs">
+                  File a Report
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Quick Report Intake Actions */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Link
             href="/citizen/report?mode=voice"
-            className="flex items-center sm:flex-col justify-start sm:justify-center p-4 rounded-xl border border-ink-border bg-white shadow-card hover:border-civic-blue hover:bg-civic-blueLight/20 transition-all gap-3 text-left sm:text-center"
+            className="flex items-center sm:flex-col justify-start sm:justify-center p-4 rounded-xl border border-ink-border bg-white shadow-card hover:border-civic-blue hover:bg-civic-blueLight/20 transition-all gap-3 text-left sm:text-center group"
           >
-            <div className="w-10 h-10 rounded-full bg-civic-blueLight flex items-center justify-center text-civic-blue">
+            <div className="w-10 h-10 rounded-full bg-civic-blueLight flex items-center justify-center text-civic-blue group-hover:scale-105 transition-transform">
               <Mic className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-sm font-semibold text-ink-primary">Speak in your language</div>
+              <div className="text-sm font-semibold text-ink-primary">Speak description</div>
               <div className="text-[11px] text-ink-secondary">Odia (ଓଡ଼ିଆ), Hindi, English</div>
             </div>
           </Link>
 
           <Link
             href="/citizen/report?mode=photo"
-            className="flex items-center sm:flex-col justify-start sm:justify-center p-4 rounded-xl border border-ink-border bg-white shadow-card hover:border-civic-blue hover:bg-civic-blueLight/20 transition-all gap-3 text-left sm:text-center"
+            className="flex items-center sm:flex-col justify-start sm:justify-center p-4 rounded-xl border border-ink-border bg-white shadow-card hover:border-civic-blue hover:bg-civic-blueLight/20 transition-all gap-3 text-left sm:text-center group"
           >
-            <div className="w-10 h-10 rounded-full bg-civic-blueLight flex items-center justify-center text-civic-blue">
+            <div className="w-10 h-10 rounded-full bg-civic-blueLight flex items-center justify-center text-civic-blue group-hover:scale-105 transition-transform">
               <Camera className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-sm font-semibold text-ink-primary">Take a photo</div>
-              <div className="text-[11px] text-ink-secondary">AI detects category & severity</div>
+              <div className="text-sm font-semibold text-ink-primary">Attach photo</div>
+              <div className="text-[11px] text-ink-secondary">Up to 10 MB with GPS</div>
             </div>
           </Link>
 
           <Link
             href="/citizen/report?mode=text"
-            className="flex items-center sm:flex-col justify-start sm:justify-center p-4 rounded-xl border border-ink-border bg-white shadow-card hover:border-civic-blue hover:bg-civic-blueLight/20 transition-all gap-3 text-left sm:text-center"
+            className="flex items-center sm:flex-col justify-start sm:justify-center p-4 rounded-xl border border-ink-border bg-white shadow-card hover:border-civic-blue hover:bg-civic-blueLight/20 transition-all gap-3 text-left sm:text-center group"
           >
-            <div className="w-10 h-10 rounded-full bg-civic-blueLight flex items-center justify-center text-civic-blue">
+            <div className="w-10 h-10 rounded-full bg-civic-blueLight flex items-center justify-center text-civic-blue group-hover:scale-105 transition-transform">
               <FileText className="w-5 h-5" />
             </div>
             <div>
               <div className="text-sm font-semibold text-ink-primary">Type description</div>
-              <div className="text-[11px] text-ink-secondary">Simple message or WhatsApp text</div>
+              <div className="text-[11px] text-ink-secondary">Plain-language civic text</div>
             </div>
           </Link>
         </div>
 
-        {/* Neighborhood Status Card */}
-        <div className="p-5 rounded-xl border border-ink-border bg-white shadow-card space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-semibold uppercase tracking-wider text-ink-secondary">
-              Active Community Incident
-            </span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-civic-amberLight text-amber-900">
-              Dispatched
-            </span>
-          </div>
-
-          <div className="space-y-1">
-            <h3 className="text-sm font-bold text-ink-primary">
-              Water supply disruption on VIP Road
+        {/* Primary Call to Action Bar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-civic-blue to-civic-blueDark text-white shadow-elevated">
+          <div className="space-y-0.5">
+            <h3 className="text-sm font-bold flex items-center gap-1.5">
+              <PlusCircle className="w-4 h-4 text-civic-emeraldLight" />
+              <span>Have a new civic problem to report?</span>
             </h3>
-            <p className="text-xs text-ink-secondary leading-relaxed">
-              327 neighboring residents have reported this issue. WATCO repair crew is on-site replacing Valve 4B.
+            <p className="text-[11px] text-blue-100">
+              Instant AI structuring, GIS ward localization, and public correlation.
             </p>
           </div>
-
-          <div className="pt-2 border-t border-ink-border/60 flex items-center justify-between text-xs font-medium text-civic-blue">
-            <span className="text-ink-tertiary font-mono text-[11px]">Est. water restored: ~3 hours</span>
-            <Link href="/citizen/issues" className="hover:underline flex items-center gap-1">
-              <span>View details</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
+          <Link href="/citizen/report" className="shrink-0">
+            <Button variant="secondary" size="sm" className="w-full sm:w-auto bg-white text-civic-blue font-semibold hover:bg-blue-50 border-0 text-xs">
+              Report a Public Issue
+            </Button>
+          </Link>
         </div>
 
-        {/* Recent Citizen Reports */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-ink-primary">Your recent reports</h2>
-            <Link href="/citizen/issues" className="text-xs font-semibold text-civic-blue hover:underline">
-              View all
-            </Link>
+        {/* Real Reports & Telemetry Section */}
+        {isLoading ? (
+          <div className="p-12 text-center text-ink-secondary space-y-3 bg-white rounded-2xl border border-ink-border">
+            <Loader2 className="w-6 h-6 animate-spin mx-auto text-civic-blue" />
+            <p className="text-xs">Loading citizen dashboard data from server...</p>
           </div>
-
-          <div className="space-y-2">
-            <div className="p-4 rounded-xl border border-ink-border bg-white shadow-card flex items-center justify-between">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-ink-primary">Water leak outside gate</span>
-                  <span className="px-2 py-0.2 rounded text-[10px] font-mono bg-civic-amberLight text-amber-900">
-                    In Progress
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-ink-tertiary">
-                  <Clock className="w-3 h-3" />
-                  <span>Reported yesterday • Ref #CP-10482</span>
-                </div>
-              </div>
-              <CheckCircle2 className="w-5 h-5 text-civic-emerald" />
+        ) : loadError ? (
+          <div className="p-4 rounded-xl border border-civic-rose/30 bg-rose-50 text-xs text-rose-900 flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-civic-rose shrink-0 mt-0.5" />
+              <span>{loadError}</span>
+            </div>
+            <button
+              onClick={loadData}
+              className="text-xs font-semibold text-civic-blue hover:underline shrink-0"
+            >
+              Retry
+            </button>
+          </div>
+        ) : totalReports === 0 ? (
+          /* Honest Empty State */
+          <div className="p-8 text-center rounded-2xl border border-ink-border bg-white shadow-card space-y-4">
+            <div className="w-12 h-12 rounded-full bg-canvas-subtle text-ink-tertiary mx-auto flex items-center justify-center">
+              <Building2 className="w-6 h-6 text-civic-blue" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-ink-primary">No reports yet</h3>
+              <p className="text-xs text-ink-secondary max-w-md mx-auto leading-relaxed">
+                You have not submitted any civic reports yet. When you report public issues in your area, your reports and correlated government progress will appear here.
+              </p>
+            </div>
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link href="/citizen/report">
+                <Button variant="primary" size="sm" className="text-xs gap-1.5">
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>Report a Public Issue</span>
+                </Button>
+              </Link>
+              <Link href="/citizen/issues">
+                <Button variant="secondary" size="sm" className="text-xs">
+                  Track My Reports
+                </Button>
+              </Link>
             </div>
           </div>
-        </div>
+        ) : (
+          /* Authoritative Dashboard with Real Counts & Recent Reports */
+          <div className="space-y-6">
+            {/* Real Authoritative Metric Tiles */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-4 rounded-xl border border-ink-border bg-white shadow-card space-y-1">
+                <span className="text-[11px] font-medium text-ink-secondary uppercase tracking-wider block">
+                  Total Reports
+                </span>
+                <span className="text-xl font-bold font-mono text-ink-primary">
+                  {totalReports}
+                </span>
+              </div>
+
+              <div className="p-4 rounded-xl border border-ink-border bg-white shadow-card space-y-1">
+                <span className="text-[11px] font-medium text-ink-secondary uppercase tracking-wider block">
+                  In Progress
+                </span>
+                <span className="text-xl font-bold font-mono text-civic-amber">
+                  {inProgressReports}
+                </span>
+              </div>
+
+              <div className="p-4 rounded-xl border border-ink-border bg-white shadow-card space-y-1">
+                <span className="text-[11px] font-medium text-ink-secondary uppercase tracking-wider block">
+                  Resolved
+                </span>
+                <span className="text-xl font-bold font-mono text-civic-emerald">
+                  {resolvedReports}
+                </span>
+              </div>
+
+              <div className="p-4 rounded-xl border border-ink-border bg-white shadow-card space-y-1">
+                <span className="text-[11px] font-medium text-ink-secondary uppercase tracking-wider block">
+                  Correlated
+                </span>
+                <span className="text-xl font-bold font-mono text-civic-blue">
+                  {correlatedProblems}
+                </span>
+              </div>
+            </div>
+
+            {/* Recent Citizen Reports */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-bold text-ink-primary flex items-center gap-2">
+                  <span>Your recent reports</span>
+                  <span className="text-xs font-mono font-normal text-ink-tertiary">
+                    ({signals.length})
+                  </span>
+                </h2>
+                <Link
+                  href="/citizen/issues"
+                  className="text-xs font-semibold text-civic-blue hover:underline flex items-center gap-1"
+                >
+                  <span>Track My Reports</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              <div className="space-y-2.5">
+                {signals.slice(0, 3).map((sig) => {
+                  const formattedDate = new Date(sig.created_at).toLocaleDateString('en-IN', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  });
+
+                  return (
+                    <div
+                      key={sig.id}
+                      className="p-4 rounded-xl border border-ink-border bg-white shadow-card hover:border-civic-blue/40 transition-colors space-y-2"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono font-bold text-civic-blue">
+                              #{sig.id}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                                sig.processing_status === 'COMPLETED'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                  : 'bg-amber-50 text-amber-900 border-amber-200'
+                              }`}
+                            >
+                              {sig.processing_status === 'COMPLETED' ? 'Processed' : 'Pending Analysis'}
+                            </span>
+                            {sig.problem_cluster_id && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+                                Correlated: #{sig.problem_cluster_id}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs font-medium text-ink-primary line-clamp-2 leading-relaxed">
+                            {sig.original_text}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 text-[11px] text-ink-secondary border-t border-ink-border/40">
+                        <span className="flex items-center gap-1 font-mono text-[11px]">
+                          <MapPin className="w-3 h-3 text-ink-tertiary" />
+                          <span>
+                            {sig.location_reference ||
+                              sig.ward_name ||
+                              sig.ward_id ||
+                              (sig.location ? `${sig.location.lat.toFixed(4)}, ${sig.location.lng.toFixed(4)}` : 'Bhubaneswar')}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-1 text-[11px] text-ink-tertiary">
+                          <Clock className="w-3 h-3" />
+                          <span>{formattedDate}</span>
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Quick Navigation Footer */}
+            <div className="pt-2 flex items-center justify-between border-t border-ink-border/50 text-xs">
+              <Link href="/citizen/report" className="text-civic-blue hover:underline font-semibold flex items-center gap-1">
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Report another issue</span>
+              </Link>
+              <Link href="/citizen/issues" className="text-ink-secondary hover:text-ink-primary font-medium flex items-center gap-1">
+                <span>View all reports ({signals.length})</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </CitizenShell>
   );

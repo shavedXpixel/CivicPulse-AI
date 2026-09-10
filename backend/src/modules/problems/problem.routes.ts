@@ -20,8 +20,13 @@ router.get('/:id', ProblemController.getProblem);
 // Extended problem cluster details with members, timeline, and impact breakdown
 router.get('/:id/details', ProblemController.getProblemDetails);
 
-// Retrieve member signals for a problem cluster
-router.get('/:id/signals', ProblemController.getProblemSignals);
+// Retrieve member signals for a problem cluster (Government Officers and Admins only)
+// CRITICAL PRIVACY GUARDRAIL: Ordinary citizens are strictly forbidden from querying raw member signals (403)
+router.get(
+  '/:id/signals',
+  requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN, UserRole.DEPARTMENT_OFFICER, UserRole.FIELD_OFFICER),
+  ProblemController.getProblemSignals
+);
 
 // Official Problem Cluster Creation
 // CRITICAL GUARDRAIL: Ordinary citizens are strictly forbidden from creating official government ProblemClusters (403)
@@ -56,8 +61,12 @@ router.post(
   WorkflowController.assignProblem
 );
 
-// Problem-specific Assignment History
-router.get('/:id/assignments', WorkflowController.getAssignments);
+// Problem-specific Assignment History (Officers and Admins only)
+router.get(
+  '/:id/assignments',
+  requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN, UserRole.DEPARTMENT_OFFICER, UserRole.FIELD_OFFICER),
+  WorkflowController.getAssignments
+);
 
 // Authorized Officer Action Logging (Field Officer, Department Officer, Admin, System Admin)
 router.post(
@@ -66,9 +75,17 @@ router.post(
   WorkflowController.recordAction
 );
 
-// Problem Audit History / Action Timeline
-router.get('/:id/actions', WorkflowController.getActions);
-router.get('/:id/timeline', WorkflowController.getActions);
+// Internal Problem Audit History / Action Timeline (Officers and Admins only)
+router.get(
+  '/:id/actions',
+  requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN, UserRole.DEPARTMENT_OFFICER, UserRole.FIELD_OFFICER),
+  WorkflowController.getActions
+);
+router.get(
+  '/:id/timeline',
+  requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN, UserRole.DEPARTMENT_OFFICER, UserRole.FIELD_OFFICER),
+  WorkflowController.getActions
+);
 
 // Problem Status / Lifecycle Transitions
 router.patch(

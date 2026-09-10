@@ -15,11 +15,14 @@ import {
   ChevronDown,
   ChevronUp,
   Lock,
-  RefreshCw
+  RefreshCw,
+  Camera,
+  ExternalLink
 } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { Button } from '../../../components/ui/Button';
 import { SignalAIPreview, SignalAIPreviewData } from '../../../components/citizen/SignalAIPreview';
+import { PublicProblemModal } from '../../../components/citizen/PublicProblemModal';
 import { useAuth } from '../../../context/AuthContext';
 
 interface CitizenSignal {
@@ -46,6 +49,7 @@ export default function CitizenIssuesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedSignalId, setExpandedSignalId] = useState<string | null>(null);
+  const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
 
   const loadReports = useCallback(async () => {
     try {
@@ -232,10 +236,23 @@ export default function CitizenIssuesPage() {
                         </span>
                       </div>
 
+                      {/* Media indicator */}
+                      {sig.media_ids && sig.media_ids.length > 0 && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-canvas-subtle border border-ink-border/50 text-[11px] text-ink-secondary">
+                          <Camera className="w-3.5 h-3.5 text-civic-blue shrink-0" />
+                          <span>{sig.media_ids.length} verification photograph{sig.media_ids.length > 1 ? 's' : ''} attached</span>
+                        </div>
+                      )}
+
                       {/* Progress Milestone Tracker */}
-                      <div className="p-3 rounded-xl bg-canvas-subtle border border-ink-border/60 text-xs space-y-2">
+                      <div className="p-3.5 rounded-2xl bg-canvas-subtle border border-ink-border/60 text-xs space-y-2.5">
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-ink-tertiary font-medium">
+                          Lifecycle Progress
+                        </div>
+
+                        {/* Milestone 1: Signal Recorded */}
                         <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 rounded-full bg-civic-emerald text-white flex items-center justify-center text-[9px]">
+                          <div className="w-4 h-4 rounded-full bg-civic-emerald text-white flex items-center justify-center text-[9px] shrink-0">
                             <Check className="w-2.5 h-2.5" />
                           </div>
                           <span className="text-[11px] font-medium text-ink-primary">
@@ -243,30 +260,72 @@ export default function CitizenIssuesPage() {
                           </span>
                         </div>
 
+                        {/* Milestone 2: AI Triage */}
                         <div className="flex items-center gap-2">
                           <div
-                            className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${
+                            className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] shrink-0 ${
                               sig.processing_status === 'COMPLETED'
                                 ? 'bg-civic-emerald text-white'
-                                : 'bg-canvas-muted text-ink-tertiary border border-ink-border'
+                                : 'bg-amber-100 text-amber-800 border border-amber-300'
                             }`}
                           >
-                            {sig.processing_status === 'COMPLETED' ? <Check className="w-2.5 h-2.5" /> : '2'}
+                            {sig.processing_status === 'COMPLETED' ? (
+                              <Check className="w-2.5 h-2.5" />
+                            ) : (
+                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                            )}
                           </div>
                           <span className="text-[11px] text-ink-secondary">
                             {sig.processing_status === 'COMPLETED'
-                              ? 'AI structured extraction completed'
+                              ? `AI triage completed${sig.category ? ` (${sig.category})` : ''}`
                               : 'Awaiting AI intelligence pipeline'}
                           </span>
                         </div>
 
-                        {sig.problem_cluster_id && (
+                        {/* Milestone 3: Problem Correlation */}
+                        {sig.problem_cluster_id ? (
+                          <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/70 space-y-1.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 rounded-full bg-civic-blue text-white flex items-center justify-center text-[9px] shrink-0">
+                                  <Check className="w-2.5 h-2.5" />
+                                </div>
+                                <span className="text-[11px] font-semibold text-civic-blueDark">
+                                  Community Problem Cluster Correlated
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedProblemId(sig.problem_cluster_id!)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-civic-blue/30 text-civic-blue text-[11px] font-semibold hover:bg-civic-blue hover:text-white transition-colors shadow-xs"
+                              >
+                                <span>Track Cluster #{sig.problem_cluster_id.substring(0, 10)}</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-slate-600 pl-6">
+                              This report has been aggregated with other citizen signals for coordinated municipal response.
+                            </p>
+                          </div>
+                        ) : (
                           <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 rounded-full bg-civic-blue text-white flex items-center justify-center text-[9px]">
+                            <div className="w-4 h-4 rounded-full bg-canvas-muted text-ink-tertiary border border-ink-border flex items-center justify-center text-[9px] shrink-0">
+                              3
+                            </div>
+                            <span className="text-[11px] text-ink-secondary">
+                              Spatial correlation & cluster clustering in progress
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Milestone 4: Municipal Routing */}
+                        {sig.recommended_department && (
+                          <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 rounded-full bg-civic-emerald text-white flex items-center justify-center text-[9px] shrink-0">
                               <Check className="w-2.5 h-2.5" />
                             </div>
-                            <span className="text-[11px] font-medium text-civic-blueDark">
-                              Public Problem Correlated: <span className="font-mono font-bold">#{sig.problem_cluster_id}</span>
+                            <span className="text-[11px] font-medium text-ink-primary">
+                              Routed to: {sig.recommended_department.replace(/_/g, ' ')}
                             </span>
                           </div>
                         )}
@@ -325,6 +384,14 @@ export default function CitizenIssuesPage() {
               </div>
             )}
           </>
+        )}
+
+        {/* Safe Public Problem Tracking Modal */}
+        {selectedProblemId && (
+          <PublicProblemModal
+            problemId={selectedProblemId}
+            onClose={() => setSelectedProblemId(null)}
+          />
         )}
       </div>
     </CitizenShell>

@@ -32,6 +32,8 @@ export async function getAuthTokenAsync(): Promise<string> {
     return getAuthToken();
   }
 
+  // REAL_MODE: Firebase Authentication is authoritative.
+  // Never fall back to demo persona tokens stored in localStorage.
   if (typeof window !== 'undefined') {
     try {
       const firebaseToken = await getCurrentIdToken();
@@ -39,10 +41,9 @@ export async function getAuthTokenAsync(): Promise<string> {
         return firebaseToken;
       }
     } catch {
-      // Fall through if token retrieval fails
+      // Token retrieval failed
     }
-    // Fallback to stored token (e.g. demo persona or session token)
-    return getAuthToken();
+    return '';
   }
 
   return '';

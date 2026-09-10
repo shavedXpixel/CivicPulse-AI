@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   User,
   ShieldCheck,
@@ -15,13 +15,18 @@ import {
   AlertCircle,
   Loader2,
   LogOut,
-  CheckCircle2
+  CheckCircle2,
+  Clock
 } from 'lucide-react';
 import { setAuthToken } from '../../lib/api-client';
 import { useAuth } from '../../context/AuthContext';
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTarget = searchParams.get('redirect') || '/citizen';
+  const isSessionExpired = searchParams.get('session_expired') === 'true';
+
   const { user, loading: authLoading, isDemoMode, isConfigured, signIn, signUp, signOut } = useAuth();
 
   // REAL_MODE state
@@ -105,15 +110,25 @@ export default function LoginPage() {
       } else {
         await signIn(email.trim(), password);
       }
-      router.push('/citizen');
+      router.push(redirectTarget);
     } catch (err: any) {
       let msg = err.message || 'Authentication failed. Please check your credentials.';
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        msg = 'Invalid email or password.';
+      if (
+        err.code === 'auth/user-not-found' ||
+        err.code === 'auth/wrong-password' ||
+        err.code === 'auth/invalid-credential'
+      ) {
+        msg = 'Invalid email or password. Please verify your credentials.';
       } else if (err.code === 'auth/email-already-in-use') {
         msg = 'An account with this email address already exists. Please sign in instead.';
       } else if (err.code === 'auth/invalid-email') {
-        msg = 'Please enter a valid email address.';
+        msg = 'Please enter a valid email address format.';
+      } else if (err.code === 'auth/weak-password') {
+        msg = 'Password is too weak. Please use at least 6 characters.';
+      } else if (err.code === 'auth/network-request-failed') {
+        msg = 'Network failure. Please verify your internet connection and retry.';
+      } else if (err.code === 'auth/too-many-requests') {
+        msg = 'Too many failed login attempts. Account access is temporarily throttled. Please try again shortly.';
       }
       setFormError(msg);
     } finally {
@@ -228,6 +243,13 @@ export default function LoginPage() {
             ) : (
               /* Sign In / Register Form */
               <form onSubmit={handleRealAuth} className="space-y-4">
+                {isSessionExpired && (
+                  <div className="p-3 rounded-lg bg-amber-50 border border-amber-300 text-xs text-amber-900 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Your session has expired. Please sign in again to continue.</span>
+                  </div>
+                )}
+
                 {formError && (
                   <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-900 flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
@@ -307,5 +329,19 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-canvas flex items-center justify-center">
+          <Loader2 className="w-6 h-6 animate-spin text-civic-blue" />
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }

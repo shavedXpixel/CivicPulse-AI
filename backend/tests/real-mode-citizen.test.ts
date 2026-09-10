@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app';
-import { ProviderContainer, MockDatabaseProvider } from '../src/providers';
+import { ProviderContainer, MockDatabaseProvider, MockAIProvider } from '../src/providers';
 import { env } from '../src/config/env';
 import { UserRole, UserStatus, ERROR_CODES } from '@civicpulse/shared';
 import * as firebaseAdminModule from '../src/infrastructure/firebase/firebase-admin';
@@ -14,6 +14,7 @@ describe('Phase 10 Step 3: Real-Mode Authentication & Citizen Reporting', () => 
   beforeEach(() => {
     ProviderContainer.resetAllProviders();
     ProviderContainer.setDatabaseProvider(new MockDatabaseProvider());
+    ProviderContainer.setAIProvider(new MockAIProvider());
     app = createApp();
 
     mockVerifyIdToken = vi.fn();
@@ -387,6 +388,151 @@ describe('Phase 10 Step 3: Real-Mode Authentication & Citizen Reporting', () => 
       expect(res.status).toBe(200);
       expect(res.body.data.length).toBeGreaterThan(0);
       expect(res.body.data.every((s: any) => s.citizen_id === 'usr_citizen_01')).toBe(true);
+    });
+  });
+
+  describe('5. Citizen Privacy, RBAC & Safe Public Problem Tracking', () => {
+    const strangerUid = 'usr_citizen_stranger_99';
+
+    beforeEach(async () => {
+      (env as any).DEMO_MODE = false;
+      const db = ProviderContainer.getDatabaseProvider();
+      await db.createUser({
+        id: strangerUid,
+        email: 'stranger@bhubaneswar.local',
+        display_name: 'Concerned Citizen',
+        role: UserRole.CITIZEN,
+        status: UserStatus.ACTIVE,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+      mockVerifyIdToken.mockResolvedValue({
+        uid: strangerUid,
+        email: 'stranger@bhubaneswar.local',
+        name: 'Concerned Citizen'
+      });
+    });
+
+    it('strictly forbids citizens from accessing raw member signals (403)', async () => {
+      const res = await request(app)
+        .get('/api/v1/problems/PRB-2026-0819/signals')
+        .set('Authorization', 'Bearer valid-citizen-token');
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBeDefined();
+      expect(res.body.error.code).toBe(ERROR_CODES.FORBIDDEN);
+    });
+
+    it('allows citizens to view public problem details while sanitizing other citizens member signals', async () => {
+      const res = await request(app)
+        .get('/api/v1/problems/PRB-2026-0819/details')
+        .set('Authorization', 'Bearer valid-citizen-token');
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeDefined();
+      expect(res.body.data.id).toBe('PRB-2026-0819');
+      expect(res.body.data.impact_score).toBeDefined();
+
+      // Verify member sanitization: stranger citizen does NOT own any of PRB-2026-0819's signals (owned by usr_citizen_01)
+      const members = res.body.data.members;
+      expect(Array.isArray(members)).toBe(true);
+      expect(members.length).toBeGreaterThan(0);
+      for (const m of members) {
+        expect(m.signal).toBeUndefined();
+      }
+    });
+
+    it('strictly forbids citizens from creating official government problem clusters (403)', async () => {
+      const res = await request(app)
+        .post('/api/v1/problems')
+        .set('Authorization', 'Bearer valid-citizen-token')
+        .send({
+          title: 'Unauthorized Cluster Creation',
+          category: 'water_supply',
+          ward_id: 'WARD-018'
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe(ERROR_CODES.FORBIDDEN);
+    });
+
+    it('strictly forbids citizens from assigning departments or officers (403)', async () => {
+      const res = await request(app)
+        .post('/api/v1/problems/PRB-2026-0819/assign')
+        .set('Authorization', 'Bearer valid-citizen-token')
+        .send({
+          department_id: 'WATCO',
+          officer_id: 'usr_officer_01'
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe(ERROR_CODES.FORBIDDEN);
+    });
+
+    it('strictly forbids citizens from logging authorized officer actions (403)', async () => {
+      const res = await request(app)
+        .post('/api/v1/problems/PRB-2026-0819/actions')
+        .set('Authorization', 'Bearer valid-citizen-token')
+        .send({
+          action: 'INVESTIGATION_STARTED',
+          note: 'Unauthorized field note attempt'
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe(ERROR_CODES.FORBIDDEN);
+    });
+
+    it('strictly forbids citizens from submitting resolution evidence (403)', async () => {
+      const res = await request(app)
+        .post('/api/v1/problems/PRB-2026-0819/evidence')
+        .set('Authorization', 'Bearer valid-citizen-token')
+        .send({
+          evidence_type: 'AFTER_PHOTO',
+          media_id: 'med_test_1',
+          notes: 'Unauthorized resolution evidence'
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe(ERROR_CODES.FORBIDDEN);
+    });
+
+    it('strictly forbids citizens from performing supervisory resolution reviews (403)', async () => {
+      const res = await request(app)
+        .post('/api/v1/problems/PRB-2026-0819/review-resolution')
+        .set('Authorization', 'Bearer valid-citizen-token')
+        .send({
+          decision: 'ACCEPT',
+          notes: 'Citizen attempting to close problem'
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe(ERROR_CODES.FORBIDDEN);
+    });
+
+    it('enforces 409 Conflict cooldown when a citizen submits duplicate reports within 60 seconds', async () => {
+      const reportPayload = {
+        original_text: 'Burst pipeline on Main Janpath Road spilling heavy water',
+        location: { lat: 20.2882, lng: 85.8436 },
+        auto_process: true
+      };
+
+      // First submission succeeds
+      const firstRes = await request(app)
+        .post('/api/v1/signals')
+        .set('Authorization', 'Bearer valid-citizen-token')
+        .send(reportPayload);
+
+      expect(firstRes.status).toBe(201);
+
+      // Immediate duplicate submission gets rejected with 409 CONFLICT
+      const duplicateRes = await request(app)
+        .post('/api/v1/signals')
+        .set('Authorization', 'Bearer valid-citizen-token')
+        .send(reportPayload);
+
+      expect(duplicateRes.status).toBe(409);
+      expect(duplicateRes.body.error.code).toBe(ERROR_CODES.CONFLICT);
+      expect(duplicateRes.body.error.message).toContain('cooldown');
     });
   });
 });

@@ -48,18 +48,42 @@ export class ProblemService {
     const problem = await this.getProblem(_user, id);
     const members = await this.problemRepo.getMembers(id);
 
-    // Hydrate member signals if not already present
-    const hydratedMembers: ProblemClusterMember[] = await Promise.all(
-      members.map(async (m) => {
-        if (!m.signal) {
-          const signal = await this.signalRepo.findById(m.signal_id);
-          if (signal) {
+    // Hydrate member signals if not already present, with strict privacy scoping for citizens
+    let hydratedMembers: ProblemClusterMember[];
+    if (_user.role === UserRole.CITIZEN) {
+      // CITIZEN PRIVACY GUARDRAIL: A citizen may only see their own signal details.
+      // Other citizens' signals are stripped of private fields (original_text, citizen_id, media_ids, coordinates).
+      hydratedMembers = await Promise.all(
+        members.map(async (m) => {
+          const signal = m.signal || (await this.signalRepo.findById(m.signal_id));
+          if (signal && signal.citizen_id === _user.id) {
             return { ...m, signal };
           }
-        }
-        return m;
-      })
-    );
+          // Non-owned signal: return safe member metadata only, strictly omit private signal content
+          return {
+            id: m.id,
+            problem_id: m.problem_id,
+            signal_id: m.signal_id,
+            relationship: m.relationship,
+            similarity: m.similarity,
+            reason: m.reason,
+            created_at: m.created_at
+          };
+        })
+      );
+    } else {
+      hydratedMembers = await Promise.all(
+        members.map(async (m) => {
+          if (!m.signal) {
+            const signal = await this.signalRepo.findById(m.signal_id);
+            if (signal) {
+              return { ...m, signal };
+            }
+          }
+          return m;
+        })
+      );
+    }
 
     // Build timeline milestones
     const timeline: NonNullable<ProblemClusterDetail['timeline']> = [
