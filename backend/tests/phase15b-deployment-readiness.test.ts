@@ -28,7 +28,7 @@ import {
 } from '../src/config/env';
 import { createApp } from '../src/app';
 
-describe('Phase 15B.5.2 — Deployment Implementation & Provider Selection Suite', () => {
+describe('Phase 15B.5.2 — Deployment Implementation & Gemini Provider Suite', () => {
   const originalEnv = {
     DEMO_MODE: env.DEMO_MODE,
     AUTH_PROVIDER: env.AUTH_PROVIDER,
@@ -48,22 +48,22 @@ describe('Phase 15B.5.2 — Deployment Implementation & Provider Selection Suite
     ProviderContainer.resetAllProviders();
   });
 
-  describe('1. Explicit Provider Wiring (Blocker B2)', () => {
-    it('selects target production providers when explicitly configured in REAL_MODE', () => {
+  describe('1. Explicit Provider Wiring (Gemini Target & Legacy Rollback)', () => {
+    it('selects target production providers (supabase + postgres + r2 + gemini) when explicitly configured in REAL_MODE', () => {
       (env as any).DEMO_MODE = false;
       (env as any).AUTH_PROVIDER = 'supabase';
       (env as any).DATABASE_PROVIDER = 'postgres';
       (env as any).STORAGE_PROVIDER = 'r2';
-      (env as any).AI_PROVIDER = 'openai';
+      (env as any).AI_PROVIDER = 'gemini';
 
       expect(getAuthProvider()).toBeInstanceOf(SupabaseAuthProvider);
       expect(getDatabaseProvider()).toBeInstanceOf(PostgresDatabaseProvider);
       expect(getStorageProvider()).toBeInstanceOf(R2StorageProvider);
-      expect(getAIProvider()).toBeInstanceOf(OpenAIProvider);
-      expect(getVerificationProvider()).toBeInstanceOf(OpenAIProvider);
+      expect(getAIProvider()).toBeInstanceOf(GeminiAIProvider);
+      expect(getVerificationProvider()).toBeInstanceOf(GeminiVerificationProvider);
     });
 
-    it('selects rollback Google Cloud providers when explicitly configured in REAL_MODE', () => {
+    it('selects rollback Google Cloud providers (firebase + firestore + gcs + gemini) when explicitly configured in REAL_MODE', () => {
       (env as any).DEMO_MODE = false;
       (env as any).AUTH_PROVIDER = 'firebase';
       (env as any).DATABASE_PROVIDER = 'firestore';
@@ -77,10 +77,21 @@ describe('Phase 15B.5.2 — Deployment Implementation & Provider Selection Suite
       expect(getVerificationProvider()).toBeInstanceOf(GeminiVerificationProvider);
     });
 
+    it('preserves OpenAIProvider when explicitly configured (secondary/standalone provider)', () => {
+      (env as any).DEMO_MODE = false;
+      (env as any).AUTH_PROVIDER = 'supabase';
+      (env as any).DATABASE_PROVIDER = 'postgres';
+      (env as any).STORAGE_PROVIDER = 'r2';
+      (env as any).AI_PROVIDER = 'openai';
+
+      expect(getAIProvider()).toBeInstanceOf(OpenAIProvider);
+      expect(getVerificationProvider()).toBeInstanceOf(OpenAIProvider);
+    });
+
     it('returns Mock providers when DEMO_MODE=true regardless of provider flags', () => {
       (env as any).DEMO_MODE = true;
       (env as any).DATABASE_PROVIDER = 'postgres';
-      (env as any).AI_PROVIDER = 'openai';
+      (env as any).AI_PROVIDER = 'gemini';
 
       expect(getDatabaseProvider()).toBeInstanceOf(MockDatabaseProvider);
       expect(getAIProvider()).toBeInstanceOf(MockAIProvider);
@@ -142,51 +153,136 @@ describe('Phase 15B.5.2 — Deployment Implementation & Provider Selection Suite
     });
   });
 
-  describe('2. REAL_MODE Startup Validation (Blocker B3)', () => {
+  describe('2. REAL_MODE Startup Validation (Gemini Alignment Tests A-G)', () => {
     const validTargetConfig = {
       DEMO_MODE: false,
       PROVIDER_MODE: 'cloud' as const,
       AUTH_PROVIDER: 'supabase' as const,
       DATABASE_PROVIDER: 'postgres' as const,
       STORAGE_PROVIDER: 'r2' as const,
-      AI_PROVIDER: 'openai' as const,
+      AI_PROVIDER: 'gemini' as const,
       SUPABASE_URL: 'https://sihttdjkubjuizwdjmrj.supabase.co',
       SUPABASE_SECRET_KEY: 'sb_secret_test_key',
       DATABASE_URL: 'postgresql://postgres:pass@localhost:5432/postgres',
-      OPENAI_API_KEY: 'sk-test-openai-key',
+      GEMINI_API_KEY: 'test-gemini-api-key',
       R2_ACCOUNT_ID: 'test-r2-account-id',
       R2_ACCESS_KEY_ID: 'test-r2-access-key',
       R2_SECRET_ACCESS_KEY: 'test-r2-secret-key',
       CORS_ALLOWED_ORIGINS: ['https://civicpulse.vercel.app']
     };
 
-    it('passes validation when all target production requirements are provided', () => {
+    // Test A: supabase + postgres + r2 + gemini -> PASS
+    it('Test A: passes validation for target stack (supabase + postgres + r2 + gemini)', () => {
       const result = validateRealModeConfig(validTargetConfig as any);
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
       expect(() => assertRealModeConfig(validTargetConfig as any)).not.toThrow();
     });
 
-    it('does NOT require Firebase or Gemini credentials in target production path', () => {
-      const configWithoutGoogle = {
+    // Test B: missing GEMINI_API_KEY -> FAIL
+    it('Test B: fails validation when GEMINI_API_KEY is missing from target stack', () => {
+      const configMissingGemini = {
         ...validTargetConfig,
-        FIREBASE_PROJECT_ID: '',
-        FIREBASE_WEB_API_KEY: '',
-        GEMINI_API_KEY: '',
-        GOOGLE_APPLICATION_CREDENTIALS: ''
+        GEMINI_API_KEY: ''
       };
+      const result = validateRealModeConfig(configMissingGemini as any);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('GEMINI_API_KEY is required when AI_PROVIDER=gemini');
+    });
 
-      const result = validateRealModeConfig(configWithoutGoogle as any);
+    // Test C: missing OPENAI_API_KEY -> MUST NOT invalidate target stack
+    it('Test C: missing OPENAI_API_KEY does NOT invalidate target production stack', () => {
+      const configWithoutOpenAI = {
+        ...validTargetConfig,
+        OPENAI_API_KEY: undefined
+      };
+      const result = validateRealModeConfig(configWithoutOpenAI as any);
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
-    it('fails closed when required credentials are missing individually', () => {
+    // Test D: supabase + postgres + r2 + openai -> invalid for selected target architecture
+    it('Test D: marks supabase + postgres + r2 + openai invalid for target production stack', () => {
+      const configWithOpenAI = {
+        ...validTargetConfig,
+        AI_PROVIDER: 'openai' as const
+      };
+      const result = validateRealModeConfig(configWithOpenAI as any);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain("AI_PROVIDER must be 'gemini' in production target architecture (got 'openai')");
+    });
+
+    // Test E: Firebase + Firestore + GCS + Gemini rollback -> PASS
+    it('Test E: validates legacy rollback stack (firebase + firestore + gcs + gemini) successfully', () => {
+      const validRollbackConfig = {
+        DEMO_MODE: false,
+        PROVIDER_MODE: 'cloud' as const,
+        AUTH_PROVIDER: 'firebase' as const,
+        DATABASE_PROVIDER: 'firestore' as const,
+        STORAGE_PROVIDER: 'gcs' as const,
+        AI_PROVIDER: 'gemini' as const,
+        FIREBASE_PROJECT_ID: 'civicpulse-prod',
+        GEMINI_API_KEY: 'test-gemini-key',
+        CORS_ALLOWED_ORIGINS: ['https://civicpulse.vercel.app']
+      };
+
+      const result = validateRealModeConfig(validRollbackConfig as any);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+      expect(() => assertRealModeConfig(validRollbackConfig as any)).not.toThrow();
+    });
+
+    // Test F: mock/local providers in REAL_MODE -> FAIL
+    it('Test F: fails closed when mock or local providers are used in REAL_MODE', () => {
+      const mockDbConfig = { ...validTargetConfig, DATABASE_PROVIDER: 'mock' as const };
+      expect(validateRealModeConfig(mockDbConfig as any).valid).toBe(false);
+
+      const localStoreConfig = { ...validTargetConfig, STORAGE_PROVIDER: 'local' as const };
+      expect(validateRealModeConfig(localStoreConfig as any).valid).toBe(false);
+
+      const mockStoreConfig = { ...validTargetConfig, STORAGE_PROVIDER: 'mock' as const };
+      expect(validateRealModeConfig(mockStoreConfig as any).valid).toBe(false);
+
+      const mockAiConfig = { ...validTargetConfig, AI_PROVIDER: 'mock' as const };
+      expect(validateRealModeConfig(mockAiConfig as any).valid).toBe(false);
+
+      const mockAuthConfig = { ...validTargetConfig, AUTH_PROVIDER: 'mock' as const };
+      expect(validateRealModeConfig(mockAuthConfig as any).valid).toBe(false);
+    });
+
+    // Test G: unsupported combinations -> FAIL CLOSED
+    it('Test G: fails closed on unsupported or mismatched provider combinations', () => {
+      // Mismatched DB with target auth & storage
+      const mismatchedDb = { ...validTargetConfig, DATABASE_PROVIDER: 'firestore' as const };
+      const resDb = validateRealModeConfig(mismatchedDb as any);
+      expect(resDb.valid).toBe(false);
+      expect(resDb.errors.some((e) => e.includes("DATABASE_PROVIDER must be 'postgres'"))).toBe(true);
+
+      // Mismatched storage with target auth & db
+      const mismatchedStorage = { ...validTargetConfig, STORAGE_PROVIDER: 'gcs' as const };
+      const resStorage = validateRealModeConfig(mismatchedStorage as any);
+      expect(resStorage.valid).toBe(false);
+      expect(resStorage.errors.some((e) => e.includes("STORAGE_PROVIDER must be 'r2'"))).toBe(true);
+
+      // Completely unsupported provider combination
+      const unsupportedComb = {
+        DEMO_MODE: false,
+        AUTH_PROVIDER: 'unsupported_auth' as any,
+        DATABASE_PROVIDER: 'unsupported_db' as any,
+        STORAGE_PROVIDER: 'unsupported_storage' as any,
+        AI_PROVIDER: 'gemini' as const
+      };
+      const resUnsupported = validateRealModeConfig(unsupportedComb as any);
+      expect(resUnsupported.valid).toBe(false);
+      expect(resUnsupported.errors.some((e) => e.includes('Unsupported provider combination'))).toBe(true);
+    });
+
+    it('fails closed when any required target credentials are missing individually', () => {
       const requiredFields = [
         { field: 'SUPABASE_URL', expectedError: 'SUPABASE_URL is required when AUTH_PROVIDER=supabase' },
         { field: 'SUPABASE_SECRET_KEY', expectedError: 'SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) is required when AUTH_PROVIDER=supabase' },
         { field: 'DATABASE_URL', expectedError: 'DATABASE_URL is required when DATABASE_PROVIDER=postgres' },
-        { field: 'OPENAI_API_KEY', expectedError: 'OPENAI_API_KEY is required when AI_PROVIDER=openai' },
+        { field: 'GEMINI_API_KEY', expectedError: 'GEMINI_API_KEY is required when AI_PROVIDER=gemini' },
         { field: 'R2_ACCOUNT_ID', expectedError: 'R2_ACCOUNT_ID is required when STORAGE_PROVIDER=r2' },
         { field: 'R2_ACCESS_KEY_ID', expectedError: 'R2_ACCESS_KEY_ID is required when STORAGE_PROVIDER=r2' },
         { field: 'R2_SECRET_ACCESS_KEY', expectedError: 'R2_SECRET_ACCESS_KEY is required when STORAGE_PROVIDER=r2' }
@@ -200,15 +296,18 @@ describe('Phase 15B.5.2 — Deployment Implementation & Provider Selection Suite
       }
     });
 
-    it('fails closed when provider flags are mismatched or partially configured', () => {
-      const mismatchedConfig = {
+    it('does NOT require Firebase or OpenAI credentials in target production path', () => {
+      const configWithoutLegacy = {
         ...validTargetConfig,
-        DATABASE_PROVIDER: 'firestore' as const
+        FIREBASE_PROJECT_ID: '',
+        FIREBASE_WEB_API_KEY: '',
+        OPENAI_API_KEY: '',
+        GOOGLE_APPLICATION_CREDENTIALS: ''
       };
 
-      const result = validateRealModeConfig(mismatchedConfig as any);
-      expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes("DATABASE_PROVIDER must be 'postgres'"))).toBe(true);
+      const result = validateRealModeConfig(configWithoutLegacy as any);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
     });
 
     it('rejects wildcard CORS with credentials in REAL_MODE', () => {
@@ -226,7 +325,7 @@ describe('Phase 15B.5.2 — Deployment Implementation & Provider Selection Suite
       const invalidConfig = {
         ...validTargetConfig,
         DATABASE_URL: '',
-        OPENAI_API_KEY: ''
+        GEMINI_API_KEY: ''
       };
 
       let thrownMessage = '';
@@ -237,29 +336,14 @@ describe('Phase 15B.5.2 — Deployment Implementation & Provider Selection Suite
       }
 
       expect(thrownMessage).toContain('DATABASE_URL is required');
-      expect(thrownMessage).toContain('OPENAI_API_KEY is required');
+      expect(thrownMessage).toContain('GEMINI_API_KEY is required');
       // Ensure existing secrets are never leaked into the message
       expect(thrownMessage).not.toContain(validTargetConfig.SUPABASE_SECRET_KEY);
       expect(thrownMessage).not.toContain(validTargetConfig.R2_SECRET_ACCESS_KEY);
     });
-
-    it('preserves rollback Firebase validation when AUTH_PROVIDER is firebase', () => {
-      const rollbackConfig = {
-        DEMO_MODE: false,
-        AUTH_PROVIDER: 'firebase' as const,
-        DATABASE_PROVIDER: 'firestore' as const,
-        STORAGE_PROVIDER: 'local' as const,
-        AI_PROVIDER: 'gemini' as const,
-        FIREBASE_PROJECT_ID: ''
-      };
-
-      const result = validateRealModeConfig(rollbackConfig as any);
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain('FIREBASE_PROJECT_ID is required when DEMO_MODE=false');
-    });
   });
 
-  describe('3. CORS and Observability Endpoints (Blocker B5, Health/Readiness)', () => {
+  describe('3. CORS and Observability Endpoints (Health/Readiness)', () => {
     it('GET /api/v1/health responds 200 with ok status and without leaking secrets', async () => {
       const app = createApp();
       const res = await request(app).get('/api/v1/health');

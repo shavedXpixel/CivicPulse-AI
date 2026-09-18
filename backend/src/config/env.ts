@@ -16,8 +16,8 @@ const EnvSchema = z.object({
   GEMINI_PRIMARY_MODEL: z.string().optional(),
   GEMINI_FALLBACK_MODEL: z.string().optional().default('gemini-3.5-flash'),
   AI_MODEL_GENERAL: z.string().default('gemini-3.6-flash'),
-  AI_MODEL_EMBEDDING: z.string().default('gemini-embedding-001'),
-  AI_EMBEDDING_MODEL: z.string().optional(),
+  AI_MODEL_EMBEDDING: z.string().optional(),
+  AI_EMBEDDING_MODEL: z.string().optional().default('text-embedding-004'),
   FIREBASE_PROJECT_ID: z.string().optional().default(''),
   FIREBASE_WEB_API_KEY: z.string().optional().default(''),
   GOOGLE_APPLICATION_CREDENTIALS: z.string().optional().default(''),
@@ -93,11 +93,10 @@ export function validateRealModeConfig(targetEnv?: Partial<typeof env>): RealMod
     const isTargetStack =
       target.AUTH_PROVIDER === 'supabase' ||
       target.DATABASE_PROVIDER === 'postgres' ||
-      target.STORAGE_PROVIDER === 'r2' ||
-      target.AI_PROVIDER === 'openai';
+      target.STORAGE_PROVIDER === 'r2';
 
     if (isTargetStack) {
-      // 1. Explicit Provider Flags Enforcement
+      // 1. Explicit Provider Flags Enforcement (Target Production: supabase + postgres + r2 + gemini)
       if (target.AUTH_PROVIDER !== 'supabase') {
         errors.push(`AUTH_PROVIDER must be 'supabase' in production target architecture (got '${target.AUTH_PROVIDER}')`);
       }
@@ -107,11 +106,11 @@ export function validateRealModeConfig(targetEnv?: Partial<typeof env>): RealMod
       if (target.STORAGE_PROVIDER !== 'r2') {
         errors.push(`STORAGE_PROVIDER must be 'r2' in production target architecture (got '${target.STORAGE_PROVIDER}')`);
       }
-      if (target.AI_PROVIDER !== 'openai') {
-        errors.push(`AI_PROVIDER must be 'openai' in production target architecture (got '${target.AI_PROVIDER}')`);
+      if (target.AI_PROVIDER !== 'gemini') {
+        errors.push(`AI_PROVIDER must be 'gemini' in production target architecture (got '${target.AI_PROVIDER}')`);
       }
 
-      // 2. Exact Non-Google Production Dependencies (never print secret values)
+      // 2. Exact Target Production Dependencies (never print secret values)
       if (!target.SUPABASE_URL || target.SUPABASE_URL.trim() === '') {
         errors.push('SUPABASE_URL is required when AUTH_PROVIDER=supabase');
       }
@@ -122,8 +121,8 @@ export function validateRealModeConfig(targetEnv?: Partial<typeof env>): RealMod
       if (!target.DATABASE_URL || target.DATABASE_URL.trim() === '') {
         errors.push('DATABASE_URL is required when DATABASE_PROVIDER=postgres');
       }
-      if (!target.OPENAI_API_KEY || target.OPENAI_API_KEY.trim() === '') {
-        errors.push('OPENAI_API_KEY is required when AI_PROVIDER=openai');
+      if (!target.GEMINI_API_KEY || target.GEMINI_API_KEY.trim() === '') {
+        errors.push('GEMINI_API_KEY is required when AI_PROVIDER=gemini');
       }
       if (!target.R2_ACCOUNT_ID || target.R2_ACCOUNT_ID.trim() === '') {
         errors.push('R2_ACCOUNT_ID is required when STORAGE_PROVIDER=r2');
@@ -135,29 +134,54 @@ export function validateRealModeConfig(targetEnv?: Partial<typeof env>): RealMod
         errors.push('R2_SECRET_ACCESS_KEY is required when STORAGE_PROVIDER=r2');
       }
     } else {
-      // Rollback Google Cloud Architecture (Firebase / Firestore / GCS / Gemini)
-      if (!target.FIREBASE_PROJECT_ID || target.FIREBASE_PROJECT_ID.trim() === '') {
-        errors.push('FIREBASE_PROJECT_ID is required when DEMO_MODE=false');
-      }
+      // Rollback Google Cloud Architecture (Firebase / Firestore / GCS / Gemini) or legacy test fixtures
+      const isRollbackOrLegacy =
+        target.AUTH_PROVIDER === 'firebase' ||
+        target.DATABASE_PROVIDER === 'firestore' ||
+        target.STORAGE_PROVIDER === 'gcs' ||
+        (!target.AUTH_PROVIDER && !target.DATABASE_PROVIDER && !target.STORAGE_PROVIDER);
 
-      if (target.PROVIDER_MODE === 'cloud') {
-        if (!target.GEMINI_API_KEY || target.GEMINI_API_KEY.trim() === '') {
-          errors.push('GEMINI_API_KEY is required when PROVIDER_MODE=cloud and DEMO_MODE=false');
+      if (!isRollbackOrLegacy) {
+        errors.push(
+          `Unsupported provider combination in REAL_MODE. Valid stacks are Target Production (supabase + postgres + r2 + gemini) or Rollback (firebase + firestore + gcs + gemini).`
+        );
+      } else {
+        if (target.AUTH_PROVIDER && target.AUTH_PROVIDER !== 'firebase') {
+          errors.push(`AUTH_PROVIDER must be 'firebase' in rollback architecture (got '${target.AUTH_PROVIDER}')`);
         }
-      }
+        if (target.DATABASE_PROVIDER && target.DATABASE_PROVIDER !== 'firestore') {
+          errors.push(`DATABASE_PROVIDER must be 'firestore' in rollback architecture (got '${target.DATABASE_PROVIDER}')`);
+        }
+        if (target.STORAGE_PROVIDER && target.STORAGE_PROVIDER !== 'gcs' && target.STORAGE_PROVIDER !== 'local') {
+          errors.push(`STORAGE_PROVIDER must be 'gcs' in rollback architecture (got '${target.STORAGE_PROVIDER}')`);
+        }
+        if (target.AI_PROVIDER && target.AI_PROVIDER !== 'gemini') {
+          errors.push(`AI_PROVIDER must be 'gemini' in rollback architecture (got '${target.AI_PROVIDER}')`);
+        }
 
-      if (target.GOOGLE_APPLICATION_CREDENTIALS && target.GOOGLE_APPLICATION_CREDENTIALS.trim() !== '') {
-        const fs = require('fs');
-        const p = target.GOOGLE_APPLICATION_CREDENTIALS;
-        let resolved = path.isAbsolute(p) ? p : path.resolve(process.cwd(), p);
-        if (!fs.existsSync(resolved) && !path.isAbsolute(p)) {
-          const parentResolved = path.resolve(process.cwd(), '..', p);
-          if (fs.existsSync(parentResolved)) {
-            resolved = parentResolved;
+        if (!target.FIREBASE_PROJECT_ID || target.FIREBASE_PROJECT_ID.trim() === '') {
+          errors.push('FIREBASE_PROJECT_ID is required when DEMO_MODE=false');
+        }
+
+        if (target.PROVIDER_MODE === 'cloud' || target.STORAGE_PROVIDER === 'gcs') {
+          if (!target.GEMINI_API_KEY || target.GEMINI_API_KEY.trim() === '') {
+            errors.push('GEMINI_API_KEY is required when PROVIDER_MODE=cloud and DEMO_MODE=false');
           }
         }
-        if (!fs.existsSync(resolved)) {
-          errors.push(`GOOGLE_APPLICATION_CREDENTIALS file not found at: ${target.GOOGLE_APPLICATION_CREDENTIALS}`);
+
+        if (target.GOOGLE_APPLICATION_CREDENTIALS && target.GOOGLE_APPLICATION_CREDENTIALS.trim() !== '') {
+          const fs = require('fs');
+          const p = target.GOOGLE_APPLICATION_CREDENTIALS;
+          let resolved = path.isAbsolute(p) ? p : path.resolve(process.cwd(), p);
+          if (!fs.existsSync(resolved) && !path.isAbsolute(p)) {
+            const parentResolved = path.resolve(process.cwd(), '..', p);
+            if (fs.existsSync(parentResolved)) {
+              resolved = parentResolved;
+            }
+          }
+          if (!fs.existsSync(resolved)) {
+            errors.push(`GOOGLE_APPLICATION_CREDENTIALS file not found at: ${target.GOOGLE_APPLICATION_CREDENTIALS}`);
+          }
         }
       }
     }
