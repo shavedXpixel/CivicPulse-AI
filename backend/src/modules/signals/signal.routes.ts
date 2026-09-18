@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { SignalController } from './signal.controller';
 import { authMiddleware } from '../../middleware/auth.middleware';
 import { requireRole } from '../../middleware/rbac.middleware';
+import { idempotencyMiddleware } from '../../middleware/idempotency.middleware';
 import { UserRole } from '@civicpulse/shared';
 
 const router = Router();
@@ -9,9 +10,10 @@ const router = Router();
 // Apply authentication to all signal routes
 router.use(authMiddleware);
 
-// Citizen & Officer signal submission
+// Citizen & Officer signal submission with Idempotency-Key support
 router.post(
   '/',
+  idempotencyMiddleware(),
   requireRole(UserRole.CITIZEN, UserRole.FIELD_OFFICER, UserRole.ADMIN, UserRole.SYSTEM_ADMIN),
   SignalController.createSignal
 );

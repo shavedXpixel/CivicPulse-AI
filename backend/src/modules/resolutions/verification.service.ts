@@ -30,7 +30,8 @@ export class VerificationService {
   public static async verifyProblemEvidence(
     user: UserProfile,
     problemId: string,
-    evidenceId?: string
+    evidenceId?: string,
+    forceReverify: boolean = false
   ): Promise<VerificationResult> {
     // 1. Citizen is strictly forbidden
     if (user.role === UserRole.CITIZEN) {
@@ -89,6 +90,25 @@ export class VerificationService {
         statusCode: 400,
         code: ERROR_CODES.NOT_FOUND,
         message: 'No resolution evidence submitted for this problem to verify.'
+      });
+    }
+
+    // 4. Idempotency Check:
+    // If evidence has already been evaluated by AI advisory verification and forceReverify is false,
+    // return the existing verification result. This prevents redundant Gemini provider calls, token costs,
+    // and duplicate audit timeline clutter.
+    if (targetEvidence.verification_id && !forceReverify) {
+      const existing = await db.getLatestVerification(targetEvidence.id);
+      if (existing) {
+        return existing;
+      }
+    }
+
+    // If forceReverify was requested on already verified evidence, record that verification was explicitly re-requested by the officer
+    if (forceReverify && targetEvidence.verification_id) {
+      await WorkflowService.recordAction(user, problem.id, {
+        action: ActionType.VERIFICATION_REQUESTED,
+        note: `Advisory re-verification explicitly requested by ${user.display_name} (${user.role}).`
       });
     }
 
@@ -182,9 +202,22 @@ export class VerificationService {
 
     // Record immutable audit action in timeline
     // NOTICE: AI verification DOES NOT change problem.status to RESOLVED. Problem remains in AWAITING_VERIFICATION.
+    // Attribution is authoritatively 'SYSTEM' (civicpulse_ai_advisory) because the AI evaluates the evidence,
+    // not the submitting field officer (who is barred by self-approval) nor the requesting supervisor.
     await WorkflowService.recordAction(user, problem.id, {
       action: ActionType.VERIFICATION_COMPLETED,
-      note: `AI advisory verification completed: [${verificationRecord.verification_result}] with ${(verificationRecord.confidence * 100).toFixed(0)}% confidence. Review required by supervisor before official resolution.`
+      actor_id: 'civicpulse_ai_advisory',
+      actor_role: 'SYSTEM',
+      note: `AI advisory verification completed: [${verificationRecord.verification_result}] with ${(verificationRecord.confidence * 100).toFixed(0)}% confidence. Review required by supervisor before official resolution.`,
+      metadata: {
+        verification_id: verificationRecord.id,
+        evidence_id: targetEvidence.id,
+        triggered_by: user.id,
+        triggered_by_role: user.role,
+        model: verificationRecord.model,
+        confidence: verificationRecord.confidence,
+        result: verificationRecord.verification_result
+      }
     });
 
     return verificationRecord;

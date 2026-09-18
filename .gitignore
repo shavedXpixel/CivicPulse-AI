@@ -47,6 +47,7 @@ Thumbs.db
 # Turbopack cache
 .turbo
 secrets/
+.operator/
 *.json
 !package.json
 !package-lock.json

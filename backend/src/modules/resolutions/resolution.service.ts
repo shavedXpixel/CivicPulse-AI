@@ -7,6 +7,7 @@ import {
   BeforeOrAfter,
   EvidenceStatus,
   ResolutionEvidence,
+  ProblemAction,
   ERROR_CODES
 } from '@civicpulse/shared';
 import { getDatabaseProvider } from '../../providers';
@@ -161,7 +162,15 @@ export class ResolutionService {
       }
     }
 
-    return db.getResolutionEvidence(problemId);
+    const rawList = await db.getResolutionEvidence(problemId);
+    if (user.role === UserRole.CITIZEN) {
+      return rawList.map((ev) => ({
+        ...ev,
+        submitted_by: 'Municipal Officer',
+        sha256_hash: undefined
+      }));
+    }
+    return rawList;
   }
 
   /**
@@ -191,6 +200,14 @@ export class ResolutionService {
           message: `Department officer cannot view evidence for ${problem.department_id}.`
         });
       }
+    }
+
+    if (user.role === UserRole.CITIZEN) {
+      return {
+        ...evidence,
+        submitted_by: 'Municipal Officer',
+        sha256_hash: undefined
+      };
     }
 
     return evidence;
@@ -252,55 +269,50 @@ export class ResolutionService {
     // Fetch submitted resolution evidence
     const evidenceList = await db.getResolutionEvidence(problemId);
 
-    if (input.decision === 'ACCEPT') {
-      // Mark evidence as ACCEPTED
-      for (const ev of evidenceList) {
-        if (ev.status === EvidenceStatus.SUBMITTED || ev.status === EvidenceStatus.UNDER_REVIEW) {
-          await db.updateResolutionEvidence(ev.id, { status: EvidenceStatus.ACCEPTED });
-        }
-      }
-
-      // Transition to RESOLVED via canonical state machine
-      const transitionResult = await WorkflowService.transitionStatus(
-        user,
-        problem.id,
-        ProblemStatus.RESOLVED,
-        input.notes || `Resolution officially validated and accepted by supervisor ${user.display_name}.`,
-        ActionType.RESOLVED
-      );
-
-      return {
-        problem_status: transitionResult.problem.status,
-        decision: 'ACCEPT',
-        message: `Problem ${problem.id} officially marked as RESOLVED.`
-      };
-    } else {
-      // REJECT:
-      // Mark evidence as REJECTED (permanently stored)
-      for (const ev of evidenceList) {
-        if (ev.status === EvidenceStatus.SUBMITTED || ev.status === EvidenceStatus.UNDER_REVIEW) {
-          await db.updateResolutionEvidence(ev.id, { status: EvidenceStatus.REJECTED });
-        }
-      }
-
-      // Transition problem back from AWAITING_VERIFICATION to IN_PROGRESS
-      const rejectionNote = input.notes
-        ? `Resolution rejected by ${user.display_name}: ${input.notes}`
-        : `Resolution evidence rejected by supervisor ${user.display_name}. Resumed IN_PROGRESS for rework.`;
-
-      const transitionResult = await WorkflowService.transitionStatus(
-        user,
-        problem.id,
-        ProblemStatus.IN_PROGRESS,
-        rejectionNote,
-        ActionType.REOPENED
-      );
-
-      return {
-        problem_status: transitionResult.problem.status,
-        decision: 'REJECT',
-        message: `Resolution rejected. Problem returned to IN_PROGRESS for corrective remediation.`
-      };
+    // Four-Eyes Control: Supervisor cannot review work they were assigned to or evidence they submitted
+    const isAssignedToCaller = Boolean(problem.assigned_to && problem.assigned_to === user.id);
+    const submittedEvidenceByCaller = evidenceList.some((ev) => ev.submitted_by === user.id);
+    if (isAssignedToCaller || submittedEvidenceByCaller) {
+      throw new AppError({
+        statusCode: 403,
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Self-approval is strictly forbidden. A different authorized supervisor must review and approve this resolution.'
+      });
     }
+
+    const now = new Date().toISOString();
+    const actionId = `act_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const actionType = input.decision === 'ACCEPT' ? ActionType.RESOLVED : ActionType.REOPENED;
+    const targetStatus = input.decision === 'ACCEPT' ? ProblemStatus.RESOLVED : ProblemStatus.IN_PROGRESS;
+    const note = input.decision === 'ACCEPT'
+      ? (input.notes || `Resolution officially validated and accepted by supervisor ${user.display_name}.`)
+      : (input.notes
+          ? `Resolution rejected by ${user.display_name}: ${input.notes}`
+          : `Resolution evidence rejected by supervisor ${user.display_name}. Resumed IN_PROGRESS for rework.`);
+
+    const action: ProblemAction = {
+      id: actionId,
+      problem_id: problem.id,
+      actor_id: user.id,
+      actor_role: user.role,
+      action_type: actionType,
+      previous_state: problem.status,
+      new_state: targetStatus,
+      target_department_id: problem.department_id,
+      target_officer_id: problem.assigned_to,
+      note,
+      created_at: now
+    };
+
+    const evidenceIds = evidenceList.map((ev) => ev.id);
+    const result = await db.atomicReviewResolution(problem.id, input.decision, action, evidenceIds, input.notes);
+
+    return {
+      problem_status: result.problem.status,
+      decision: input.decision,
+      message: input.decision === 'ACCEPT'
+        ? `Problem ${problem.id} officially marked as RESOLVED.`
+        : `Resolution rejected. Problem returned to IN_PROGRESS for corrective remediation.`
+    };
   }
 }

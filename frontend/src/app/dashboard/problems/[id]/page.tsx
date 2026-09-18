@@ -1,6 +1,6 @@
 'use client';
 
-import React, { use, useCallback, useEffect, useState } from 'react';
+import React, { use, useCallback, useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { GovernmentShell } from '../../../../components/shells/GovernmentShell';
 import { PageHeader } from '../../../../components/ui/PageHeader';
@@ -12,6 +12,7 @@ import { AIInsight } from '../../../../components/domain/AIInsight';
 import { ResolutionWorkspace } from '../../../../components/domain/ResolutionWorkspace';
 import { DEMO_PROBLEMS } from '../../../../lib/mockData';
 import { apiClient } from '../../../../lib/api-client';
+import { useAuth } from '../../../../context/AuthContext';
 import {
   ProblemClusterDetail,
   ProblemClusterMember,
@@ -36,7 +37,8 @@ import {
   UserCheck,
   Sliders,
   AlertTriangle,
-  MessageSquare
+  MessageSquare,
+  ShieldCheck,
 } from 'lucide-react';
 
 const PERSONAS = [
@@ -53,10 +55,14 @@ export default function ProblemDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const { user, userProfile, isDemoMode } = useAuth();
   const fallbackProblem = DEMO_PROBLEMS.find((p) => p.id === id) || DEMO_PROBLEMS[0]!;
 
   const [personaId, setPersonaId] = useState<string>('dept_watco');
   const activePersona = PERSONAS.find((p) => p.id === personaId) || PERSONAS[0]!;
+  const authHeaders = useMemo(() => {
+    return isDemoMode ? { Authorization: `Bearer ${activePersona.token}` } : undefined;
+  }, [isDemoMode, activePersona.token]);
 
   const [liveProblem, setLiveProblem] = useState<ProblemClusterDetail | null>(null);
   const [liveActions, setLiveActions] = useState<ProblemAction[]>([]);
@@ -84,7 +90,7 @@ export default function ProblemDetailPage({
     try {
       const res = await apiClient.get<{ data: ProblemClusterDetail }>(
         `/api/v1/problems/${id}/details`,
-        { Authorization: `Bearer ${activePersona.token}` }
+        authHeaders
       );
       if (res?.data) {
         setLiveProblem(res.data);
@@ -93,17 +99,17 @@ export default function ProblemDetailPage({
     } catch (err) {
       console.warn('Could not fetch live problem details, rendering fallback:', err);
     }
-  }, [id, activePersona.token]);
+  }, [id, authHeaders]);
 
   const fetchActions = useCallback(async () => {
     try {
       const res = await apiClient.get<{ data: ProblemAction[] }>(
         `/api/v1/problems/${id}/timeline`,
-        { Authorization: `Bearer ${activePersona.token}` }
+        authHeaders
       ).catch(() =>
         apiClient.get<{ data: ProblemAction[] }>(
           `/api/v1/problems/${id}/actions`,
-          { Authorization: `Bearer ${activePersona.token}` }
+          authHeaders
         )
       );
       if (res?.data) {
@@ -112,13 +118,11 @@ export default function ProblemDetailPage({
     } catch (err) {
       console.warn('Could not fetch actions timeline:', err);
     }
-  }, [id, activePersona.token]);
+  }, [id, authHeaders]);
 
   const fetchDepartments = useCallback(async () => {
     try {
-      const res = await apiClient.get<{ data: any[] }>('/api/v1/departments', {
-        Authorization: `Bearer ${activePersona.token}`,
-      });
+      const res = await apiClient.get<{ data: any[] }>('/api/v1/departments', authHeaders);
       if (res?.data && res.data.length > 0) {
         setAvailableDepts(res.data.map((d) => ({ id: d.id, name: d.name || d.id })));
       } else {
@@ -139,13 +143,13 @@ export default function ProblemDetailPage({
         { id: 'TPCODL', name: 'TP Central Odisha Distribution Ltd (Power)' },
       ]);
     }
-  }, [activePersona.token]);
+  }, [authHeaders]);
 
   const fetchOfficersForDept = useCallback(async (deptId: string) => {
     try {
       const res = await apiClient.get<{ data: any[] }>(
         `/api/v1/departments/${deptId}/officers`,
-        { Authorization: `Bearer ${activePersona.token}` }
+        authHeaders
       );
       if (res?.data && res.data.length > 0 && res.data[0]) {
         setDeptOfficers(res.data);
@@ -166,7 +170,7 @@ export default function ProblemDetailPage({
       ]);
       setAssignOfficer('usr_officer_01');
     }
-  }, [activePersona.token]);
+  }, [authHeaders]);
 
   useEffect(() => {
     let mounted = true;
@@ -196,7 +200,7 @@ export default function ProblemDetailPage({
       const res = await apiClient.post<{ data: ProblemClusterDetail }>(
         `/api/v1/problems/${id}/recalculate-impact`,
         {},
-        { Authorization: `Bearer ${activePersona.token}` }
+        authHeaders
       );
       if (res?.data) {
         setLiveProblem((prev) => (prev ? { ...prev, ...res.data } : res.data));
@@ -224,7 +228,7 @@ export default function ProblemDetailPage({
             status: ProblemStatus.TRIAGED,
             note: 'Automated triage before official assignment.',
           },
-          { Authorization: `Bearer ${activePersona.token}` }
+          authHeaders
         );
       }
 
@@ -236,7 +240,7 @@ export default function ProblemDetailPage({
           priority: assignPriority,
           notes: assignNotes,
         },
-        { Authorization: `Bearer ${activePersona.token}` }
+        authHeaders
       );
       setWorkflowSuccess(`Problem assigned to ${assignDept} (${assignOfficer}) successfully.`);
       setIsAssignModalOpen(false);
@@ -267,7 +271,7 @@ export default function ProblemDetailPage({
           note: finalNote,
           notes: finalNote,
         },
-        { Authorization: `Bearer ${activePersona.token}` }
+        authHeaders
       );
       setWorkflowSuccess(`Status transitioned to ${newStatus}.`);
       setTransitionNote('');
@@ -445,38 +449,54 @@ export default function ProblemDetailPage({
           </div>
         </div>
 
-        {/* Evaluation Persona Switcher for RBAC & Verification Testing */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-white border border-ink-border shadow-subtle text-xs gap-3">
-          <div className="flex items-center gap-2">
-            <UserCheck className="w-4 h-4 text-civic-blue" />
-            <span className="font-bold text-ink-primary">Testing Persona:</span>
-            <span className="font-mono text-ink-secondary">{activePersona.label}</span>
-          </div>
+        {/* Evaluation Persona Switcher (DEMO_MODE) OR Verified Operator Banner (REAL_MODE) */}
+        {isDemoMode ? (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-white border border-ink-border shadow-subtle text-xs gap-3">
+            <div className="flex items-center gap-2">
+              <UserCheck className="w-4 h-4 text-civic-blue" />
+              <span className="font-bold text-ink-primary">Testing Persona:</span>
+              <span className="font-mono text-ink-secondary">{activePersona.label}</span>
+            </div>
 
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {PERSONAS.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setPersonaId(p.id)}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition-colors text-[11px] ${
-                  personaId === p.id
-                    ? 'bg-civic-blue text-white shadow-subtle'
-                    : 'bg-canvas-subtle border border-ink-border text-ink-secondary hover:bg-white'
-                }`}
-              >
-                {p.id === 'dept_watco'
-                  ? 'WATCO Officer'
-                  : p.id === 'officer_rajesh'
-                  ? 'Assigned Officer (Rajesh)'
-                  : p.id === 'officer_suresh'
-                  ? 'Unassigned (Suresh)'
-                  : p.id === 'admin'
-                  ? 'Admin'
-                  : 'Citizen (Public)'}
-              </button>
-            ))}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {PERSONAS.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setPersonaId(p.id)}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-colors text-[11px] ${
+                    personaId === p.id
+                      ? 'bg-civic-blue text-white shadow-subtle'
+                      : 'bg-canvas-subtle border border-ink-border text-ink-secondary hover:bg-white'
+                  }`}
+                >
+                  {p.id === 'dept_watco'
+                    ? 'WATCO Officer'
+                    : p.id === 'officer_rajesh'
+                    ? 'Assigned Officer (Rajesh)'
+                    : p.id === 'officer_suresh'
+                    ? 'Unassigned (Suresh)'
+                    : p.id === 'admin'
+                    ? 'Admin'
+                    : 'Citizen (Public)'}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-white border border-ink-border shadow-subtle text-xs gap-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-civic-emerald" />
+              <span className="font-bold text-ink-primary">Verified Operator:</span>
+              <span className="font-semibold text-ink-primary">{userProfile?.display_name || user?.email}</span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-civic-blueLight text-civic-blueDark">
+                {userProfile?.role === 'ADMIN' ? 'MUNICIPAL_ADMIN' : `${userProfile?.department_id || 'WATCO'} SUPERVISOR`}
+              </span>
+            </div>
+            <div className="text-[11px] text-ink-tertiary font-mono">
+              Live Operations Authority • Real Firestore
+            </div>
+          </div>
+        )}
 
         {/* Problem Header (Section 1) */}
         <PageHeader
@@ -605,9 +625,9 @@ export default function ProblemDetailPage({
               problemStatus={status}
               assignedTo={assignedTo}
               departmentId={department}
-              authToken={activePersona.token}
-              userRole={activePersona.role}
-              userName={activePersona.name}
+              authToken={isDemoMode ? activePersona.token : ''}
+              userRole={isDemoMode ? activePersona.role : (userProfile?.role || 'DEPARTMENT_OFFICER')}
+              userName={isDemoMode ? activePersona.name : (userProfile?.display_name || user?.displayName || user?.email || 'Government Officer')}
               onStatusChange={async () => {
                 await Promise.all([fetchDetails(), fetchActions()]);
               }}

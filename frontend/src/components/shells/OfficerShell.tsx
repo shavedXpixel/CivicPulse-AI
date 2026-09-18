@@ -2,13 +2,13 @@
 
 import React, { ReactNode } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Briefcase,
   AlertTriangle,
   History,
   LogOut,
-  User,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -18,10 +18,16 @@ export interface OfficerShellProps {
 
 export function OfficerShell({ children }: OfficerShellProps) {
   const pathname = usePathname();
-  const { isDemoMode } = useAuth();
+  const router = useRouter();
+  const { user, userProfile, isDemoMode, signOut } = useAuth();
 
   const navigation = [
-    { name: 'My Work / Officer Queue', href: '/officer', icon: Briefcase, badge: '3 Active' },
+    {
+      name: 'My Work / Officer Queue',
+      href: '/officer',
+      icon: Briefcase,
+      badge: isDemoMode ? '3 Active' : undefined,
+    },
     {
       name: 'Assigned Problems',
       href: isDemoMode ? '/dashboard/problems/PRB-2026-0819' : '/officer',
@@ -45,7 +51,7 @@ export function OfficerShell({ children }: OfficerShellProps) {
                 CivicPulse <span className="text-xs font-semibold text-civic-blue">Field Ops</span>
               </span>
               <span className="text-[10px] text-ink-tertiary">
-                WATCO Water Division • Ward 18 Nayapalli
+                {userProfile?.department_id || 'WATCO'} Field Division • Bhubaneswar
               </span>
             </div>
           </Link>
@@ -77,16 +83,21 @@ export function OfficerShell({ children }: OfficerShellProps) {
 
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-2 text-xs text-ink-secondary">
-              <User className="w-3.5 h-3.5 text-ink-tertiary" />
-              <span>Officer Rajesh K.</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-civic-blue" />
+              <span className="font-semibold text-ink-primary">
+                {userProfile?.display_name || user?.displayName || (isDemoMode ? 'Officer Rajesh K.' : user?.email || 'Field Officer')}
+              </span>
             </div>
-            <Link
-              href="/login"
-              className="text-xs font-medium text-ink-tertiary hover:text-ink-primary p-1 rounded hover:bg-canvas"
-              title="Switch Role"
+            <button
+              onClick={async () => {
+                await signOut();
+                router.push('/login');
+              }}
+              className="text-xs font-medium text-ink-tertiary hover:text-ink-primary p-1 rounded hover:bg-canvas transition-colors"
+              title={isDemoMode ? 'Switch Role' : 'Sign Out'}
             >
               <LogOut className="w-4 h-4" />
-            </Link>
+            </button>
           </div>
         </div>
       </header>

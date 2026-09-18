@@ -39,8 +39,13 @@ import { StaticGeographyProvider } from './reference/static-geography.provider';
 import { StaticPopulationProvider } from './reference/static-population.provider';
 import { StaticFacilityProvider } from './reference/static-facility.provider';
 
+import { IAuthProvider } from './auth/auth.interface';
+import { SupabaseAuthProvider } from './auth/supabase.auth.provider';
+import { FirebaseAuthProvider } from './auth/firebase.auth.provider';
+
 class ProviderContainer {
   private static dbInstance: IDatabaseProvider | null = null;
+  private static authInstance: IAuthProvider | null = null;
   private static storageInstance: IStorageProvider | null = null;
   private static aiInstance: IAIProvider | null = null;
   private static verificationInstance: IAIVerificationProvider | null = null;
@@ -59,6 +64,21 @@ class ProviderContainer {
       }
     }
     return this.dbInstance;
+  }
+
+  public static getAuthProvider(): IAuthProvider {
+    if (!this.authInstance) {
+      if (env.AUTH_PROVIDER === 'supabase') {
+        this.authInstance = new SupabaseAuthProvider();
+      } else {
+        this.authInstance = new FirebaseAuthProvider();
+      }
+    }
+    return this.authInstance;
+  }
+
+  public static setAuthProvider(provider: IAuthProvider | null): void {
+    this.authInstance = provider;
   }
 
   public static getStorageProvider(): IStorageProvider {
@@ -208,6 +228,7 @@ class ProviderContainer {
 
   public static resetAllProviders() {
     this.dbInstance = null;
+    this.authInstance = null;
     this.storageInstance = null;
     this.aiInstance = null;
     this.verificationInstance = null;
@@ -220,6 +241,7 @@ class ProviderContainer {
 }
 
 export const getDatabaseProvider = () => ProviderContainer.getDatabaseProvider();
+export const getAuthProvider = () => ProviderContainer.getAuthProvider();
 export const getStorageProvider = () => ProviderContainer.getStorageProvider();
 export const getAIProvider = () => ProviderContainer.getAIProvider();
 export const getVerificationProvider = () => ProviderContainer.getVerificationProvider();
@@ -232,6 +254,7 @@ export const getFacilityProvider = () => ProviderContainer.getFacilityProvider()
 export { ProviderContainer };
 export * from './database/database.interface';
 export * from './storage/storage.interface';
+export * from './auth/auth.interface';
 export * from './ai/ai.interface';
 export * from './ai/verification.interface';
 export * from './ai/governance.interface';
@@ -240,6 +263,7 @@ export * from './reference/reference.interface';
 export { MockDatabaseProvider } from './database/mock.database';
 export { FirestoreDatabaseProvider } from './database/firestore.provider';
 export { LocalStorageProvider } from './storage/local.storage';
+export { GCSStorageProvider } from './storage/gcs.storage';
 export { MockAIProvider } from './ai/mock.ai';
 export { GeminiAIProvider } from './ai/gemini.provider';
 export { MockVerificationProvider } from './ai/mock.verification';
@@ -252,5 +276,12 @@ export { MockGeographyProvider, MockPopulationProvider, MockFacilityProvider } f
 export { StaticGeographyProvider } from './reference/static-geography.provider';
 export { StaticPopulationProvider } from './reference/static-population.provider';
 export { StaticFacilityProvider } from './reference/static-facility.provider';
+
+// Target Non-Google Providers (Phase 15B Scaffolding)
+export { PostgresDatabaseProvider } from './database/postgres.provider';
+export { R2StorageProvider } from './storage/r2.storage';
+export { OpenAIProvider } from './ai/openai.provider';
+export { SupabaseAuthProvider } from './auth/supabase.auth.provider';
+export { FirebaseAuthProvider } from './auth/firebase.auth.provider';
 
 

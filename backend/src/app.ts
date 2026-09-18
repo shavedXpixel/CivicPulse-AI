@@ -14,22 +14,45 @@ import { governanceRouter } from './modules/governance/governance.routes';
 import simulationRouter from './modules/simulation/simulation.routes';
 import { adminRouter } from './modules/admin/admin.routes';
 
+import { structuredLogger } from './middleware/logger.middleware';
+import { getDatabaseProvider } from './providers';
+import { env } from './config/env';
+
 export function createApp(): Express {
   const app = express();
 
-  // Basic middleware
-  app.use(cors());
-  app.use(express.json({ limit: '10mb' }));
-
-  // Request ID generator & logger middleware
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    const requestId = (req.headers['x-request-id'] as string) || `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    res.setHeader('X-Request-ID', requestId);
-    req.headers['x-request-id'] = requestId;
+  // AUD-SEC-04: Security headers
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Content-Security-Policy', "default-src 'self'; frame-ancestors 'none';");
     next();
   });
 
-  // Health endpoint required for Phase 0
+  // AUD-CORS-01: Explicit CORS configuration
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        // Allow requests with no origin (e.g. mobile apps, curl, tests, server-to-server)
+        if (!origin) return callback(null, true);
+        if (env.CORS_ALLOWED_ORIGINS.includes(origin) || env.CORS_ALLOWED_ORIGINS.includes('*')) {
+          return callback(null, true);
+        }
+        return callback(new Error(`Origin ${origin} not allowed by CORS policy`));
+      },
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Request-ID', 'X-Demo-Mode']
+    })
+  );
+
+  app.use(express.json({ limit: '10mb' }));
+
+  // AUD-OBS-01: Centralized structured logging & Request ID
+  app.use(structuredLogger);
+
+  // Health endpoint (liveness probe)
   app.get('/api/v1/health', (_req: Request, res: Response) => {
     res.status(200).json({
       data: {
@@ -38,6 +61,35 @@ export function createApp(): Express {
         timestamp: new Date().toISOString()
       }
     });
+  });
+
+  // AUD-DEP-01: Readiness endpoint checking operational database connectivity
+  app.get('/api/v1/ready', async (_req: Request, res: Response) => {
+    try {
+      const db = getDatabaseProvider();
+      const readyCheck = await db.checkReadiness();
+      if (readyCheck.ready) {
+        res.status(200).json({
+          status: 'ready',
+          database: 'connected',
+          latency_ms: readyCheck.latencyMs,
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        res.status(503).json({
+          status: 'not_ready',
+          database: 'unavailable',
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch {
+      // Do not expose internal infrastructure details in error responses
+      res.status(503).json({
+        status: 'not_ready',
+        database: 'error',
+        timestamp: new Date().toISOString()
+      });
+    }
   });
 
   // Domain API Routers

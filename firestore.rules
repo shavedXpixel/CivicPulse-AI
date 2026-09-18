@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      // Only backend Admin SDK mutates user roles and profiles
+      allow write: if false;
+    }
+
+    match /citizen_profiles/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    // Signals: Citizens can read their own signals; writes only through backend intake API
+    match /signals/{signalId} {
+      allow read: if isAuthenticated() && (resource.data.citizen_id == request.auth.uid || request.auth.token.role != 'CITIZEN');
+      allow write: if false;
+    }
+
+    match /signal_media/{mediaId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // Problem Clusters: Public problems readable; mutations strictly via backend API
+    match /problem_clusters/{problemId} {
+      allow read: if true; // Public problems are visible to all citizens
+      allow write: if false; // Only backend state machine can mutate
+    }
+
+    match /cluster_members/{memberId} {
+      allow read: if isAuthenticated() && request.auth.token.role != 'CITIZEN';
+      allow write: if false;
+    }
+
+    // Operational collections: strictly protected against direct client manipulation
+    match /assignments/{assignmentId} {
+      allow read: if isAuthenticated() && request.auth.token.role != 'CITIZEN';
+      allow write: if false;
+    }
+
+    match /problem_actions/{actionId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Immutable audit trail; only backend can record
+    }
+
+    match /departments/{deptId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /resolution_evidence/{evidenceId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Submitted and validated only via backend API
+    }
+
+    match /verification_results/{verifId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Evaluated and created only by backend AI advisory engine
+    }
+
+    match /ai_operations/{opId} {
+      allow read: if isAuthenticated() && request.auth.token.role != 'CITIZEN';
+      allow write: if false;
+    }
+
+    // Default deny for all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

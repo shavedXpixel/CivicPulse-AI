@@ -21,13 +21,13 @@ export const CreateSignalSchema = z.object({
 });
 
 export const MAX_MEDIA_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB canonical limit
-export const ALLOWED_MEDIA_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'] as const;
+export const ALLOWED_MEDIA_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
 export const RegisterMediaSchema = z.object({
   file_name: z.string().min(1, 'File name is required').max(255),
   mime_type: z.string().refine(
     (type) => ALLOWED_MEDIA_MIME_TYPES.includes(type as (typeof ALLOWED_MEDIA_MIME_TYPES)[number]),
-    { message: 'Unsupported file type. Only JPEG, PNG, WEBP, and HEIC images are allowed.' }
+    { message: 'Unsupported file type. Only JPEG, PNG, and WEBP images are allowed.' }
   ),
   file_size_bytes: z
     .number()

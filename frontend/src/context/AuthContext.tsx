@@ -1,43 +1,77 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User as FirebaseUser } from 'firebase/auth';
+import React, { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import type { UserProfile } from '@civicpulse/shared';
 import {
-  signInWithEmail,
-  signUpWithEmail,
-  signOutUser,
-  onAuthChange,
-  getCurrentIdToken,
+  signInWithEmail as firebaseSignIn,
+  signUpWithEmail as firebaseSignUp,
+  signOutUser as firebaseSignOut,
+  onAuthChange as firebaseOnAuthChange,
+  getCurrentIdToken as firebaseGetToken,
   isFirebaseConfigured
 } from '../lib/firebase-client';
+import {
+  signInWithEmail as supabaseSignIn,
+  signOutUser as supabaseSignOut,
+  onAuthChange as supabaseOnAuthChange,
+  getCurrentSessionToken as supabaseGetToken,
+  isSupabaseConfigured
+} from '../lib/supabase-client';
+import { apiClient } from '../lib/api-client';
+
+export interface GenericAuthUser {
+  uid: string;
+  email?: string | null;
+  displayName?: string | null;
+}
 
 export interface AuthContextType {
-  user: FirebaseUser | null;
+  user: any | null;
+  userProfile: UserProfile | null;
   loading: boolean;
   isDemoMode: boolean;
   isConfigured: boolean;
-  signIn: (email: string, pass: string) => Promise<FirebaseUser>;
-  signUp: (email: string, pass: string) => Promise<FirebaseUser>;
+  signIn: (email: string, pass: string) => Promise<{ user: any; profile: UserProfile | null }>;
+  signUp: (email: string, pass: string) => Promise<{ user: any; profile: UserProfile | null }>;
   signOut: () => Promise<void>;
   getIdToken: (forceRefresh?: boolean) => Promise<string | null>;
+  refreshProfile: () => Promise<UserProfile | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const useSupabase = isSupabaseConfigured();
+
+  const [user, setUser] = useState<any | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(!isDemoMode);
-  const [isConfigured, setIsConfigured] = useState<boolean>(isFirebaseConfigured);
+  const [isConfigured, setIsConfigured] = useState<boolean>(
+    useSupabase ? isSupabaseConfigured() : isFirebaseConfigured()
+  );
+
+  const fetchProfile = useCallback(async (): Promise<UserProfile | null> => {
+    if (isDemoMode) return null;
+    try {
+      const res = await apiClient.get<{ data: { user: UserProfile } }>('/api/v1/auth/me');
+      if (res?.data?.user) {
+        setUserProfile(res.data.user);
+        return res.data.user;
+      }
+    } catch (err) {
+      console.warn('Could not fetch authoritative user profile:', err);
+    }
+    return null;
+  }, [isDemoMode]);
 
   useEffect(() => {
-    // Only subscribe to Firebase Auth in REAL_MODE on the browser
     if (isDemoMode) {
       setLoading(false);
       return;
     }
 
-    const configured = isFirebaseConfigured();
+    const configured = useSupabase ? isSupabaseConfigured() : isFirebaseConfigured();
     setIsConfigured(configured);
 
     if (!configured) {
@@ -45,42 +79,106 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const unsubscribe = onAuthChange((firebaseUser) => {
-      setUser(firebaseUser);
-      setLoading(false);
-    });
+    if (useSupabase) {
+      const unsubscribe = supabaseOnAuthChange(async (sbUser) => {
+        if (sbUser) {
+          setUser({
+            uid: sbUser.id,
+            email: sbUser.email,
+            displayName: sbUser.user_metadata?.full_name || sbUser.email
+          });
+          await fetchProfile();
+        } else {
+          setUser(null);
+          setUserProfile(null);
+        }
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    } else {
+      const unsubscribe = firebaseOnAuthChange(async (fbUser) => {
+        setUser(fbUser);
+        if (fbUser) {
+          await fetchProfile();
+        } else {
+          setUserProfile(null);
+        }
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    }
+  }, [isDemoMode, useSupabase, fetchProfile]);
 
-    return () => unsubscribe();
-  }, [isDemoMode]);
-
-  const handleSignIn = async (email: string, pass: string): Promise<FirebaseUser> => {
-    const loggedInUser = await signInWithEmail(email, pass);
-    setUser(loggedInUser);
-    return loggedInUser;
+  const handleSignIn = async (email: string, pass: string): Promise<{ user: any; profile: UserProfile | null }> => {
+    if (useSupabase) {
+      const { user: sbUser } = await supabaseSignIn(email, pass);
+      const adaptedUser = {
+        uid: sbUser.id,
+        email: sbUser.email,
+        displayName: sbUser.user_metadata?.full_name || sbUser.email
+      };
+      setUser(adaptedUser);
+      const profile = await fetchProfile();
+      return { user: adaptedUser, profile };
+    } else {
+      const loggedInUser = await firebaseSignIn(email, pass);
+      setUser(loggedInUser);
+      const profile = await fetchProfile();
+      return { user: loggedInUser, profile };
+    }
   };
 
-  const handleSignUp = async (email: string, pass: string): Promise<FirebaseUser> => {
-    const newUser = await signUpWithEmail(email, pass);
-    setUser(newUser);
-    return newUser;
+  const handleSignUp = async (email: string, pass: string): Promise<{ user: any; profile: UserProfile | null }> => {
+    if (useSupabase) {
+      // In Supabase mode, self-signup redirects to standard citizen flow or signIn
+      const { user: sbUser } = await supabaseSignIn(email, pass);
+      const adaptedUser = {
+        uid: sbUser.id,
+        email: sbUser.email,
+        displayName: sbUser.user_metadata?.full_name || sbUser.email
+      };
+      setUser(adaptedUser);
+      const profile = await fetchProfile();
+      return { user: adaptedUser, profile };
+    } else {
+      const newUser = await firebaseSignUp(email, pass);
+      setUser(newUser);
+      const profile = await fetchProfile();
+      return { user: newUser, profile };
+    }
   };
 
   const handleSignOut = async (): Promise<void> => {
-    await signOutUser();
+    if (useSupabase) {
+      await supabaseSignOut();
+    } else {
+      await firebaseSignOut();
+    }
     setUser(null);
+    setUserProfile(null);
+  };
+
+  const handleGetIdToken = async (_forceRefresh?: boolean): Promise<string | null> => {
+    if (useSupabase) {
+      return supabaseGetToken();
+    } else {
+      return firebaseGetToken();
+    }
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        userProfile,
         loading,
         isDemoMode,
         isConfigured,
         signIn: handleSignIn,
         signUp: handleSignUp,
         signOut: handleSignOut,
-        getIdToken: getCurrentIdToken
+        getIdToken: handleGetIdToken,
+        refreshProfile: fetchProfile
       }}
     >
       {children}
@@ -91,17 +189,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (!context) {
-    // Return safe fallback for components rendered outside AuthProvider
     const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
     return {
       user: null,
+      userProfile: null,
       loading: false,
       isDemoMode: isDemo,
       isConfigured: false,
       signIn: async () => { throw new Error('AuthProvider not mounted'); },
       signUp: async () => { throw new Error('AuthProvider not mounted'); },
       signOut: async () => {},
-      getIdToken: async () => null
+      getIdToken: async () => null,
+      refreshProfile: async () => null
     };
   }
   return context;

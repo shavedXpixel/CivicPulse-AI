@@ -28,6 +28,8 @@ export interface ProblemActionInput {
   note?: string;
   target_officer_id?: string;
   metadata?: Record<string, unknown>;
+  actor_id?: string;
+  actor_role?: string;
 }
 
 export class WorkflowService {
@@ -152,8 +154,8 @@ export class WorkflowService {
       created_at: nowIso
     };
 
-    // 5. Execute atomic assignment mutation
-    const result = await db.atomicAssignProblem(problem.id, assignment, targetStatus, action);
+    // 5. Execute atomic assignment mutation with precondition check
+    const result = await db.atomicAssignProblem(problem.id, assignment, targetStatus, action, problem.status);
 
     // Compute live SLA on returned problem
     result.problem.sla_state = SLAService.computeSLAState(result.problem);
@@ -340,8 +342,8 @@ export class WorkflowService {
     const action: ProblemAction = {
       id: actionId,
       problem_id: problem.id,
-      actor_id: user.id,
-      actor_role: user.role,
+      actor_id: input.actor_id || user.id,
+      actor_role: input.actor_role || user.role,
       action_type: input.action,
       previous_state: problem.status,
       new_state: problem.status,

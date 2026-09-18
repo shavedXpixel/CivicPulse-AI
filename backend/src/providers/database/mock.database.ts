@@ -596,6 +596,15 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     return this.users.get(id) || null;
   }
 
+  async getUserByAuthId(authUserId: string): Promise<UserProfile | null> {
+    for (const u of this.users.values()) {
+      if ((u as any).auth_user_id === authUserId || u.id === authUserId) {
+        return { ...u };
+      }
+    }
+    return null;
+  }
+
   async createUser(user: UserProfile): Promise<UserProfile> {
     this.users.set(user.id, user);
     return user;
@@ -676,6 +685,14 @@ export class MockDatabaseProvider implements IDatabaseProvider {
 
   async getSignalMedia(signalId: string): Promise<SignalMediaItem[]> {
     return this.signalMedia.get(signalId) || [];
+  }
+
+  async getSignalMediaByPath(storagePath: string): Promise<SignalMediaItem | null> {
+    for (const list of this.signalMedia.values()) {
+      const found = list.find((m) => m.storage_path === storagePath);
+      if (found) return found;
+    }
+    return null;
   }
 
   async attachMediaToSignal(signalId: string, mediaId: string): Promise<void> {
@@ -922,7 +939,8 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     problemId: string,
     assignment: Assignment,
     nextStatus: ProblemStatus,
-    action: ProblemAction
+    action: ProblemAction,
+    expectedCurrentStatus?: ProblemStatus
   ): Promise<{ problem: ProblemCluster; assignment: Assignment; action: ProblemAction }> {
     const existing = this.problemClusters.get(problemId);
     if (!existing) {
@@ -930,6 +948,14 @@ export class MockDatabaseProvider implements IDatabaseProvider {
         statusCode: 404,
         code: ERROR_CODES.NOT_FOUND,
         message: `ProblemCluster ${problemId} not found.`
+      });
+    }
+
+    if (expectedCurrentStatus && existing.status !== expectedCurrentStatus) {
+      throw new AppError({
+        statusCode: 400,
+        code: ERROR_CODES.INVALID_STATE_TRANSITION,
+        message: `Assignment state transition conflict: expected current state is ${expectedCurrentStatus}, but persisted state is ${existing.status}.`
       });
     }
 
@@ -948,6 +974,85 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     const createdAction = await this.createAction(action);
 
     return { problem: updatedProblem, assignment: createdAssignment, action: createdAction };
+  }
+
+  async atomicCreateClusterFromSignal(
+    problem: ProblemCluster,
+    member: ProblemClusterMember,
+    signalId: string
+  ): Promise<{ problem: ProblemCluster; member: ProblemClusterMember }> {
+    const signal = this.signals.get(signalId);
+    if (!signal) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: `Signal ${signalId} not found during cluster creation.`
+      });
+    }
+
+    const now = new Date().toISOString();
+    const updatedSignal: Signal = {
+      ...signal,
+      status: SignalStatus.ATTACHED_TO_PROBLEM,
+      problem_cluster_id: problem.id,
+      updated_at: now
+    };
+
+    this.problemClusters.set(problem.id, problem);
+    this.problemClusterMembers.set(problem.id, [member]);
+    this.signals.set(signalId, updatedSignal);
+
+    return { problem, member };
+  }
+
+  async atomicReviewResolution(
+    problemId: string,
+    decision: 'ACCEPT' | 'REJECT',
+    action: ProblemAction,
+    evidenceIds: string[],
+    notes?: string
+  ): Promise<{ problem: ProblemCluster; action: ProblemAction; decision: string }> {
+    const existing = this.problemClusters.get(problemId);
+    if (!existing) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: `ProblemCluster ${problemId} not found.`
+      });
+    }
+
+    if (existing.status !== ProblemStatus.AWAITING_VERIFICATION) {
+      throw new AppError({
+        statusCode: 400,
+        code: ERROR_CODES.INVALID_STATE_TRANSITION,
+        message: `State transition conflict: expected AWAITING_VERIFICATION, but problem is currently in ${existing.status}.`
+      });
+    }
+
+    const now = new Date().toISOString();
+    const nextStatus = decision === 'ACCEPT' ? ProblemStatus.RESOLVED : ProblemStatus.IN_PROGRESS;
+    const evidenceTargetStatus = decision === 'ACCEPT' ? EvidenceStatus.ACCEPTED : EvidenceStatus.REJECTED;
+
+    const updatedProblem: ProblemCluster = {
+      ...existing,
+      status: nextStatus,
+      updated_at: now,
+      ...(decision === 'ACCEPT' ? { resolved_at: now } : {})
+    };
+
+    // Update evidence in-memory
+    const existingEvidenceList = this.resolutionEvidence.get(problemId) || [];
+    for (const ev of existingEvidenceList) {
+      if (evidenceIds.includes(ev.id)) {
+        ev.status = evidenceTargetStatus;
+        ev.updated_at = now;
+      }
+    }
+
+    this.problemClusters.set(problemId, updatedProblem);
+    const createdAction = await this.createAction(action);
+
+    return { problem: updatedProblem, action: createdAction, decision };
   }
 
   async atomicTransitionStatus(
@@ -1009,6 +1114,14 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     return this.resolutionEvidence.get(problemId) || [];
   }
 
+  async getResolutionEvidenceByPath(storagePath: string): Promise<ResolutionEvidence | null> {
+    for (const list of this.resolutionEvidence.values()) {
+      const found = list.find((e) => e.storage_path === storagePath);
+      if (found) return found;
+    }
+    return null;
+  }
+
   async getEvidenceById(id: string): Promise<ResolutionEvidence | null> {
     for (const list of this.resolutionEvidence.values()) {
       const found = list.find((e) => e.id === id);
@@ -1057,6 +1170,10 @@ export class MockDatabaseProvider implements IDatabaseProvider {
       }
     }
     return null;
+  }
+
+  async checkReadiness(): Promise<{ ready: boolean; latencyMs: number }> {
+    return { ready: true, latencyMs: 1 };
   }
 
   /**

@@ -59,11 +59,11 @@ export class ProblemService {
           if (signal && signal.citizen_id === _user.id) {
             return { ...m, signal };
           }
-          // Non-owned signal: return safe member metadata only, strictly omit private signal content
+          // Non-owned signal: return safe member metadata only, strictly omit private signal content and redact raw signal ID
           return {
             id: m.id,
             problem_id: m.problem_id,
-            signal_id: m.signal_id,
+            signal_id: '[REDACTED]',
             relationship: m.relationship,
             similarity: m.similarity,
             reason: m.reason,

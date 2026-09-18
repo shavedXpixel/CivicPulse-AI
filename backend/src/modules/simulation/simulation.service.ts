@@ -19,11 +19,17 @@ export class SimulationService {
    * Enforces server-side RBAC scoping for simulation access.
    */
   private checkAuthorization(user: UserProfile, departmentId?: string): void {
-    if (user.role === UserRole.CITIZEN) {
+    // Strict RBAC gate: only ADMIN, SYSTEM_ADMIN, and DEPARTMENT_OFFICER permitted
+    const isAuthorizedRole =
+      user.role === UserRole.ADMIN ||
+      user.role === UserRole.SYSTEM_ADMIN ||
+      user.role === UserRole.DEPARTMENT_OFFICER;
+
+    if (!isAuthorizedRole) {
       throw new AppError({
         statusCode: 403,
         code: ERROR_CODES.FORBIDDEN,
-        message: 'Simulation workspace is restricted to municipal administrators and department officers. Citizen access is prohibited.'
+        message: 'Simulation workspace is restricted to municipal administrators and department officers. Unauthorized role.'
       });
     }
 
@@ -153,7 +159,7 @@ export class SimulationService {
       problem: {
         id: problem.id,
         title: problem.title,
-        baseline_impact: problem.impact_score || 92
+        baseline_impact: problem.impact_score ?? 0
       },
       presets
     };

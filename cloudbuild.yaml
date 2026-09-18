@@ -1,0 +1,119 @@
+# ==============================================================================
+# CivicPulse AI — Cloud Build Configuration for Google Cloud Run
+# Region: asia-south1 | Project: civicpulse-ai-f1bbf
+# ==============================================================================
+
+steps:
+  # ----------------------------------------------------------------------------
+  # 1. Build and Push Backend Container Image
+  # ----------------------------------------------------------------------------
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-backend'
+    args:
+      - 'build'
+      - '-t'
+      - 'asia-south1-docker.pkg.dev/$PROJECT_ID/civicpulse-repo/backend:$COMMIT_SHA'
+      - '-t'
+      - 'asia-south1-docker.pkg.dev/$PROJECT_ID/civicpulse-repo/backend:latest'
+      - '-f'
+      - 'backend/Dockerfile'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-backend'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'asia-south1-docker.pkg.dev/$PROJECT_ID/civicpulse-repo/backend'
+
+  # ----------------------------------------------------------------------------
+  # 2. Deploy Backend to Google Cloud Run
+  # ----------------------------------------------------------------------------
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-backend'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'civicpulse-backend'
+      - '--image=asia-south1-docker.pkg.dev/$PROJECT_ID/civicpulse-repo/backend:$COMMIT_SHA'
+      - '--region=asia-south1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--service-account=civicpulse-backend-sa@$PROJECT_ID.iam.gserviceaccount.com'
+      - '--cpu=1'
+      - '--memory=1Gi'
+      - '--concurrency=80'
+      - '--min-instances=0'
+      - '--max-instances=10'
+      - '--timeout=60s'
+      - '--port=8080'
+      - '--set-env-vars=NODE_ENV=production,DEMO_MODE=false,PROVIDER_MODE=cloud,FIREBASE_PROJECT_ID=$PROJECT_ID,STORAGE_BUCKET=$PROJECT_ID.firebasestorage.app,GCS_MEDIA_BUCKET=$PROJECT_ID.firebasestorage.app,GEMINI_PRIMARY_MODEL=gemini-3.6-flash,GEMINI_FALLBACK_MODEL=gemini-3.5-flash,AI_MODEL_GENERAL=gemini-3.6-flash,AI_MODEL_EMBEDDING=gemini-embedding-001,LOG_LEVEL=info,CORS_ALLOWED_ORIGINS=$_FRONTEND_URL'
+      - '--set-secrets=GEMINI_API_KEY=civicpulse-gemini-api-key:latest'
+
+  # ----------------------------------------------------------------------------
+  # 3. Build and Push Frontend Container Image
+  # ----------------------------------------------------------------------------
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-frontend'
+    args:
+      - 'build'
+      - '-t'
+      - 'asia-south1-docker.pkg.dev/$PROJECT_ID/civicpulse-repo/frontend:$COMMIT_SHA'
+      - '-t'
+      - 'asia-south1-docker.pkg.dev/$PROJECT_ID/civicpulse-repo/frontend:latest'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_DEMO_MODE=false'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_API_URL=$_BACKEND_URL/api/v1'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_FIREBASE_API_KEY=$_FIREBASE_API_KEY'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=$PROJECT_ID.firebaseapp.com'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_FIREBASE_PROJECT_ID=$PROJECT_ID'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=$PROJECT_ID.firebasestorage.app'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_FIREBASE_APP_ID=$_FIREBASE_APP_ID'
+      - '-f'
+      - 'frontend/Dockerfile'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-frontend'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'asia-south1-docker.pkg.dev/$PROJECT_ID/civicpulse-repo/frontend'
+
+  # ----------------------------------------------------------------------------
+  # 4. Deploy Frontend to Google Cloud Run
+  # ----------------------------------------------------------------------------
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-frontend'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'civicpulse-frontend'
+      - '--image=asia-south1-docker.pkg.dev/$PROJECT_ID/civicpulse-repo/frontend:$COMMIT_SHA'
+      - '--region=asia-south1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--cpu=1'
+      - '--memory=512Mi'
+      - '--min-instances=0'
+      - '--max-instances=10'
+      - '--timeout=60s'
+      - '--port=8080'
+      - '--set-env-vars=NODE_ENV=production,PORT=8080,HOSTNAME=0.0.0.0'
+
+substitutions:
+  _BACKEND_URL: ''
+  _FRONTEND_URL: ''
+  _FIREBASE_API_KEY: ''
+  _FIREBASE_APP_ID: ''
+
+options:
+  logging: CLOUD_LOGGING_ONLY

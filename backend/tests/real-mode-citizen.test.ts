@@ -333,7 +333,7 @@ describe('Phase 10 Step 3: Real-Mode Authentication & Citizen Reporting', () => 
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('INVALID_REQUEST');
-      expect(res.body.error.message).toContain('Only JPEG, PNG, WEBP, and HEIC');
+      expect(res.body.error.message).toContain('Only JPEG, PNG, and WEBP');
     });
 
     it('prevents non-owner citizen from registering media on another user signal', async () => {

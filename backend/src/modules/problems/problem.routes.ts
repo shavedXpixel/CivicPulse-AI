@@ -4,6 +4,7 @@ import { WorkflowController } from '../workflow/workflow.controller';
 import { ResolutionController } from '../resolutions/resolution.controller';
 import { authMiddleware } from '../../middleware/auth.middleware';
 import { requireRole } from '../../middleware/rbac.middleware';
+import { idempotencyMiddleware } from '../../middleware/idempotency.middleware';
 import { UserRole } from '@civicpulse/shared';
 
 const router = Router();
@@ -57,6 +58,7 @@ router.post(
 // Official Department & Officer Assignment (Department Officer, Admin, System Admin)
 router.post(
   '/:id/assign',
+  idempotencyMiddleware(),
   requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN, UserRole.DEPARTMENT_OFFICER),
   WorkflowController.assignProblem
 );
@@ -71,6 +73,7 @@ router.get(
 // Authorized Officer Action Logging (Field Officer, Department Officer, Admin, System Admin)
 router.post(
   '/:id/actions',
+  idempotencyMiddleware(),
   requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN, UserRole.DEPARTMENT_OFFICER, UserRole.FIELD_OFFICER),
   WorkflowController.recordAction
 );
@@ -90,6 +93,7 @@ router.get(
 // Problem Status / Lifecycle Transitions
 router.patch(
   '/:id/status',
+  idempotencyMiddleware(),
   requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN, UserRole.DEPARTMENT_OFFICER, UserRole.FIELD_OFFICER),
   WorkflowController.updateStatus
 );
@@ -102,11 +106,13 @@ router.patch(
 // CRITICAL GUARDRAIL: Citizens receive 403 Forbidden.
 router.post(
   '/:id/evidence',
+  idempotencyMiddleware(),
   requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN, UserRole.DEPARTMENT_OFFICER, UserRole.FIELD_OFFICER),
   ResolutionController.submitEvidence
 );
 router.post(
   '/:id/resolution-evidence',
+  idempotencyMiddleware(),
   requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN, UserRole.DEPARTMENT_OFFICER, UserRole.FIELD_OFFICER),
   ResolutionController.submitEvidence
 );
@@ -132,6 +138,7 @@ router.get('/:id/verification-history', ResolutionController.getVerificationHist
 // CRITICAL GUARDRAIL: Only Department Officer or Admin may accept/reject. Field Officer receives 403.
 router.post(
   '/:id/review-resolution',
+  idempotencyMiddleware(),
   requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN, UserRole.DEPARTMENT_OFFICER),
   ResolutionController.reviewResolution
 );

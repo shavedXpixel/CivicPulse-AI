@@ -361,26 +361,21 @@ export class ClusteringService {
     draftCluster.impact_explanation = impactCalc.impact_explanation;
     draftCluster.data_provenance = provenance;
 
-    const createdProblem = await this.problemRepo.create(draftCluster);
-
     const member: ProblemClusterMember = {
       id: `mem_${crypto.randomUUID().substring(0, 8)}`,
-      problem_id: createdProblem.id,
+      problem_id: draftCluster.id,
       signal_id: signal.id,
       relationship: ClusterRelationshipType.DUPLICATE,
       similarity: 1.0,
       reason: 'Initial seed signal establishing problem cluster.',
       created_at: now
     };
-    await this.problemRepo.addMember(member);
 
-    await this.signalRepo.update(signal.id, {
-      status: SignalStatus.ATTACHED_TO_PROBLEM,
-      problem_cluster_id: createdProblem.id,
-      updated_at: now
-    });
+    const { getDatabaseProvider } = await import('../../providers');
+    const db = getDatabaseProvider();
+    const result = await db.atomicCreateClusterFromSignal(draftCluster, member, signal.id);
 
-    return { problem: createdProblem, member };
+    return result;
   }
 
   /**

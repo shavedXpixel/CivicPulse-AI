@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { UserProfile, UserRole, UserStatus, ERROR_CODES } from '@civicpulse/shared';
 import { AppError } from './error.middleware';
 import { env } from '../config/env';
-import { getDatabaseProvider } from '../providers';
+import { getDatabaseProvider, getAuthProvider, SupabaseAuthProvider } from '../providers';
 
 // Augment Express Request interface with authenticated user
 declare global {
@@ -14,6 +14,17 @@ declare global {
 }
 
 export async function authMiddleware(req: Request, _res: Response, next: NextFunction): Promise<void> {
+  // Reject x-demo-mode immediately in REAL_MODE
+  if (!env.DEMO_MODE && (req.headers['x-demo-mode'] === 'true' || req.headers['x-demo-mode'])) {
+    return next(
+      new AppError({
+        statusCode: 401,
+        code: ERROR_CODES.UNAUTHORIZED,
+        message: 'Demo authentication and x-demo-mode headers are strictly forbidden in REAL_MODE. Valid Firebase ID token required.'
+      })
+    );
+  }
+
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -40,8 +51,31 @@ export async function authMiddleware(req: Request, _res: Response, next: NextFun
 
   const db = getDatabaseProvider();
 
-  // In Demo Mode or if demo persona token is presented, resolve predefined personas
-  if (env.DEMO_MODE || token.startsWith('demo-token-') || req.headers['x-demo-mode'] === 'true') {
+  const isExplicitDemoToken =
+    token.startsWith('demo-token-') ||
+    token.startsWith('usr_') ||
+    token === 'citizen' ||
+    token === 'officer' ||
+    token === 'dept_watco' ||
+    token === 'dept_drainage' ||
+    token === 'field_drainage' ||
+    token === 'admin';
+
+  // Strict REAL_MODE security gate: Demo tokens and x-demo-mode headers are unconditionally rejected in REAL_MODE
+  if (!env.DEMO_MODE) {
+    if (req.headers['x-demo-mode'] || isExplicitDemoToken) {
+      return next(
+        new AppError({
+          statusCode: 401,
+          code: ERROR_CODES.UNAUTHORIZED,
+          message: 'Demo authentication and x-demo-mode headers are strictly forbidden in REAL_MODE. Valid Firebase ID token required.'
+        })
+      );
+    }
+  }
+
+  // In Demo Mode with an explicit demo token, or if x-demo-mode header is presented, resolve predefined personas
+  if (env.DEMO_MODE && (isExplicitDemoToken || req.headers['x-demo-mode'] === 'true')) {
     let resolvedUserId: string | null = null;
 
     if (token === 'demo-token-citizen' || token === 'citizen') {
@@ -107,40 +141,63 @@ export async function authMiddleware(req: Request, _res: Response, next: NextFun
     return next();
   }
 
-  // REAL_MODE: Verify Firebase ID token using Firebase Admin Auth
+  // REAL_MODE: Provider-driven authentication
   try {
-    const { getFirebaseAuth } = await import('../infrastructure/firebase/firebase-admin');
-    const auth = getFirebaseAuth();
-    const decoded = await auth.verifyIdToken(token);
-    const userId = decoded.uid;
+    const authProvider = getAuthProvider();
+    const payload = await authProvider.verifyToken(token);
+    const authUserId = payload.uid;
 
-    let user = await db.getUser(userId);
+    let user: UserProfile | null = null;
+    const isSupabase = authProvider instanceof SupabaseAuthProvider || env.AUTH_PROVIDER === 'supabase';
 
-    // Auto-provision first-time citizen profile in Firestore
-    if (!user) {
-      const now = new Date().toISOString();
-      const newUser: UserProfile = {
-        id: userId,
-        email: decoded.email || `${userId}@firebase.civicpulse.local`,
-        display_name: decoded.name || decoded.email?.split('@')[0] || 'Citizen',
-        role: UserRole.CITIZEN,
-        status: UserStatus.ACTIVE,
-        created_at: now,
-        updated_at: now
-      };
-      user = await db.createUser(newUser);
+    if (isSupabase) {
+      // Runtime Rule 2: Strict lookup SELECT * FROM public.users WHERE auth_user_id = sub
+      // NEVER fall back to email, display name, client UID, or metadata!
+      if (typeof db.getUserByAuthId === 'function') {
+        user = await db.getUserByAuthId(authUserId);
+      } else {
+        user = await db.getUser(authUserId);
+      }
 
-      try {
-        await db.createCitizenProfile({
-          id: `prof_${userId}`,
-          user_id: userId,
-          preferred_language: 'en',
-          notification_enabled: true,
+      if (!user) {
+        return next(
+          new AppError({
+            statusCode: 401,
+            code: ERROR_CODES.UNAUTHORIZED,
+            message: 'ACCOUNT_NOT_PROVISIONED: User identity is not linked to an authoritative profile.'
+          })
+        );
+      }
+    } else {
+      // Rollback Mode (Firebase Auth against Firestore)
+      user = await db.getUser(authUserId);
+
+      // Auto-provision first-time citizen profile in Firestore for legacy Firebase Auth
+      if (!user) {
+        const now = new Date().toISOString();
+        const newUser: UserProfile = {
+          id: authUserId,
+          email: payload.email || `${authUserId}@firebase.civicpulse.local`,
+          display_name: payload.name || payload.email?.split('@')[0] || 'Citizen',
+          role: UserRole.CITIZEN,
+          status: UserStatus.ACTIVE,
           created_at: now,
           updated_at: now
-        });
-      } catch {
-        // Best effort profile creation
+        };
+        user = await db.createUser(newUser);
+
+        try {
+          await db.createCitizenProfile({
+            id: `prof_${authUserId}`,
+            user_id: authUserId,
+            preferred_language: 'en',
+            notification_enabled: true,
+            created_at: now,
+            updated_at: now
+          });
+        } catch {
+          // Best effort profile creation
+        }
       }
     }
 
@@ -162,9 +219,9 @@ export async function authMiddleware(req: Request, _res: Response, next: NextFun
     }
     return next(
       new AppError({
-        statusCode: 401,
-        code: ERROR_CODES.UNAUTHORIZED,
-        message: `Authentication failed: ${err.message || 'Invalid or expired Firebase ID token.'}`
+        statusCode: err.statusCode || 401,
+        code: err.code || ERROR_CODES.UNAUTHORIZED,
+        message: err.message || 'Authentication failed: Invalid or expired token.'
       })
     );
   }
@@ -197,10 +254,16 @@ export async function optionalAuthMiddleware(req: Request, _res: Response, next:
         req.user = user;
       }
     } else {
-      const { getFirebaseAuth } = await import('../infrastructure/firebase/firebase-admin');
-      const auth = getFirebaseAuth();
-      const decoded = await auth.verifyIdToken(token);
-      const user = await db.getUser(decoded.uid);
+      const authProvider = getAuthProvider();
+      const payload = await authProvider.verifyToken(token);
+      let user: UserProfile | null = null;
+      if (authProvider instanceof SupabaseAuthProvider || env.AUTH_PROVIDER === 'supabase') {
+        if (typeof db.getUserByAuthId === 'function') {
+          user = await db.getUserByAuthId(payload.uid);
+        }
+      } else {
+        user = await db.getUser(payload.uid);
+      }
       if (user) {
         req.user = user;
       }

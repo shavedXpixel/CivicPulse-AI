@@ -278,6 +278,7 @@ export class GovernanceTools {
 
     const activeCount = problems.filter((p) => p.status !== ProblemStatus.RESOLVED && p.status !== ProblemStatus.CLOSED).length;
     const isSynthetic = problems.some((p) => p.is_demo);
+    const wardContext = params.ward_id ? `in ${params.ward_id}` : 'across municipal reporting areas';
 
     return {
       trend: {
@@ -285,8 +286,8 @@ export class GovernanceTools {
         ward_id: params.ward_id || 'all_wards',
         active_problem_clusters: activeCount,
         has_sufficient_history: true,
-        direction: 'INCREASING',
-        summary: `Identified ${activeCount} active problem cluster(s) in category "${params.category || 'all'}". Report volume shows concentrated localized clustering in Nayapalli Ward 18 corridor.`,
+        direction: activeCount > 5 ? 'INCREASING' : 'STABLE',
+        summary: `Identified ${activeCount} active problem cluster(s) in category "${params.category || 'all'}" ${wardContext}.`,
         is_synthetic: isSynthetic,
         limitations: isSynthetic ? ['Trend analysis includes synthetic demonstration cluster data.'] : []
       },
@@ -356,7 +357,7 @@ export class GovernanceTools {
       ward_id: p.ward_id,
       critical_exposure_score: p.critical_exposure_score,
       impact_score: p.impact_score,
-      critical_facility: p.id === 'PRB-2026-0819' ? 'DAV Public School / Nayapalli Corridor' : 'Critical Infrastructure Route'
+      critical_facility: (p as any).critical_facility || (p as any).critical_facility_name || (p.id === 'PRB-2026-0819' ? 'DAV Public School' : 'Designated Municipal Asset')
     }));
 
     return {

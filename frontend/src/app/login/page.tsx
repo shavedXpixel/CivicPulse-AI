@@ -16,18 +16,20 @@ import {
   Loader2,
   LogOut,
   CheckCircle2,
-  Clock
+  Clock,
+  Shield
 } from 'lucide-react';
-import { setAuthToken } from '../../lib/api-client';
+import { UserRole } from '@civicpulse/shared';
+import { setAuthToken, apiClient } from '../../lib/api-client';
 import { useAuth } from '../../context/AuthContext';
 
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTarget = searchParams.get('redirect') || '/citizen';
+  const explicitRedirect = searchParams.get('redirect');
   const isSessionExpired = searchParams.get('session_expired') === 'true';
 
-  const { user, loading: authLoading, isDemoMode, isConfigured, signIn, signUp, signOut } = useAuth();
+  const { user, userProfile, loading: authLoading, isDemoMode, isConfigured, signIn, signUp, signOut } = useAuth();
 
   // REAL_MODE state
   const [email, setEmail] = useState('');
@@ -89,6 +91,27 @@ function LoginContent() {
     router.push(href);
   };
 
+  const determineDestination = (role?: string): string => {
+    if (explicitRedirect) {
+      if (role === UserRole.CITIZEN && (explicitRedirect.startsWith('/dashboard') || explicitRedirect.startsWith('/officer'))) {
+        return '/citizen';
+      }
+      return explicitRedirect;
+    }
+
+    switch (role) {
+      case UserRole.FIELD_OFFICER:
+        return '/officer';
+      case UserRole.DEPARTMENT_OFFICER:
+      case UserRole.ADMIN:
+      case UserRole.SYSTEM_ADMIN:
+        return '/dashboard';
+      case UserRole.CITIZEN:
+      default:
+        return '/citizen';
+    }
+  };
+
   const handleRealAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -105,12 +128,28 @@ function LoginContent() {
 
     setSubmitting(true);
     try {
+      let resolvedRole: string | undefined;
+
       if (isRegistering) {
-        await signUp(email.trim(), password);
+        const { profile } = await signUp(email.trim(), password);
+        resolvedRole = profile?.role || UserRole.CITIZEN;
       } else {
-        await signIn(email.trim(), password);
+        const { profile } = await signIn(email.trim(), password);
+        resolvedRole = profile?.role;
       }
-      router.push(redirectTarget);
+
+      // If profile role was not immediate, fetch authoritatively from backend
+      if (!resolvedRole) {
+        try {
+          const meRes = await apiClient.get<{ data: { user: { role: string } } }>('/api/v1/auth/me');
+          resolvedRole = meRes?.data?.user?.role;
+        } catch {
+          // Default fallback if endpoint temporarily unresponsive
+        }
+      }
+
+      const destination = determineDestination(resolvedRole);
+      router.push(destination);
     } catch (err: any) {
       let msg = err.message || 'Authentication failed. Please check your credentials.';
       if (
@@ -136,6 +175,15 @@ function LoginContent() {
     }
   };
 
+  const effectiveRole = userProfile?.role || (user ? UserRole.CITIZEN : undefined);
+  const activeDestination = determineDestination(effectiveRole);
+  const destinationLabel =
+    effectiveRole === UserRole.FIELD_OFFICER
+      ? 'Go to Field Operations Queue'
+      : effectiveRole === UserRole.DEPARTMENT_OFFICER || effectiveRole === UserRole.ADMIN || effectiveRole === UserRole.SYSTEM_ADMIN
+      ? 'Go to Operations Command Center'
+      : 'Go to Citizen Portal';
+
   return (
     <div className="min-h-screen bg-canvas flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-3">
@@ -148,12 +196,16 @@ function LoginContent() {
           </span>
         </Link>
         <h2 className="text-2xl font-bold tracking-tight text-ink-primary">
-          {isDemoMode ? 'Select Demo Persona' : isRegistering ? 'Create Citizen Account' : 'Citizen Authentication'}
+          {isDemoMode
+            ? 'Select Demo Persona'
+            : isRegistering
+            ? 'Create Citizen Account'
+            : 'Civic & Operations Authentication'}
         </h2>
         <p className="text-xs text-ink-secondary">
           {isDemoMode
             ? "CivicPulse AI adapts its visual system to the user's governance role. Choose an application shell to explore."
-            : 'Authenticate securely to submit verified civic signals and monitor resolution progress.'}
+            : 'Authenticate securely. Verified roles (Citizen, Department Officer, Field Operations, Admin) are routed authoritatively.'}
         </p>
       </div>
 
@@ -194,7 +246,7 @@ function LoginContent() {
             })}
           </div>
         ) : (
-          /* REAL_MODE: Firebase Authentication Form */
+          /* REAL_MODE: Authoritative Firebase Authentication Form */
           <div className="bg-white p-6 sm:p-8 rounded-2xl border border-ink-border shadow-card space-y-6">
             {!isConfigured ? (
               <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-2">
@@ -214,21 +266,39 @@ function LoginContent() {
             ) : user ? (
               /* Already authenticated user view */
               <div className="space-y-5 text-center py-4">
-                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center shadow-subtle">
                   <CheckCircle2 className="w-6 h-6" />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <h3 className="text-sm font-bold text-ink-primary">Currently Authenticated</h3>
-                  <p className="text-xs text-ink-secondary font-mono">{user.email}</p>
-                  <p className="text-[11px] text-ink-tertiary">Server-provisioned Role: CITIZEN</p>
+                  <p className="text-xs font-semibold text-ink-primary">
+                    {userProfile?.display_name || user.displayName || user.email}
+                  </p>
+                  <p className="text-[11px] text-ink-secondary font-mono">{user.email}</p>
+                  <div className="pt-1">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium bg-civic-blueLight text-civic-blueDark">
+                      <Shield className="w-3 h-3 text-civic-blue" />
+                      <span>
+                        {userProfile?.role === UserRole.ADMIN
+                          ? 'MUNICIPAL_ADMIN (Citywide Authority)'
+                          : userProfile?.role === UserRole.DEPARTMENT_OFFICER
+                          ? `DEPARTMENT_OFFICER (${userProfile.department_id || 'WATCO'})`
+                          : userProfile?.role === UserRole.FIELD_OFFICER
+                          ? `FIELD_OFFICER (${userProfile.department_id || 'WATCO'})`
+                          : userProfile?.role === UserRole.SYSTEM_ADMIN
+                          ? 'SYSTEM_ADMIN'
+                          : 'VERIFIED_CITIZEN'}
+                      </span>
+                    </span>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-center gap-3 pt-2">
                   <button
-                    onClick={() => router.push('/citizen')}
+                    onClick={() => router.push(activeDestination)}
                     className="px-4 py-2 rounded-lg text-xs font-semibold bg-civic-blue text-white hover:bg-civic-blueDark transition-colors shadow-subtle flex items-center gap-1.5"
                   >
-                    <span>Go to Citizen Portal</span>
+                    <span>{destinationLabel}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                   <button
@@ -266,7 +336,7 @@ function LoginContent() {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="citizen@example.com"
+                      placeholder="officer@civicpulse.local or citizen@example.com"
                       className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-ink-border bg-canvas-subtle focus:bg-white focus:outline-none focus:border-civic-blue transition-colors text-ink-primary"
                     />
                   </div>
@@ -295,10 +365,10 @@ function LoginContent() {
                   {submitting ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>{isRegistering ? 'Creating Account...' : 'Authenticating...'}</span>
+                      <span>{isRegistering ? 'Creating Citizen Account...' : 'Authenticating...'}</span>
                     </>
                   ) : (
-                    <span>{isRegistering ? 'Register as Citizen' : 'Sign In as Citizen'}</span>
+                    <span>{isRegistering ? 'Register as Citizen' : 'Sign In'}</span>
                   )}
                 </button>
 
@@ -311,7 +381,7 @@ function LoginContent() {
                     }}
                     className="text-xs text-civic-blue hover:underline font-medium"
                   >
-                    {isRegistering ? 'Already have an account? Sign in' : "Don't have an account? Register"}
+                    {isRegistering ? 'Already have an account? Sign in' : "New citizen? Register for public signal intake"}
                   </button>
                 </div>
               </form>

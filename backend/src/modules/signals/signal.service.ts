@@ -117,7 +117,7 @@ export class SignalService {
           message: 'Signal not found.'
         });
       }
-    } else if (user.role === UserRole.DEPARTMENT_OFFICER) {
+    } else if (user.role === UserRole.DEPARTMENT_OFFICER || user.role === UserRole.FIELD_OFFICER) {
       if (signal.department_id && user.department_id && signal.department_id !== user.department_id) {
         throw new AppError({
           statusCode: 403,
@@ -147,6 +147,14 @@ export class SignalService {
       // Unconditionally force citizen_id to authenticated user.
       // Never allow a citizen to query another user's signals.
       effectiveFilter.citizen_id = user.id;
+    } else if (user.role === UserRole.FIELD_OFFICER) {
+      // Field officer is strictly scoped to their assigned department.
+      // Field officers cannot query citywide or cross-department citizen signals.
+      if (user.department_id) {
+        effectiveFilter.department_id = user.department_id;
+      } else {
+        return { data: [] };
+      }
     } else if (user.role === UserRole.DEPARTMENT_OFFICER && user.department_id) {
       effectiveFilter.department_id = user.department_id;
     } else if (query.citizen_id && (user.role === UserRole.ADMIN || user.role === UserRole.SYSTEM_ADMIN)) {
@@ -179,15 +187,19 @@ export class SignalService {
       });
     }
 
+    const mediaId = `med_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const now = new Date().toISOString();
+
     const storage = getStorageProvider();
     const uploadResult = await storage.getSignedUploadUrl(
       input.file_name,
       input.mime_type,
-      input.file_size_bytes
+      input.file_size_bytes,
+      {
+        signalId,
+        mediaId
+      }
     );
-
-    const mediaId = `med_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    const now = new Date().toISOString();
 
     const mediaItem: SignalMediaItem = {
       id: mediaId,
@@ -236,5 +248,9 @@ export class SignalService {
     // Check signal read scope first
     await this.getSignal(user, signalId);
     return this.repo.getMedia(signalId);
+  }
+
+  async updateSignal(id: string, updates: Partial<Signal>): Promise<Signal> {
+    return this.repo.update(id, updates);
   }
 }

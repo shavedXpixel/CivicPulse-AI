@@ -16,6 +16,8 @@ import {
   ImpactLevel,
   ResolutionEvidence,
   VerificationResult,
+  SignalStatus,
+  EvidenceStatus,
   ERROR_CODES
 } from '@civicpulse/shared';
 import { IDatabaseProvider, SignalFilterCriteria, ProblemFilterCriteria } from './database.interface';
@@ -57,6 +59,12 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
   // Users & Profiles
   async getUser(id: string): Promise<UserProfile | null> {
     const snap = await this.db.collection('users').doc(id).get();
+    if (!snap.exists) return null;
+    return snap.data() as UserProfile;
+  }
+
+  async getUserByAuthId(authUserId: string): Promise<UserProfile | null> {
+    const snap = await this.db.collection('users').doc(authUserId).get();
     if (!snap.exists) return null;
     return snap.data() as UserProfile;
   }
@@ -180,6 +188,12 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
   async getSignalMedia(signalId: string): Promise<SignalMediaItem[]> {
     const snap = await this.db.collection('signal_media').where('signal_id', '==', signalId).get();
     return snap.docs.map((d: DocumentSnapshot) => d.data() as SignalMediaItem);
+  }
+
+  async getSignalMediaByPath(storagePath: string): Promise<SignalMediaItem | null> {
+    const snap = await this.db.collection('signal_media').where('storage_path', '==', storagePath).limit(1).get();
+    if (snap.empty || !snap.docs[0]) return null;
+    return snap.docs[0].data() as SignalMediaItem;
   }
 
   async attachMediaToSignal(signalId: string, mediaId: string): Promise<void> {
@@ -499,7 +513,8 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
     problemId: string,
     assignment: Assignment,
     nextStatus: ProblemStatus,
-    action: ProblemAction
+    action: ProblemAction,
+    expectedCurrentStatus?: ProblemStatus
   ): Promise<{ problem: ProblemCluster; assignment: Assignment; action: ProblemAction }> {
     const problemRef = this.db.collection('problem_clusters').doc(problemId);
     const assignmentRef = this.db.collection('assignments').doc(assignment.id);
@@ -516,6 +531,16 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
       }
 
       const existing = snap.data() as ProblemCluster;
+
+      // Concurrency precondition check: prevent stale concurrent assignment overwrites
+      if (expectedCurrentStatus && existing.status !== expectedCurrentStatus) {
+        throw new AppError({
+          statusCode: 400,
+          code: ERROR_CODES.INVALID_STATE_TRANSITION,
+          message: `Assignment state transition conflict: expected current state is ${expectedCurrentStatus}, but persisted state is ${existing.status}.`
+        });
+      }
+
       const now = new Date().toISOString();
       const updatedProblem: ProblemCluster = {
         ...existing,
@@ -534,6 +559,99 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
         problem: updatedProblem,
         assignment,
         action
+      };
+    });
+  }
+
+  async atomicCreateClusterFromSignal(
+    problem: ProblemCluster,
+    member: ProblemClusterMember,
+    signalId: string
+  ): Promise<{ problem: ProblemCluster; member: ProblemClusterMember }> {
+    const problemRef = this.db.collection('problem_clusters').doc(problem.id);
+    const memberRef = this.db.collection('cluster_members').doc(member.id);
+    const signalRef = this.db.collection('signals').doc(signalId);
+
+    return await this.db.runTransaction(async (transaction: Transaction) => {
+      const signalSnap = await transaction.get(signalRef);
+      if (!signalSnap.exists) {
+        throw new AppError({
+          statusCode: 404,
+          code: ERROR_CODES.NOT_FOUND,
+          message: `Signal ${signalId} not found during cluster creation.`
+        });
+      }
+
+      const existingSignal = signalSnap.data() as Signal;
+      const now = new Date().toISOString();
+      const updatedSignal: Signal = {
+        ...existingSignal,
+        status: SignalStatus.ATTACHED_TO_PROBLEM,
+        problem_cluster_id: problem.id,
+        updated_at: now
+      };
+
+      transaction.set(problemRef, problem);
+      transaction.set(memberRef, member);
+      transaction.set(signalRef, updatedSignal, { merge: true });
+
+      return { problem, member };
+    });
+  }
+
+  async atomicReviewResolution(
+    problemId: string,
+    decision: 'ACCEPT' | 'REJECT',
+    action: ProblemAction,
+    evidenceIds: string[],
+    notes?: string
+  ): Promise<{ problem: ProblemCluster; action: ProblemAction; decision: string }> {
+    const problemRef = this.db.collection('problem_clusters').doc(problemId);
+    const actionRef = this.db.collection('problem_actions').doc(action.id);
+
+    return await this.db.runTransaction(async (transaction: Transaction) => {
+      const snap = await transaction.get(problemRef);
+      if (!snap.exists) {
+        throw new AppError({
+          statusCode: 404,
+          code: ERROR_CODES.NOT_FOUND,
+          message: `ProblemCluster ${problemId} not found.`
+        });
+      }
+
+      const existing = snap.data() as ProblemCluster;
+      if (existing.status !== ProblemStatus.AWAITING_VERIFICATION) {
+        throw new AppError({
+          statusCode: 400,
+          code: ERROR_CODES.INVALID_STATE_TRANSITION,
+          message: `State transition conflict: expected AWAITING_VERIFICATION, but problem is currently in ${existing.status}.`
+        });
+      }
+
+      const now = new Date().toISOString();
+      const nextStatus = decision === 'ACCEPT' ? ProblemStatus.RESOLVED : ProblemStatus.IN_PROGRESS;
+      const evidenceTargetStatus = decision === 'ACCEPT' ? EvidenceStatus.ACCEPTED : EvidenceStatus.REJECTED;
+
+      const updatedProblem: ProblemCluster = {
+        ...existing,
+        status: nextStatus,
+        updated_at: now,
+        ...(decision === 'ACCEPT' ? { resolved_at: now } : {})
+      };
+
+      // Atomically update all associated evidence documents in the same transaction
+      for (const evId of evidenceIds) {
+        const evRef = this.db.collection('resolution_evidence').doc(evId);
+        transaction.set(evRef, { status: evidenceTargetStatus, updated_at: now }, { merge: true });
+      }
+
+      transaction.set(problemRef, updatedProblem, { merge: true });
+      transaction.set(actionRef, action);
+
+      return {
+        problem: updatedProblem,
+        action,
+        decision
       };
     });
   }
@@ -603,6 +721,12 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
     return snap.docs.map((d: DocumentSnapshot) => d.data() as ResolutionEvidence);
   }
 
+  async getResolutionEvidenceByPath(storagePath: string): Promise<ResolutionEvidence | null> {
+    const snap = await this.db.collection('resolution_evidence').where('storage_path', '==', storagePath).limit(1).get();
+    if (snap.empty || !snap.docs[0]) return null;
+    return snap.docs[0].data() as ResolutionEvidence;
+  }
+
   async getEvidenceById(id: string): Promise<ResolutionEvidence | null> {
     const snap = await this.db.collection('resolution_evidence').doc(id).get();
     if (!snap.exists) return null;
@@ -650,5 +774,14 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
       .get();
     if (snap.empty || !snap.docs[0]) return null;
     return snap.docs[0].data() as VerificationResult;
+  }
+
+  async checkReadiness(): Promise<{ ready: boolean; latencyMs: number }> {
+    const start = Date.now();
+    await this.db.collection('departments').limit(1).get();
+    return {
+      ready: true,
+      latencyMs: Date.now() - start
+    };
   }
 }

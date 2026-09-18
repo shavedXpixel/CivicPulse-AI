@@ -17,6 +17,7 @@ interface DepartmentWithWorkload extends Department {
 export default function DepartmentsPage() {
   const { isDemoMode } = useAuth();
   const [departments, setDepartments] = useState<DepartmentWithWorkload[]>([]);
+  const [officersByDept, setOfficersByDept] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,25 +27,27 @@ export default function DepartmentsPage() {
     try {
       const deptRes = await apiClient.get<{ data: Department[] }>('/api/v1/departments');
       if (deptRes?.data && deptRes.data.length > 0) {
+        const offMap: Record<string, any[]> = {};
         const deptsWithWorkload = await Promise.all(
           deptRes.data.map(async (dept) => {
             try {
-              const wRes = await apiClient.get<{ data: DepartmentWorkload }>(
-                `/api/v1/departments/${dept.id}/workload`
-              );
-              return { ...dept, workload: wRes.data };
+              const [wRes, offRes] = await Promise.all([
+                apiClient.get<{ data: DepartmentWorkload }>(`/api/v1/departments/${dept.id}/workload`).catch(() => null),
+                apiClient.get<{ data: any[] }>(`/api/v1/departments/${dept.id}/officers`).catch(() => null)
+              ]);
+              if (offRes?.data) {
+                offMap[dept.id] = offRes.data;
+              }
+              return { ...dept, workload: wRes?.data };
             } catch {
               return { ...dept };
             }
           })
         );
+        setOfficersByDept(offMap);
         setDepartments(deptsWithWorkload);
       } else {
-        if (!isDemoMode) {
-          setDepartments([]);
-        } else {
-          setDepartments([]);
-        }
+        setDepartments([]);
       }
     } catch (err: any) {
       console.warn('Could not load departments from API:', err);
@@ -196,6 +199,24 @@ export default function DepartmentsPage() {
                       </div>
                     </div>
                   </div>
+
+                  {officersByDept[deptId] && officersByDept[deptId].length > 0 && (
+                    <div className="pt-2 border-t border-ink-border/40 text-[11px] space-y-1.5">
+                      <span className="font-semibold text-ink-primary">
+                        Department Personnel ({officersByDept[deptId].length}):
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {officersByDept[deptId].map((off: any) => (
+                          <span
+                            key={off.id}
+                            className="px-2 py-0.5 rounded bg-canvas-subtle border border-ink-border text-ink-secondary text-[10px] font-mono"
+                          >
+                            {off.display_name} • {off.role.replace(/_/g, ' ')}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="pt-2 border-t border-ink-border/60 flex items-center justify-between text-xs font-semibold text-civic-blue">
                     <Link

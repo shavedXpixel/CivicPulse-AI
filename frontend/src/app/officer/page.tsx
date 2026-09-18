@@ -7,6 +7,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { StatusBadge } from '../../components/domain/StatusBadge';
 import { apiClient } from '../../lib/api-client';
+import { useAuth } from '../../context/AuthContext';
 import { Assignment, ProblemCluster } from '@civicpulse/shared';
 import {
   MapPin,
@@ -27,6 +28,7 @@ interface AssignmentWithProblem extends Assignment {
 }
 
 export default function OfficerPage() {
+  const { user, userProfile, isDemoMode, loading: authLoading } = useAuth();
   const [officerToken, setOfficerToken] = useState<'demo-token-officer' | 'demo-token-field-drainage'>('demo-token-officer');
   const [assignments, setAssignments] = useState<AssignmentWithProblem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,9 +40,10 @@ export default function OfficerPage() {
     setLoading(true);
     setActionError(null);
     try {
+      const headers = isDemoMode ? { Authorization: `Bearer ${officerToken}` } : undefined;
       const res = await apiClient.get<{ data: AssignmentWithProblem[] }>(
         '/api/v1/assignments?assigned_to=me',
-        { Authorization: `Bearer ${officerToken}` }
+        headers
       );
       if (res?.data) {
         setAssignments(res.data);
@@ -50,24 +53,30 @@ export default function OfficerPage() {
     } finally {
       setLoading(false);
     }
-  }, [officerToken]);
+  }, [officerToken, isDemoMode]);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!isDemoMode && !user) {
+      setLoading(false);
+      return;
+    }
     fetchAssignments();
-  }, [fetchAssignments]);
+  }, [authLoading, isDemoMode, user, fetchAssignments]);
 
   const handleStartWork = async (problemId: string) => {
     setActionLoading(problemId);
     setActionSuccess(null);
     setActionError(null);
     try {
+      const headers = isDemoMode ? { Authorization: `Bearer ${officerToken}` } : undefined;
       await apiClient.post(
         `/api/v1/problems/${problemId}/actions`,
         {
           action: 'STARTED_WORK',
           note: 'Field crew deployed on site and initiated maintenance protocol.',
         },
-        { Authorization: `Bearer ${officerToken}` }
+        headers
       );
       setActionSuccess(`Work successfully commenced on problem ${problemId}! State transitioned to IN_PROGRESS.`);
       await fetchAssignments();
@@ -87,13 +96,14 @@ export default function OfficerPage() {
     setActionSuccess(null);
     setActionError(null);
     try {
+      const headers = isDemoMode ? { Authorization: `Bearer ${officerToken}` } : undefined;
       await apiClient.post(
         `/api/v1/problems/${problemId}/actions`,
         {
           action: 'VERIFICATION_REQUESTED',
           note: 'Field repairs completed. Restored infrastructure submitted for supervisory verification.',
         },
-        { Authorization: `Bearer ${officerToken}` }
+        headers
       );
       setActionSuccess(`Verification requested for ${problemId}! State transitioned to AWAITING_VERIFICATION.`);
       await fetchAssignments();
@@ -111,7 +121,7 @@ export default function OfficerPage() {
   return (
     <OfficerShell>
       <div className="space-y-6">
-        {/* Header with Officer Persona Switcher */}
+        {/* Header with Officer Persona Switcher (Demo Mode Only) */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <PageHeader
             title="Field Operations Queue"
@@ -123,33 +133,35 @@ export default function OfficerPage() {
             }
           />
 
-          {/* Persona Switcher for Verification */}
-          <div className="flex items-center gap-2 bg-white p-1.5 rounded-lg border border-ink-border shadow-subtle text-xs">
-            <span className="text-ink-tertiary font-medium px-2 flex items-center gap-1">
-              <UserCheck className="w-3.5 h-3.5 text-civic-blue" />
-              <span>Officer Scope:</span>
-            </span>
-            <button
-              onClick={() => setOfficerToken('demo-token-officer')}
-              className={`px-2.5 py-1 rounded font-semibold transition-colors ${
-                officerToken === 'demo-token-officer'
-                  ? 'bg-civic-blue text-white shadow-subtle'
-                  : 'text-ink-secondary hover:bg-canvas-subtle'
-              }`}
-            >
-              Rajesh K. (WATCO)
-            </button>
-            <button
-              onClick={() => setOfficerToken('demo-token-field-drainage')}
-              className={`px-2.5 py-1 rounded font-semibold transition-colors ${
-                officerToken === 'demo-token-field-drainage'
-                  ? 'bg-civic-blue text-white shadow-subtle'
-                  : 'text-ink-secondary hover:bg-canvas-subtle'
-              }`}
-            >
-              Suresh P. (Drainage)
-            </button>
-          </div>
+          {/* Persona Switcher for Verification in DEMO_MODE */}
+          {isDemoMode && (
+            <div className="flex items-center gap-2 bg-white p-1.5 rounded-lg border border-ink-border shadow-subtle text-xs">
+              <span className="text-ink-tertiary font-medium px-2 flex items-center gap-1">
+                <UserCheck className="w-3.5 h-3.5 text-civic-blue" />
+                <span>Officer Scope:</span>
+              </span>
+              <button
+                onClick={() => setOfficerToken('demo-token-officer')}
+                className={`px-2.5 py-1 rounded font-semibold transition-colors ${
+                  officerToken === 'demo-token-officer'
+                    ? 'bg-civic-blue text-white shadow-subtle'
+                    : 'text-ink-secondary hover:bg-canvas-subtle'
+                }`}
+              >
+                Rajesh K. (WATCO)
+              </button>
+              <button
+                onClick={() => setOfficerToken('demo-token-field-drainage')}
+                className={`px-2.5 py-1 rounded font-semibold transition-colors ${
+                  officerToken === 'demo-token-field-drainage'
+                    ? 'bg-civic-blue text-white shadow-subtle'
+                    : 'text-ink-secondary hover:bg-canvas-subtle'
+                }`}
+              >
+                Suresh P. (Drainage)
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Action alerts */}
@@ -178,7 +190,9 @@ export default function OfficerPage() {
             <CheckCircle2 className="w-8 h-8 text-civic-emerald mx-auto" />
             <h3 className="text-sm font-bold text-ink-primary">No Operational Problems Assigned</h3>
             <p className="text-xs text-ink-secondary max-w-sm mx-auto">
-              You are current on all assigned tasks. New dispatches will appear here once explicitly assigned by department leadership.
+              {isDemoMode
+                ? 'You are current on all assigned tasks. New dispatches will appear here once explicitly assigned by department leadership.'
+                : `No active work orders are currently assigned to ${userProfile?.display_name || user?.email || 'your officer account'}. As emergency dispatches or infrastructure work orders are assigned by WATCO leadership, they will appear here in real time.`}
             </p>
           </div>
         ) : (
@@ -209,7 +223,7 @@ export default function OfficerPage() {
                           {isCritical ? 'EMERGENCY DISPATCH' : 'SCHEDULED WORK ORDER'}
                         </span>
                         <span className="text-xs font-mono text-ink-tertiary">
-                          Assignment #{assignment.id}
+                          Assignment #{assignment.id} • Problem #{assignment.problem_id}
                         </span>
                         {problem?.is_demo && (
                           <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">

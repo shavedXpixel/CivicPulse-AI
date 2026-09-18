@@ -12,7 +12,14 @@ export class ProblemController {
     try {
       const user = req.user!;
       const parsed = ProblemFilterSchema.safeParse(req.query);
-      const query = parsed.success ? parsed.data : { limit: 20, sort: 'impact_desc' as const };
+      if (!parsed.success) {
+        throw new AppError({
+          statusCode: 400,
+          code: 'VALIDATION_ERROR',
+          message: `Invalid query parameters: ${parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`
+        });
+      }
+      const query = parsed.data;
 
       const result = await problemService.listProblems(user, query);
 

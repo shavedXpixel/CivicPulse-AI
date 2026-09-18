@@ -75,8 +75,9 @@ export class ResolutionController {
       const user = (req as any).user;
       const problemId = req.params.id as string;
       const evidenceId = req.body?.evidence_id || (req.params.evidenceId as string | undefined);
+      const forceReverify = req.body?.force === true || req.query.force === 'true';
 
-      const verification = await VerificationService.verifyProblemEvidence(user, problemId, evidenceId);
+      const verification = await VerificationService.verifyProblemEvidence(user, problemId, evidenceId, forceReverify);
       res.status(200).json({ data: verification });
     } catch (err) {
       next(err);

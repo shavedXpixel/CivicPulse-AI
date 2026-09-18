@@ -8,7 +8,16 @@ import {
 
 export const SubmitEvidenceSchema = z.object({
   evidence_type: z.nativeEnum(EvidenceType).default(EvidenceType.COMPLETION_PHOTO),
-  storage_path: z.string().min(1, 'storage_path is required'),
+  storage_path: z
+    .string()
+    .min(1, 'storage_path is required')
+    .regex(
+      /^(evidence|signals)\/([a-zA-Z0-9._-]+\/)*[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp|json|pdf)$/i,
+      'storage_path must reside in signals/ or evidence/ with valid extension and no directory traversal'
+    )
+    .refine((val) => !val.includes('..') && !val.startsWith('/') && !val.includes('\\'), {
+      message: 'storage_path cannot contain directory traversal or backslashes'
+    }),
   media_type: z.string().default('image/jpeg').optional(),
   media_ids: z.array(z.string()).default([]).optional(),
   description: z.string().max(5000).optional(),

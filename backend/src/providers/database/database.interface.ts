@@ -40,6 +40,7 @@ export interface ProblemFilterCriteria {
 export interface IDatabaseProvider {
   // Users & Profiles
   getUser(id: string): Promise<UserProfile | null>;
+  getUserByAuthId?(authUserId: string): Promise<UserProfile | null>;
   createUser(user: UserProfile): Promise<UserProfile>;
   getCitizenProfile(userId: string): Promise<CitizenProfile | null>;
   createCitizenProfile(profile: CitizenProfile): Promise<CitizenProfile>;
@@ -53,6 +54,7 @@ export interface IDatabaseProvider {
   // Signal Media
   createSignalMedia(media: SignalMediaItem): Promise<SignalMediaItem>;
   getSignalMedia(signalId: string): Promise<SignalMediaItem[]>;
+  getSignalMediaByPath(storagePath: string): Promise<SignalMediaItem | null>;
   attachMediaToSignal(signalId: string, mediaId: string): Promise<void>;
 
   // AI Operations
@@ -88,7 +90,8 @@ export interface IDatabaseProvider {
     problemId: string,
     assignment: Assignment,
     nextStatus: ProblemStatus,
-    action: ProblemAction
+    action: ProblemAction,
+    expectedCurrentStatus?: ProblemStatus
   ): Promise<{ problem: ProblemCluster; assignment: Assignment; action: ProblemAction }>;
 
   atomicTransitionStatus(
@@ -99,9 +102,27 @@ export interface IDatabaseProvider {
     updates?: Partial<ProblemCluster>
   ): Promise<{ problem: ProblemCluster; action: ProblemAction }>;
 
+  atomicCreateClusterFromSignal(
+    problem: ProblemCluster,
+    member: ProblemClusterMember,
+    signalId: string
+  ): Promise<{ problem: ProblemCluster; member: ProblemClusterMember }>;
+
+  atomicReviewResolution(
+    problemId: string,
+    decision: 'ACCEPT' | 'REJECT',
+    action: ProblemAction,
+    evidenceIds: string[],
+    notes?: string
+  ): Promise<{ problem: ProblemCluster; action: ProblemAction; decision: string }>;
+
+  // Container & Operational Readiness
+  checkReadiness(): Promise<{ ready: boolean; latencyMs: number }>;
+
   // Resolution Evidence & Verification (Phase 6)
   createResolutionEvidence(evidence: import('@civicpulse/shared').ResolutionEvidence): Promise<import('@civicpulse/shared').ResolutionEvidence>;
   getResolutionEvidence(problemId: string): Promise<import('@civicpulse/shared').ResolutionEvidence[]>;
+  getResolutionEvidenceByPath(storagePath: string): Promise<import('@civicpulse/shared').ResolutionEvidence | null>;
   getEvidenceById(id: string): Promise<import('@civicpulse/shared').ResolutionEvidence | null>;
   updateResolutionEvidence(
     id: string,

@@ -226,11 +226,12 @@ export class GovernanceService {
     }
 
     const top = problems[0]!;
+    const wardLabel = top.ward_id ? `in ${top.ward_id}` : 'citywide';
     return {
       title: 'MUNICIPAL EXECUTIVE INTELLIGENCE BRIEF',
-      summary: `Water supply is currently the largest unresolved public-impact disruption (#${top.id}, Impact: ${top.impact_score}/100). The strongest concentration is localized along the Nayapalli Ward 18 transit corridor.`,
+      summary: `${top.title} is currently the highest-impact unresolved disruption (#${top.id}, Impact: ${top.impact_score}/100) ${wardLabel}. Operational triage and department dispatch are active.`,
       top_problem_id: top.id,
-      priority_ward: top.ward_id || 'WARD-018',
+      priority_ward: top.ward_id || null,
       impact_score: top.impact_score,
       sources_count: top.signal_count || 1,
       evidence_label: 'Problem Ranking',

@@ -1,0 +1,15 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Phase 15 Hardening / AUD-STO-01:
+    // Direct client read and write access to the Cloud Storage bucket is strictly disabled.
+    // This prevents authenticated citizens from enumerating or directly accessing other citizens'
+    // private signal media, and prevents field/department officers from reading out-of-scope evidence.
+    //
+    // All media retrieval and upload operations MUST be mediated by the backend authorization
+    // pipeline (GET /api/v1/storage/files) with strict ownership, role, and department scoping.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

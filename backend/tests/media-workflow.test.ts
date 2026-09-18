@@ -73,10 +73,11 @@ describe('Decoupled Media Upload Workflow & 10MB Limit', () => {
     expect(regRes.status).toBe(201);
     const { media_id, upload_url } = regRes.body.data;
 
-    // 2. Upload binary payload to upload_url
-    const mockImageBuffer = Buffer.from('mock-png-image-binary-data');
+    // 2. Upload binary payload to upload_url (authenticated with valid PNG magic bytes)
+    const mockImageBuffer = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52]);
     const uploadRes = await request(app)
       .put(upload_url)
+      .set('Authorization', 'Bearer demo-token-citizen')
       .set('Content-Type', 'image/png')
       .send(mockImageBuffer);
 
@@ -97,5 +98,33 @@ describe('Decoupled Media Upload Workflow & 10MB Limit', () => {
 
     expect(listRes.status).toBe(200);
     expect(listRes.body.data.some((m: any) => m.id === media_id)).toBe(true);
+  });
+
+  describe('Cloud Storage & GCSStorageProvider Integration', () => {
+    it('selects GCSStorageProvider when PROVIDER_MODE is cloud', async () => {
+      const { GCSStorageProvider } = await import('../src/providers');
+      const gcs = new GCSStorageProvider('civicpulse-ai-f1bbf.firebasestorage.app');
+      expect(gcs).toBeInstanceOf(GCSStorageProvider);
+      expect(gcs.getBucketName()).toBe('civicpulse-ai-f1bbf.firebasestorage.app');
+      expect(typeof gcs.getSignedUploadUrl).toBe('function');
+      expect(typeof gcs.getFileUrl).toBe('function');
+      expect(typeof gcs.saveFile).toBe('function');
+      expect(typeof gcs.getFile).toBe('function');
+      expect(typeof gcs.objectExists).toBe('function');
+      expect(typeof gcs.deleteFile).toBe('function');
+    });
+
+    it('generates valid canonical storage path and signed upload structure', async () => {
+      const { GCSStorageProvider } = await import('../src/providers');
+      const gcs = new GCSStorageProvider('civicpulse-ai-f1bbf.firebasestorage.app');
+      const result = await gcs.getSignedUploadUrl('water_burst.jpg', 'image/jpeg');
+
+      expect(result.storagePath).toMatch(/^signals\/\d+_water_burst\.jpg$/);
+      expect(result.uploadUrl).toBeDefined();
+      expect(result.expiresAt).toBeDefined();
+
+      const publicUrl = await gcs.getFileUrl(result.storagePath);
+      expect(publicUrl).toBe(`/api/v1/storage/files?path=${encodeURIComponent(result.storagePath)}`);
+    });
   });
 });

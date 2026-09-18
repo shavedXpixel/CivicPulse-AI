@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { SignalService } from './signal.service';
 import { SignalAIService } from './signal-ai.service';
 import { clusteringService } from '../clustering/clustering.service';
-import { CreateSignalSchema, RegisterMediaSchema, PaginationQuerySchema } from '@civicpulse/shared';
+import { CreateSignalSchema, RegisterMediaSchema, PaginationQuerySchema, SignalProcessingStatus } from '@civicpulse/shared';
 import { AppError } from '../../middleware/error.middleware';
 
 const signalService = new SignalService();
@@ -28,28 +28,39 @@ export class SignalController {
       // 1. Create and persist raw signal to database
       const signal = await signalService.createSignal(user, validationResult.data);
 
-      // If auto_process is enabled, execute the automated end-to-end pipeline
+      // If auto_process is enabled, execute the automated end-to-end pipeline with degraded handling
       if (validationResult.data.auto_process) {
-        // 2. Automated AI Analysis
-        await signalAIService.analyzeSignal(user, signal.id);
+        try {
+          // 2. Automated AI Analysis
+          await signalAIService.analyzeSignal(user, signal.id);
 
-        // 3. Automated Embedding & Clustering (Promote to cluster or attach to existing)
-        const clusterResult = await clusteringService.clusterSignal(signal.id, {
-          autoCreate: true,
-          failOnEmbeddingError: true
-        });
+          // 3. Automated Embedding & Clustering (Promote to cluster or attach to existing)
+          const clusterResult = await clusteringService.clusterSignal(signal.id, {
+            autoCreate: true,
+            failOnEmbeddingError: true
+          });
 
-        // 4. Retrieve updated signal with latest state and link
-        const updatedSignal = await signalService.getSignal(user, signal.id);
+          // 4. Retrieve updated signal with latest state and link
+          const updatedSignal = await signalService.getSignal(user, signal.id);
 
-        res.status(201).json({
-          data: {
-            ...updatedSignal,
+          res.status(201).json({
+            data: {
+              ...updatedSignal,
+              cluster: clusterResult
+            },
             cluster: clusterResult
-          },
-          cluster: clusterResult
-        });
-        return;
+          });
+          return;
+        } catch (aiErr: any) {
+          console.warn(`[SignalController] Automated AI analysis/clustering failed for ${signal.id}:`, aiErr.message);
+          // Ensure raw signal is preserved and marked FAILED in DB
+          try {
+            await signalService.updateSignal(signal.id, {
+              processing_status: SignalProcessingStatus.FAILED
+            });
+          } catch (_) {}
+          return next(aiErr);
+        }
       }
 
       // Default: Return persisted raw signal
@@ -80,8 +91,15 @@ export class SignalController {
     try {
       const user = req.user!;
       const queryParsed = PaginationQuerySchema.safeParse(req.query);
+      if (!queryParsed.success) {
+        throw new AppError({
+          statusCode: 400,
+          code: 'VALIDATION_ERROR',
+          message: `Invalid query parameters: ${queryParsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`
+        });
+      }
 
-      const query = queryParsed.success ? queryParsed.data : { limit: 20 };
+      const query = queryParsed.data;
       const result = await signalService.listSignals(user, {
         limit: query.limit,
         cursor: query.cursor,
@@ -106,19 +124,26 @@ export class SignalController {
   public static async getMySignals(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const user = req.user!;
-      const limit = Number(req.query.limit) || 20;
-      const cursor = req.query.cursor as string | undefined;
+      const queryParsed = PaginationQuerySchema.safeParse(req.query);
+      if (!queryParsed.success) {
+        throw new AppError({
+          statusCode: 400,
+          code: 'VALIDATION_ERROR',
+          message: `Invalid query parameters: ${queryParsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`
+        });
+      }
 
+      const query = queryParsed.data;
       const result = await signalService.listSignals(user, {
-        limit,
-        cursor,
+        limit: query.limit,
+        cursor: query.cursor,
         citizen_id: user.id
       });
 
       res.status(200).json({
         data: result.data,
         pagination: {
-          limit,
+          limit: query.limit,
           next_cursor: result.nextCursor
         }
       });

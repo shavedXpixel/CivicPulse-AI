@@ -501,6 +501,13 @@ describe('Phase 6 Resolution Evidence & AI Verification', () => {
       expect(actionTypes).toContain('VERIFICATION_COMPLETED');
       expect(actionTypes).toContain('RESOLVED');
 
+      // Assert authoritative SYSTEM attribution on VERIFICATION_COMPLETED
+      const verificationAction = actions.find((a: any) => a.action_type === 'VERIFICATION_COMPLETED');
+      expect(verificationAction).toBeDefined();
+      expect(verificationAction.actor_role).toBe('SYSTEM');
+      expect(verificationAction.actor_id).toBe('civicpulse_ai_advisory');
+      expect(verificationAction.metadata).toHaveProperty('triggered_by');
+
       // Verify GET /problems/:id/verification returns latest result
       const latestRes = await request(app)
         .get('/api/v1/problems/PRB-2026-0819/verification')
@@ -520,6 +527,66 @@ describe('Phase 6 Resolution Evidence & AI Verification', () => {
       expect(historyRes.status).toBe(200);
       expect(Array.isArray(historyRes.body.data)).toBe(true);
       expect(historyRes.body.data.length).toBeGreaterThan(0);
+    });
+
+    it('enforces idempotency on /verify and avoids duplicate VERIFICATION_COMPLETED actions unless force: true', async () => {
+      // 1. Submit resolution evidence
+      const evdRes = await request(app)
+        .post('/api/v1/problems/PRB-2026-0819/evidence')
+        .set('Authorization', 'Bearer demo-token-officer')
+        .send({
+          evidence_type: EvidenceType.COMPLETION_PHOTO,
+          storage_path: 'evidence/resolutions/idempotency_check.jpg',
+          media_type: 'image/jpeg',
+          description: 'Testing verification idempotency'
+        });
+      expect(evdRes.status).toBe(201);
+      const evidenceId = evdRes.body.data.evidence.id;
+
+      // 2. First explicit verification call
+      const verify1 = await request(app)
+        .post('/api/v1/problems/PRB-2026-0819/verify')
+        .set('Authorization', 'Bearer demo-token-dept-watco')
+        .send({ evidence_id: evidenceId });
+      expect(verify1.status).toBe(200);
+
+      // Check actions count for VERIFICATION_COMPLETED on this problem
+      const actions1 = await request(app)
+        .get('/api/v1/problems/PRB-2026-0819/actions')
+        .set('Authorization', 'Bearer demo-token-dept-watco');
+      const verifActions1 = actions1.body.data.filter((a: any) => a.action_type === 'VERIFICATION_COMPLETED');
+      const countBefore = verifActions1.length;
+
+      // 3. Second verification call on the same already-verified evidence (without force)
+      const verify2 = await request(app)
+        .post('/api/v1/problems/PRB-2026-0819/verify')
+        .set('Authorization', 'Bearer demo-token-dept-watco')
+        .send({ evidence_id: evidenceId });
+      expect(verify2.status).toBe(200);
+      expect(verify2.body.data.id).toBe(verify1.body.data.id);
+
+      // Verify no duplicate VERIFICATION_COMPLETED was created
+      const actions2 = await request(app)
+        .get('/api/v1/problems/PRB-2026-0819/actions')
+        .set('Authorization', 'Bearer demo-token-dept-watco');
+      const verifActions2 = actions2.body.data.filter((a: any) => a.action_type === 'VERIFICATION_COMPLETED');
+      expect(verifActions2.length).toBe(countBefore);
+
+      // 4. Third verification call with force: true
+      const verify3 = await request(app)
+        .post('/api/v1/problems/PRB-2026-0819/verify')
+        .set('Authorization', 'Bearer demo-token-dept-watco')
+        .send({ evidence_id: evidenceId, force: true });
+      expect(verify3.status).toBe(200);
+
+      // Verify VERIFICATION_REQUESTED and new VERIFICATION_COMPLETED are added
+      const actions3 = await request(app)
+        .get('/api/v1/problems/PRB-2026-0819/actions')
+        .set('Authorization', 'Bearer demo-token-dept-watco');
+      const verifReqActions = actions3.body.data.filter((a: any) => a.action_type === 'VERIFICATION_REQUESTED');
+      expect(verifReqActions.length).toBeGreaterThan(0);
+      const verifActions3 = actions3.body.data.filter((a: any) => a.action_type === 'VERIFICATION_COMPLETED');
+      expect(verifActions3.length).toBe(countBefore + 1);
     });
   });
 });

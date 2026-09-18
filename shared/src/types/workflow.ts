@@ -37,10 +37,10 @@ export interface Department {
   name: string;
   short_name: string;
   description: string;
-  lead_officer: string;
-  contact_phone: string;
-  contact_email: string;
-  jurisdiction_wards: number[];
+  lead_officer?: string;
+  contact_phone?: string;
+  contact_email?: string;
+  jurisdiction_wards?: number[];
 }
 
 export interface DepartmentWorkload {
