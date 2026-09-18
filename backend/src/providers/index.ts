@@ -42,6 +42,9 @@ import { StaticFacilityProvider } from './reference/static-facility.provider';
 import { IAuthProvider } from './auth/auth.interface';
 import { SupabaseAuthProvider } from './auth/supabase.auth.provider';
 import { FirebaseAuthProvider } from './auth/firebase.auth.provider';
+import { PostgresDatabaseProvider } from './database/postgres.provider';
+import { R2StorageProvider } from './storage/r2.storage';
+import { OpenAIProvider } from './ai/openai.provider';
 
 class ProviderContainer {
   private static dbInstance: IDatabaseProvider | null = null;
@@ -60,7 +63,17 @@ class ProviderContainer {
       if (env.DEMO_MODE) {
         this.dbInstance = new MockDatabaseProvider();
       } else {
-        this.dbInstance = new FirestoreDatabaseProvider();
+        if (env.DATABASE_PROVIDER === 'postgres') {
+          this.dbInstance = new PostgresDatabaseProvider();
+        } else if (env.DATABASE_PROVIDER === 'firestore') {
+          this.dbInstance = new FirestoreDatabaseProvider();
+        } else {
+          throw new AppError({
+            statusCode: 500,
+            code: ERROR_CODES.INTERNAL_ERROR,
+            message: `[ProviderContainer] Unsupported DATABASE_PROVIDER in REAL_MODE: '${env.DATABASE_PROVIDER}'. Must be 'postgres' or 'firestore'. Mock database is strictly prohibited when DEMO_MODE=false.`
+          });
+        }
       }
     }
     return this.dbInstance;
@@ -70,8 +83,14 @@ class ProviderContainer {
     if (!this.authInstance) {
       if (env.AUTH_PROVIDER === 'supabase') {
         this.authInstance = new SupabaseAuthProvider();
-      } else {
+      } else if (env.AUTH_PROVIDER === 'firebase') {
         this.authInstance = new FirebaseAuthProvider();
+      } else {
+        throw new AppError({
+          statusCode: 500,
+          code: ERROR_CODES.INTERNAL_ERROR,
+          message: `[ProviderContainer] Unsupported AUTH_PROVIDER: '${env.AUTH_PROVIDER}'. Must be 'supabase' or 'firebase'.`
+        });
       }
     }
     return this.authInstance;
@@ -83,10 +102,20 @@ class ProviderContainer {
 
   public static getStorageProvider(): IStorageProvider {
     if (!this.storageInstance) {
-      if (env.PROVIDER_MODE === 'cloud') {
-        this.storageInstance = new GCSStorageProvider();
-      } else {
+      if (env.DEMO_MODE) {
         this.storageInstance = new LocalStorageProvider();
+      } else {
+        if (env.STORAGE_PROVIDER === 'r2') {
+          this.storageInstance = new R2StorageProvider();
+        } else if (env.STORAGE_PROVIDER === 'gcs') {
+          this.storageInstance = new GCSStorageProvider();
+        } else {
+          throw new AppError({
+            statusCode: 500,
+            code: ERROR_CODES.INTERNAL_ERROR,
+            message: `[ProviderContainer] Unsupported STORAGE_PROVIDER in REAL_MODE: '${env.STORAGE_PROVIDER}'. Must be 'r2' or 'gcs'. Local/mock storage is strictly prohibited when DEMO_MODE=false.`
+          });
+        }
       }
     }
     return this.storageInstance;
@@ -97,8 +126,17 @@ class ProviderContainer {
       if (env.DEMO_MODE) {
         this.aiInstance = new MockAIProvider();
       } else {
-        // Cloud/production mode: never silently fall back to MockAIProvider
-        this.aiInstance = new GeminiAIProvider();
+        if (env.AI_PROVIDER === 'openai') {
+          this.aiInstance = new OpenAIProvider();
+        } else if (env.AI_PROVIDER === 'gemini') {
+          this.aiInstance = new GeminiAIProvider();
+        } else {
+          throw new AppError({
+            statusCode: 500,
+            code: ERROR_CODES.INTERNAL_ERROR,
+            message: `[ProviderContainer] Unsupported AI_PROVIDER in REAL_MODE: '${env.AI_PROVIDER}'. Must be 'openai' or 'gemini'. Mock AI is strictly prohibited when DEMO_MODE=false.`
+          });
+        }
       }
     }
     return this.aiInstance;
@@ -109,7 +147,21 @@ class ProviderContainer {
       if (env.DEMO_MODE) {
         this.verificationInstance = new MockVerificationProvider();
       } else {
-        this.verificationInstance = new GeminiVerificationProvider();
+        if (env.AI_PROVIDER === 'openai') {
+          if (this.aiInstance instanceof OpenAIProvider) {
+            this.verificationInstance = this.aiInstance;
+          } else {
+            this.verificationInstance = new OpenAIProvider();
+          }
+        } else if (env.AI_PROVIDER === 'gemini') {
+          this.verificationInstance = new GeminiVerificationProvider();
+        } else {
+          throw new AppError({
+            statusCode: 500,
+            code: ERROR_CODES.INTERNAL_ERROR,
+            message: `[ProviderContainer] Unsupported AI_PROVIDER for verification in REAL_MODE: '${env.AI_PROVIDER}'. Must be 'openai' or 'gemini'. Mock verification is strictly prohibited when DEMO_MODE=false.`
+          });
+        }
       }
     }
     return this.verificationInstance;

@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- CivicPulse AI — Migration 0001: Required Extensions
--- Target: Supabase PostgreSQL 15+
+-- Target: Supabase PostgreSQL 17.6 (PostgreSQL 17+)
 -- ==============================================================================
 
 -- Standard UUID generation

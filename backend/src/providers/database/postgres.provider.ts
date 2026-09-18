@@ -42,8 +42,32 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     } else {
       const connStr = config?.connectionString || env.DATABASE_URL || process.env.DATABASE_URL;
       if (connStr) {
+        let sslConfig: any = undefined;
+        if (process.env.DATABASE_CA_CERT) {
+          try {
+            const fs = require('fs');
+            if (fs.existsSync(process.env.DATABASE_CA_CERT)) {
+              sslConfig = {
+                ca: fs.readFileSync(process.env.DATABASE_CA_CERT, 'utf8'),
+                rejectUnauthorized: true
+              };
+            }
+          } catch {
+            // Ignore error loading custom CA cert
+          }
+        } else if (
+          process.env.DATABASE_SSL === 'true' ||
+          connStr.includes('supabase.co') ||
+          connStr.includes('supabase.com') ||
+          connStr.includes('sslmode=require')
+        ) {
+          const rejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === 'true';
+          sslConfig = { rejectUnauthorized };
+        }
+
         this.pool = new Pool({
           connectionString: connStr,
+          ssl: sslConfig,
           max: config?.maxConnections || 10,
           idleTimeoutMillis: 30000,
           connectionTimeoutMillis: 5000

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app';
-import { ProviderContainer, MockDatabaseProvider, MockAIProvider } from '../src/providers';
+import { ProviderContainer, MockDatabaseProvider, MockAIProvider, LocalStorageProvider } from '../src/providers';
 import { env } from '../src/config/env';
 import { UserRole, UserStatus, ERROR_CODES } from '@civicpulse/shared';
 import * as firebaseAdminModule from '../src/infrastructure/firebase/firebase-admin';
@@ -15,6 +15,7 @@ describe('Phase 10 Step 3: Real-Mode Authentication & Citizen Reporting', () => 
     ProviderContainer.resetAllProviders();
     ProviderContainer.setDatabaseProvider(new MockDatabaseProvider());
     ProviderContainer.setAIProvider(new MockAIProvider());
+    ProviderContainer.setStorageProvider(new LocalStorageProvider());
     app = createApp();
 
     mockVerifyIdToken = vi.fn();

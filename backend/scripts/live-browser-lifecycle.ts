@@ -5,9 +5,11 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 import { chromium, Browser, Page } from 'playwright';
 import { getFirestoreDb } from '../src/infrastructure/firebase/firebase-admin';
-
-const ARTIFACT_DIR = '/home/runner/work\\.gemini\\antigravity-ide\\brain\\84fafff3-00b2-4dd1-95b5-901d9fe86f54';
-const BASE_URL = 'http://localhost:3000';
+const ARTIFACT_DIR = process.env.ARTIFACT_DIR || path.join(process.cwd(), '.scratch', 'browser-artifacts');
+if (!fs.existsSync(ARTIFACT_DIR)) {
+  fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
+}
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 
 const CREDENTIALS = {
   CITIZEN: {

@@ -36,7 +36,8 @@ export function createApp(): Express {
       origin: (origin, callback) => {
         // Allow requests with no origin (e.g. mobile apps, curl, tests, server-to-server)
         if (!origin) return callback(null, true);
-        if (env.CORS_ALLOWED_ORIGINS.includes(origin) || env.CORS_ALLOWED_ORIGINS.includes('*')) {
+        // AUD-CORS-01: Explicit origin match only — no wildcard CORS with credentials
+        if (env.CORS_ALLOWED_ORIGINS.includes(origin)) {
           return callback(null, true);
         }
         return callback(new Error(`Origin ${origin} not allowed by CORS policy`));

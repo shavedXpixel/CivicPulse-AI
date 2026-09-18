@@ -32,7 +32,10 @@ const EnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().optional().default(''),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional().default(''),
   AUTH_PROVIDER: z.enum(['supabase', 'firebase', 'mock']).default('firebase'),
+  DATABASE_PROVIDER: z.enum(['postgres', 'firestore', 'mock']).default('firestore'),
+  STORAGE_PROVIDER: z.enum(['r2', 'gcs', 'local', 'mock']).default('local'),
   DATABASE_URL: z.string().optional().default(''),
+  BACKEND_INTERNAL_URL: z.string().optional().default(''),
   R2_ACCOUNT_ID: z.string().optional().default(''),
   R2_ACCESS_KEY_ID: z.string().optional().default(''),
   R2_SECRET_ACCESS_KEY: z.string().optional().default(''),
@@ -58,6 +61,10 @@ export const env = {
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: parsed.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || parsed.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
   NEXT_PUBLIC_SUPABASE_ANON_KEY: parsed.NEXT_PUBLIC_SUPABASE_ANON_KEY || parsed.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '',
   AUTH_PROVIDER: parsed.AUTH_PROVIDER || 'firebase',
+  DATABASE_PROVIDER: parsed.DATABASE_PROVIDER || 'firestore',
+  STORAGE_PROVIDER: parsed.STORAGE_PROVIDER || 'local',
+  AI_PROVIDER: parsed.AI_PROVIDER || 'gemini',
+  BACKEND_INTERNAL_URL: parsed.BACKEND_INTERNAL_URL || '',
   GEMINI_PRIMARY_MODEL: parsed.GEMINI_PRIMARY_MODEL || parsed.AI_MODEL_GENERAL || 'gemini-3.6-flash',
   GEMINI_FALLBACK_MODEL: parsed.GEMINI_FALLBACK_MODEL || 'gemini-3.5-flash',
   AI_EMBEDDING_MODEL: parsed.AI_EMBEDDING_MODEL || parsed.AI_MODEL_EMBEDDING || 'text-embedding-004',
@@ -74,35 +81,108 @@ export interface RealModeValidationResult {
 
 /**
  * Validates whether the environment has the necessary configuration for REAL_MODE.
- * Cleanly supports both local development and Cloud Run / ADC environments.
+ * Enforces explicit provider selection and exact production dependencies for Phase 15B.
+ * Cleanly preserves rollback capabilities for legacy Google Cloud providers.
+ * Fails closed without printing secret values.
  */
 export function validateRealModeConfig(targetEnv?: Partial<typeof env>): RealModeValidationResult {
   const target = targetEnv || env;
   const errors: string[] = [];
 
   if (target.DEMO_MODE === false) {
-    if (!target.FIREBASE_PROJECT_ID || target.FIREBASE_PROJECT_ID.trim() === '') {
-      errors.push('FIREBASE_PROJECT_ID is required when DEMO_MODE=false');
-    }
+    const isTargetStack =
+      target.AUTH_PROVIDER === 'supabase' ||
+      target.DATABASE_PROVIDER === 'postgres' ||
+      target.STORAGE_PROVIDER === 'r2' ||
+      target.AI_PROVIDER === 'openai';
 
-    if (target.PROVIDER_MODE === 'cloud') {
-      if (!target.GEMINI_API_KEY || target.GEMINI_API_KEY.trim() === '') {
-        errors.push('GEMINI_API_KEY is required when PROVIDER_MODE=cloud and DEMO_MODE=false');
+    if (isTargetStack) {
+      // 1. Explicit Provider Flags Enforcement
+      if (target.AUTH_PROVIDER !== 'supabase') {
+        errors.push(`AUTH_PROVIDER must be 'supabase' in production target architecture (got '${target.AUTH_PROVIDER}')`);
       }
-    }
+      if (target.DATABASE_PROVIDER !== 'postgres') {
+        errors.push(`DATABASE_PROVIDER must be 'postgres' in production target architecture (got '${target.DATABASE_PROVIDER}')`);
+      }
+      if (target.STORAGE_PROVIDER !== 'r2') {
+        errors.push(`STORAGE_PROVIDER must be 'r2' in production target architecture (got '${target.STORAGE_PROVIDER}')`);
+      }
+      if (target.AI_PROVIDER !== 'openai') {
+        errors.push(`AI_PROVIDER must be 'openai' in production target architecture (got '${target.AI_PROVIDER}')`);
+      }
 
-    if (target.GOOGLE_APPLICATION_CREDENTIALS && target.GOOGLE_APPLICATION_CREDENTIALS.trim() !== '') {
-      const fs = require('fs');
-      const p = target.GOOGLE_APPLICATION_CREDENTIALS;
-      let resolved = path.isAbsolute(p) ? p : path.resolve(process.cwd(), p);
-      if (!fs.existsSync(resolved) && !path.isAbsolute(p)) {
-        const parentResolved = path.resolve(process.cwd(), '..', p);
-        if (fs.existsSync(parentResolved)) {
-          resolved = parentResolved;
+      // 2. Exact Non-Google Production Dependencies (never print secret values)
+      if (!target.SUPABASE_URL || target.SUPABASE_URL.trim() === '') {
+        errors.push('SUPABASE_URL is required when AUTH_PROVIDER=supabase');
+      }
+      const supabaseSecret = target.SUPABASE_SECRET_KEY || target.SUPABASE_SERVICE_ROLE_KEY;
+      if (!supabaseSecret || supabaseSecret.trim() === '') {
+        errors.push('SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) is required when AUTH_PROVIDER=supabase');
+      }
+      if (!target.DATABASE_URL || target.DATABASE_URL.trim() === '') {
+        errors.push('DATABASE_URL is required when DATABASE_PROVIDER=postgres');
+      }
+      if (!target.OPENAI_API_KEY || target.OPENAI_API_KEY.trim() === '') {
+        errors.push('OPENAI_API_KEY is required when AI_PROVIDER=openai');
+      }
+      if (!target.R2_ACCOUNT_ID || target.R2_ACCOUNT_ID.trim() === '') {
+        errors.push('R2_ACCOUNT_ID is required when STORAGE_PROVIDER=r2');
+      }
+      if (!target.R2_ACCESS_KEY_ID || target.R2_ACCESS_KEY_ID.trim() === '') {
+        errors.push('R2_ACCESS_KEY_ID is required when STORAGE_PROVIDER=r2');
+      }
+      if (!target.R2_SECRET_ACCESS_KEY || target.R2_SECRET_ACCESS_KEY.trim() === '') {
+        errors.push('R2_SECRET_ACCESS_KEY is required when STORAGE_PROVIDER=r2');
+      }
+    } else {
+      // Rollback Google Cloud Architecture (Firebase / Firestore / GCS / Gemini)
+      if (!target.FIREBASE_PROJECT_ID || target.FIREBASE_PROJECT_ID.trim() === '') {
+        errors.push('FIREBASE_PROJECT_ID is required when DEMO_MODE=false');
+      }
+
+      if (target.PROVIDER_MODE === 'cloud') {
+        if (!target.GEMINI_API_KEY || target.GEMINI_API_KEY.trim() === '') {
+          errors.push('GEMINI_API_KEY is required when PROVIDER_MODE=cloud and DEMO_MODE=false');
         }
       }
-      if (!fs.existsSync(resolved)) {
-        errors.push(`GOOGLE_APPLICATION_CREDENTIALS file not found at: ${target.GOOGLE_APPLICATION_CREDENTIALS}`);
+
+      if (target.GOOGLE_APPLICATION_CREDENTIALS && target.GOOGLE_APPLICATION_CREDENTIALS.trim() !== '') {
+        const fs = require('fs');
+        const p = target.GOOGLE_APPLICATION_CREDENTIALS;
+        let resolved = path.isAbsolute(p) ? p : path.resolve(process.cwd(), p);
+        if (!fs.existsSync(resolved) && !path.isAbsolute(p)) {
+          const parentResolved = path.resolve(process.cwd(), '..', p);
+          if (fs.existsSync(parentResolved)) {
+            resolved = parentResolved;
+          }
+        }
+        if (!fs.existsSync(resolved)) {
+          errors.push(`GOOGLE_APPLICATION_CREDENTIALS file not found at: ${target.GOOGLE_APPLICATION_CREDENTIALS}`);
+        }
+      }
+    }
+
+    // Strict REAL_MODE Guardrail: Mock and local providers are strictly forbidden when DEMO_MODE=false
+    if (target.DATABASE_PROVIDER === 'mock') {
+      errors.push("Mock database provider is strictly prohibited in REAL_MODE (DEMO_MODE=false)");
+    }
+    if (target.STORAGE_PROVIDER === 'mock' || target.STORAGE_PROVIDER === 'local') {
+      errors.push(`Storage provider '${target.STORAGE_PROVIDER}' is strictly prohibited in REAL_MODE (DEMO_MODE=false). Must be 'r2' or 'gcs'`);
+    }
+    if (target.AI_PROVIDER === 'mock') {
+      errors.push("Mock AI provider is strictly prohibited in REAL_MODE (DEMO_MODE=false)");
+    }
+    if (target.AUTH_PROVIDER === 'mock') {
+      errors.push("Mock auth provider is strictly prohibited in REAL_MODE (DEMO_MODE=false)");
+    }
+
+    // CORS Safety: Wildcard is strictly prohibited in REAL_MODE with credentials
+    if (target.CORS_ALLOWED_ORIGINS) {
+      const origins = Array.isArray(target.CORS_ALLOWED_ORIGINS)
+        ? target.CORS_ALLOWED_ORIGINS
+        : String(target.CORS_ALLOWED_ORIGINS).split(',').map((s) => s.trim());
+      if (origins.includes('*')) {
+        errors.push('Wildcard CORS (*) is strictly prohibited in REAL_MODE with credentials');
       }
     }
   }
