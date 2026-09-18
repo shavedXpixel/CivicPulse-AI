@@ -74,6 +74,18 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
     return user;
   }
 
+  async listUsers(filter?: { role?: UserRole; department_id?: string }): Promise<UserProfile[]> {
+    let query: Query = this.db.collection('users');
+    if (filter?.role) {
+      query = query.where('role', '==', filter.role);
+    }
+    if (filter?.department_id) {
+      query = query.where('department_id', '==', filter.department_id);
+    }
+    const snap = await query.get();
+    return snap.docs.map((doc: DocumentSnapshot) => doc.data() as UserProfile);
+  }
+
   async getCitizenProfile(userId: string): Promise<CitizenProfile | null> {
     const snap = await this.db.collection('citizen_profiles').doc(userId).get();
     if (!snap.exists) return null;
@@ -449,6 +461,11 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
     const snap = await this.db.collection('departments').doc(id).get();
     if (!snap.exists) return null;
     return snap.data() as Department;
+  }
+
+  async createDepartment(department: Department): Promise<Department> {
+    await this.db.collection('departments').doc(department.id).set(department);
+    return department;
   }
 
   async getDepartmentWorkload(id: string): Promise<DepartmentWorkload> {

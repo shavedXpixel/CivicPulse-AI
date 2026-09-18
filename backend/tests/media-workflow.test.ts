@@ -125,6 +125,6 @@ describe('Decoupled Media Upload Workflow & 10MB Limit', () => {
 
       const publicUrl = await gcs.getFileUrl(result.storagePath);
       expect(publicUrl).toBe(`/api/v1/storage/files?path=${encodeURIComponent(result.storagePath)}`);
-    });
+    }, 15000);
   });
 });

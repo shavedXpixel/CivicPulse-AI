@@ -34,9 +34,11 @@ function LoginContent() {
   // REAL_MODE state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [confirmationNotice, setConfirmationNotice] = useState<string | null>(null);
 
   const demoRoles = [
     {
@@ -127,12 +129,20 @@ function LoginContent() {
     }
 
     setSubmitting(true);
+    setConfirmationNotice(null);
     try {
       let resolvedRole: string | undefined;
 
       if (isRegistering) {
-        const { profile } = await signUp(email.trim(), password);
-        resolvedRole = profile?.role || UserRole.CITIZEN;
+        const result = await signUp(email.trim(), password, fullName.trim() || undefined);
+        if (result.confirmationRequired) {
+          setConfirmationNotice(
+            `Verification email sent to ${email.trim()}. Please check your inbox and click the confirmation link to complete account activation.`
+          );
+          setSubmitting(false);
+          return;
+        }
+        resolvedRole = result.profile?.role || UserRole.CITIZEN;
       } else {
         const { profile } = await signIn(email.trim(), password);
         resolvedRole = profile?.role;
@@ -252,15 +262,14 @@ function LoginContent() {
               <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-2">
                 <div className="flex items-center gap-2 font-bold text-amber-800">
                   <AlertCircle className="w-4 h-4 text-amber-600" />
-                  <span>Firebase Client Not Configured</span>
+                  <span>Authentication Client Not Configured</span>
                 </div>
                 <p className="leading-relaxed">
                   REAL_MODE is active, but client authentication keys have not been set in this environment. Please configure:
                 </p>
                 <code className="block bg-amber-100/70 p-2 rounded text-[11px] font-mono text-amber-950">
-                  NEXT_PUBLIC_FIREBASE_API_KEY=...<br />
-                  NEXT_PUBLIC_FIREBASE_PROJECT_ID=...<br />
-                  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+                  NEXT_PUBLIC_SUPABASE_URL=...<br />
+                  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
                 </code>
               </div>
             ) : user ? (
@@ -320,10 +329,39 @@ function LoginContent() {
                   </div>
                 )}
 
+                {confirmationNotice && (
+                  <div className="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 space-y-1">
+                    <div className="flex items-center gap-2 font-bold text-emerald-900">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Verification Email Dispatched</span>
+                    </div>
+                    <p className="leading-relaxed text-emerald-800">{confirmationNotice}</p>
+                    <p className="text-[11px] text-emerald-700">
+                      Click the link in the email to activate your account and access the citizen portal.
+                    </p>
+                  </div>
+                )}
+
                 {formError && (
                   <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-900 flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                     <span>{formError}</span>
+                  </div>
+                )}
+
+                {isRegistering && (
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-ink-primary">Full Name</label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-ink-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Aarav Patnaik"
+                        className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-ink-border bg-canvas-subtle focus:bg-white focus:outline-none focus:border-civic-blue transition-colors text-ink-primary"
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -378,6 +416,7 @@ function LoginContent() {
                     onClick={() => {
                       setIsRegistering(!isRegistering);
                       setFormError(null);
+                      setConfirmationNotice(null);
                     }}
                     className="text-xs text-civic-blue hover:underline font-medium"
                   >

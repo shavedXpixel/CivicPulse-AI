@@ -56,7 +56,7 @@ export default function ProblemDetailPage({
 }) {
   const { id } = use(params);
   const { user, userProfile, isDemoMode } = useAuth();
-  const fallbackProblem = DEMO_PROBLEMS.find((p) => p.id === id) || DEMO_PROBLEMS[0]!;
+  const fallbackProblem = isDemoMode ? (DEMO_PROBLEMS.find((p) => p.id === id) || DEMO_PROBLEMS[0]!) : null;
 
   const [personaId, setPersonaId] = useState<string>('dept_watco');
   const activePersona = PERSONAS.find((p) => p.id === personaId) || PERSONAS[0]!;
@@ -155,22 +155,31 @@ export default function ProblemDetailPage({
         setDeptOfficers(res.data);
         setAssignOfficer(res.data[0].id);
       } else {
-        // Fallback default officers
-        const fallbackOfficers = [
-          { id: 'usr_officer_01', display_name: 'Rajesh K. (Field Engineer)' },
-          { id: 'usr_field_drainage', display_name: 'Suresh P. (Field Officer)' },
-        ];
-        setDeptOfficers(fallbackOfficers);
-        setAssignOfficer(fallbackOfficers[0]!.id);
+        if (isDemoMode) {
+          const fallbackOfficers = [
+            { id: 'usr_officer_01', display_name: 'Rajesh K. (Field Engineer)' },
+            { id: 'usr_field_drainage', display_name: 'Suresh P. (Field Officer)' },
+          ];
+          setDeptOfficers(fallbackOfficers);
+          setAssignOfficer(fallbackOfficers[0]!.id);
+        } else {
+          setDeptOfficers([]);
+          setAssignOfficer('');
+        }
       }
     } catch {
-      setDeptOfficers([
-        { id: 'usr_officer_01', display_name: 'Rajesh K. (Field Engineer)' },
-        { id: 'usr_field_drainage', display_name: 'Suresh P. (Field Officer)' },
-      ]);
-      setAssignOfficer('usr_officer_01');
+      if (isDemoMode) {
+        setDeptOfficers([
+          { id: 'usr_officer_01', display_name: 'Rajesh K. (Field Engineer)' },
+          { id: 'usr_field_drainage', display_name: 'Suresh P. (Field Officer)' },
+        ]);
+        setAssignOfficer('usr_officer_01');
+      } else {
+        setDeptOfficers([]);
+        setAssignOfficer('');
+      }
     }
-  }, [authHeaders]);
+  }, [authHeaders, isDemoMode]);
 
   useEffect(() => {
     let mounted = true;
@@ -288,28 +297,28 @@ export default function ProblemDetailPage({
     }
   };
 
-  // Resolved values blending live API data with rich fallbacks
+  // Resolved values blending live API data with rich fallbacks in demo mode only
   const isDemo = liveProblem?.is_demo ?? (id === 'PRB-2026-0819');
-  const title = liveProblem?.title || fallbackProblem.title;
-  const status = (liveProblem?.status || fallbackProblem.status) as ProblemStatus;
-  const department = liveProblem?.department_id || fallbackProblem.department;
+  const title = liveProblem?.title || fallbackProblem?.title || 'Unknown Incident';
+  const status = (liveProblem?.status || fallbackProblem?.status || ProblemStatus.NEW) as ProblemStatus;
+  const department = liveProblem?.department_id || fallbackProblem?.department || 'Unassigned';
   const assignedTo = liveProblem?.assigned_to;
-  const wardName = liveProblem?.ward_id ? `Ward ${liveProblem.ward_id.replace(/\D/g, '') || '18'} (Nayapalli, Bhubaneswar)` : fallbackProblem.wardName;
-  const signalCount = liveProblem?.signal_count || fallbackProblem.signalCount;
-  const supportingMediaCount = liveProblem?.supporting_media_count ?? fallbackProblem.supporting_media_count ?? 42;
-  const impactScore = liveProblem?.impact_score ?? fallbackProblem.impactScore;
-  const impactLevel = liveProblem?.impact_level || fallbackProblem.severity;
-  const explanation = liveProblem?.impact_explanation || fallbackProblem.aiSummary;
+  const wardName = liveProblem?.ward_id ? `Ward ${liveProblem.ward_id.replace(/\D/g, '') || '18'} (Nayapalli, Bhubaneswar)` : (fallbackProblem?.wardName || 'Ward 18 (Nayapalli, Bhubaneswar)');
+  const signalCount = liveProblem?.signal_count || fallbackProblem?.signalCount || 0;
+  const supportingMediaCount = liveProblem?.supporting_media_count ?? fallbackProblem?.supporting_media_count ?? (isDemo ? 42 : 0);
+  const impactScore = liveProblem?.impact_score ?? fallbackProblem?.impactScore ?? 0;
+  const impactLevel = liveProblem?.impact_level || fallbackProblem?.severity || 'LOW';
+  const explanation = liveProblem?.impact_explanation || fallbackProblem?.aiSummary || 'No impact assessment synthesized.';
   const sla = liveProblem?.sla_state;
 
   const breakdown = {
-    severity: liveProblem?.severity_score ?? fallbackProblem.impactBreakdown.severity,
-    population: liveProblem?.population_score ?? fallbackProblem.impactBreakdown.population,
-    duration: liveProblem?.duration_score ?? fallbackProblem.impactBreakdown.duration,
-    concentration: liveProblem?.concentration_score ?? fallbackProblem.impactBreakdown.concentration,
-    facilities: liveProblem?.critical_exposure_score ?? fallbackProblem.impactBreakdown.facilities,
-    recurrence: liveProblem?.recurrence_score ?? fallbackProblem.impactBreakdown.recurrence,
-    evidence: liveProblem?.evidence_score ?? fallbackProblem.impactBreakdown.evidence,
+    severity: liveProblem?.severity_score ?? fallbackProblem?.impactBreakdown?.severity ?? 0,
+    population: liveProblem?.population_score ?? fallbackProblem?.impactBreakdown?.population ?? 0,
+    duration: liveProblem?.duration_score ?? fallbackProblem?.impactBreakdown?.duration ?? 0,
+    concentration: liveProblem?.concentration_score ?? fallbackProblem?.impactBreakdown?.concentration ?? 0,
+    facilities: liveProblem?.critical_exposure_score ?? fallbackProblem?.impactBreakdown?.facilities ?? 0,
+    recurrence: liveProblem?.recurrence_score ?? fallbackProblem?.impactBreakdown?.recurrence ?? 0,
+    evidence: liveProblem?.evidence_score ?? fallbackProblem?.impactBreakdown?.evidence ?? 0,
   };
 
   const provenance = liveProblem?.data_provenance || (isDemo ? {
@@ -398,6 +407,30 @@ export default function ProblemDetailPage({
         <div className="space-y-6 max-w-6xl mx-auto py-12">
           <div className="h-8 w-64 bg-canvas-muted animate-pulse rounded-lg" />
           <div className="h-96 bg-canvas-muted animate-pulse rounded-xl" />
+        </div>
+      </GovernmentShell>
+    );
+  }
+
+  if (!isDemoMode && !liveProblem) {
+    return (
+      <GovernmentShell>
+        <div className="max-w-4xl mx-auto py-16 px-4 text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 mx-auto flex items-center justify-center">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <h2 className="text-xl font-bold text-ink-primary">Problem Cluster Not Found</h2>
+          <p className="text-xs text-ink-secondary max-w-md mx-auto">
+            Problem cluster <code className="font-mono text-ink-primary font-bold">{id}</code> does not exist in live PostgreSQL or you do not have permission to view it.
+          </p>
+          <div className="pt-2">
+            <Link
+              href="/dashboard/problems"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-civic-blue text-white hover:bg-civic-blueDark transition-colors"
+            >
+              ← Back to Problems Directory
+            </Link>
+          </div>
         </div>
       </GovernmentShell>
     );
@@ -493,7 +526,7 @@ export default function ProblemDetailPage({
               </span>
             </div>
             <div className="text-[11px] text-ink-tertiary font-mono">
-              Live Operations Authority • Real Firestore
+              Live Operations Authority • PostgreSQL (Supabase)
             </div>
           </div>
         )}
@@ -621,7 +654,7 @@ export default function ProblemDetailPage({
             <ResolutionWorkspace
               problemId={id}
               problemTitle={title}
-              problemCategory={liveProblem?.category || fallbackProblem.category}
+              problemCategory={liveProblem?.category || fallbackProblem?.category || 'MUNICIPAL'}
               problemStatus={status}
               assignedTo={assignedTo}
               departmentId={department}

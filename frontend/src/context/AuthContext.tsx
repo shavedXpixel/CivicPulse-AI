@@ -12,6 +12,7 @@ import {
 } from '../lib/firebase-client';
 import {
   signInWithEmail as supabaseSignIn,
+  signUpWithEmail as supabaseSignUp,
   signOutUser as supabaseSignOut,
   onAuthChange as supabaseOnAuthChange,
   getCurrentSessionToken as supabaseGetToken,
@@ -32,7 +33,7 @@ export interface AuthContextType {
   isDemoMode: boolean;
   isConfigured: boolean;
   signIn: (email: string, pass: string) => Promise<{ user: any; profile: UserProfile | null }>;
-  signUp: (email: string, pass: string) => Promise<{ user: any; profile: UserProfile | null }>;
+  signUp: (email: string, pass: string, fullName?: string) => Promise<{ user: any; profile: UserProfile | null; confirmationRequired?: boolean }>;
   signOut: () => Promise<void>;
   getIdToken: (forceRefresh?: boolean) => Promise<string | null>;
   refreshProfile: () => Promise<UserProfile | null>;
@@ -128,23 +129,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const handleSignUp = async (email: string, pass: string): Promise<{ user: any; profile: UserProfile | null }> => {
+  const handleSignUp = async (
+    email: string,
+    pass: string,
+    fullName?: string
+  ): Promise<{ user: any; profile: UserProfile | null; confirmationRequired?: boolean }> => {
     if (useSupabase) {
-      // In Supabase mode, self-signup redirects to standard citizen flow or signIn
-      const { user: sbUser } = await supabaseSignIn(email, pass);
+      const { user: sbUser, session } = await supabaseSignUp(email, pass, fullName);
       const adaptedUser = {
         uid: sbUser.id,
         email: sbUser.email,
-        displayName: sbUser.user_metadata?.full_name || sbUser.email
+        displayName: sbUser.user_metadata?.full_name || fullName || sbUser.email
       };
+
+      // When email confirmation is required in Supabase, session is null
+      if (!session) {
+        return { user: adaptedUser, profile: null, confirmationRequired: true };
+      }
+
       setUser(adaptedUser);
-      const profile = await fetchProfile();
-      return { user: adaptedUser, profile };
+
+      // Explicit authoritative citizen provisioning call with immediate session
+      let profile: UserProfile | null = null;
+      try {
+        const regRes = await apiClient.post<{ data: { user: UserProfile } }>(
+          '/api/v1/auth/register-citizen',
+          { display_name: adaptedUser.displayName },
+          { Authorization: `Bearer ${session.access_token}` }
+        );
+        if (regRes?.data?.user) {
+          profile = regRes.data.user;
+          setUserProfile(profile);
+        }
+      } catch (regErr) {
+        console.warn('Authoritative citizen provisioning error:', regErr);
+        profile = await fetchProfile();
+      }
+
+      return { user: adaptedUser, profile, confirmationRequired: false };
     } else {
       const newUser = await firebaseSignUp(email, pass);
       setUser(newUser);
       const profile = await fetchProfile();
-      return { user: newUser, profile };
+      return { user: newUser, profile, confirmationRequired: false };
     }
   };
 

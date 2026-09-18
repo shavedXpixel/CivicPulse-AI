@@ -56,6 +56,48 @@ export async function signInWithEmail(email: string, pass: string): Promise<{ us
   return { user: data.user, session: data.session };
 }
 
+export async function signUpWithEmail(
+  email: string,
+  pass: string,
+  fullName?: string,
+  redirectUrl?: string
+): Promise<{ user: SupabaseUser; session: Session | null }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error('Supabase Auth is not configured on this client. Please check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.');
+  }
+
+  // Derive confirmation redirect URL from environment or current browser window origin
+  const redirectTo =
+    redirectUrl ||
+    (typeof window !== 'undefined'
+      ? `${window.location.origin}/auth/callback`
+      : process.env.NEXT_PUBLIC_SITE_URL
+      ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
+      : undefined);
+
+  const { data, error } = await client.auth.signUp({
+    email,
+    password: pass,
+    options: {
+      emailRedirectTo: redirectTo,
+      data: {
+        full_name: fullName || email.split('@')[0]
+      }
+    }
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data.user) {
+    throw new Error('Registration failed: No user returned from Supabase Auth.');
+  }
+
+  return { user: data.user, session: data.session };
+}
+
 export async function signOutUser(): Promise<void> {
   const client = getSupabaseClient();
   if (client) {

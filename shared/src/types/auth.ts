@@ -14,6 +14,7 @@ export enum UserStatus {
 
 export interface UserProfile {
   id: string;
+  auth_user_id?: string;
   email?: string;
   display_name: string;
   photo_url?: string;

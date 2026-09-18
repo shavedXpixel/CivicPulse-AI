@@ -113,7 +113,7 @@ export default function CitizenIssuesPage() {
           <p className="text-xs text-ink-secondary">
             {isDemoMode
               ? 'Personal signal records tracked securely under your citizen profile.'
-              : 'Real reports submitted by your authenticated citizen profile, persisted in Firestore.'}
+              : 'Real reports submitted by your authenticated citizen profile, persisted in PostgreSQL.'}
           </p>
         </div>
 
@@ -164,7 +164,7 @@ export default function CitizenIssuesPage() {
               <div className="p-12 text-center text-ink-secondary space-y-3">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto text-civic-blue" />
                 <p className="text-xs">
-                  {isDemoMode ? 'Loading demo reports from server...' : 'Retrieving your reports from Firestore...'}
+                  {isDemoMode ? 'Loading demo reports from server...' : 'Retrieving your reports from PostgreSQL...'}
                 </p>
               </div>
             ) : signals.length === 0 ? (

@@ -10,7 +10,8 @@ import {
   ProblemAction,
   Department,
   DepartmentWorkload,
-  ProblemStatus
+  ProblemStatus,
+  UserRole
 } from '@civicpulse/shared';
 
 export interface SignalFilterCriteria {
@@ -42,6 +43,7 @@ export interface IDatabaseProvider {
   getUser(id: string): Promise<UserProfile | null>;
   getUserByAuthId?(authUserId: string): Promise<UserProfile | null>;
   createUser(user: UserProfile): Promise<UserProfile>;
+  listUsers?(filter?: { role?: UserRole; department_id?: string }): Promise<UserProfile[]>;
   getCitizenProfile(userId: string): Promise<CitizenProfile | null>;
   createCitizenProfile(profile: CitizenProfile): Promise<CitizenProfile>;
 
@@ -82,6 +84,7 @@ export interface IDatabaseProvider {
   // Departments & Workload
   listDepartments(): Promise<Department[]>;
   getDepartment(id: string): Promise<Department | null>;
+  createDepartment?(department: Department): Promise<Department>;
   getDepartmentWorkload(id: string): Promise<DepartmentWorkload>;
   listDepartmentOfficers(departmentId: string): Promise<UserProfile[]>;
 

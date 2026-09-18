@@ -20,7 +20,7 @@ export async function authMiddleware(req: Request, _res: Response, next: NextFun
       new AppError({
         statusCode: 401,
         code: ERROR_CODES.UNAUTHORIZED,
-        message: 'Demo authentication and x-demo-mode headers are strictly forbidden in REAL_MODE. Valid Firebase ID token required.'
+        message: 'Demo authentication and x-demo-mode headers are strictly forbidden in REAL_MODE. Valid Bearer authentication token required.'
       })
     );
   }
@@ -68,7 +68,7 @@ export async function authMiddleware(req: Request, _res: Response, next: NextFun
         new AppError({
           statusCode: 401,
           code: ERROR_CODES.UNAUTHORIZED,
-          message: 'Demo authentication and x-demo-mode headers are strictly forbidden in REAL_MODE. Valid Firebase ID token required.'
+          message: 'Demo authentication and x-demo-mode headers are strictly forbidden in REAL_MODE. Valid Bearer authentication token required.'
         })
       );
     }

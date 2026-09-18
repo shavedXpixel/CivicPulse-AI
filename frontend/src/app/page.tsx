@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 
 export default function HomePage() {
+  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
   return (
     <div className="min-h-screen bg-canvas text-ink-primary selection:bg-civic-blueLight selection:text-civic-blueDark">
       {/* ------------------------------------------------------------- */}
@@ -65,10 +66,17 @@ export default function HomePage() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <div className="hidden sm:inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-canvas-subtle border border-ink-border text-ink-secondary">
-              <span className="w-1.5 h-1.5 rounded-full bg-civic-emerald" />
-              <span>DEMO_MODE</span>
-            </div>
+            {isDemoMode ? (
+              <div className="hidden sm:inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-canvas-subtle border border-ink-border text-ink-secondary">
+                <span className="w-1.5 h-1.5 rounded-full bg-civic-emerald" />
+                <span>DEMO_MODE</span>
+              </div>
+            ) : (
+              <div className="hidden sm:inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-emerald-50 border border-emerald-200 text-emerald-800">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                <span>LIVE PRODUCTION</span>
+              </div>
+            )}
             <a
               href="/api/v1/health"
               target="_blank"
@@ -82,7 +90,7 @@ export default function HomePage() {
               href="/login"
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-civic-blue hover:bg-civic-blueDark px-3.5 py-1.5 rounded-lg shadow-subtle transition-all"
             >
-              <span>Launch Demo</span>
+              <span>{isDemoMode ? 'Launch Demo' : 'Sign In / Register'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -115,7 +123,7 @@ export default function HomePage() {
                 href="/login"
                 className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-civic-blue hover:bg-civic-blueDark shadow-subtle transition-all"
               >
-                <span>Launch Demo Journey</span>
+                <span>{isDemoMode ? 'Launch Demo Journey' : 'Get Started'}</span>
                 <ArrowRight className="w-4 h-4" />
               </Link>
               <a
@@ -819,7 +827,7 @@ export default function HomePage() {
             <div className="space-y-4 pt-2">
               <div className="text-xs font-mono text-ink-secondary uppercase flex items-center justify-between">
                 <span>Grounded Synthesized Answer</span>
-                <span className="text-civic-emerald font-semibold">100% Sourced from Live Firestore & BigQuery</span>
+                <span className="text-civic-emerald font-semibold">100% Sourced from Live PostgreSQL (Supabase)</span>
               </div>
 
               <div className="text-sm text-ink-primary leading-relaxed space-y-3 bg-canvas-subtle/50 p-5 rounded-lg border border-ink-border">

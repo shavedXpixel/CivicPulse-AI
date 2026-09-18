@@ -46,7 +46,7 @@ describe('Phase 15 Container Port & Deployment Contract Smoke Tests', () => {
 
       try {
         backendProcess = spawn(
-          'node',
+          process.execPath || 'node',
           [path.join(rootDir, 'backend', 'dist', 'index.js')],
           {
             cwd: path.join(rootDir, 'backend'),
@@ -63,6 +63,7 @@ describe('Phase 15 Container Port & Deployment Contract Smoke Tests', () => {
 
         let errLogs = '';
         let outLogs = '';
+        backendProcess.on('error', (err) => { errLogs += `Spawn error: ${err.message}`; });
         backendProcess.stderr?.on('data', (d) => { errLogs += d.toString(); });
         backendProcess.stdout?.on('data', (d) => { outLogs += d.toString(); });
 

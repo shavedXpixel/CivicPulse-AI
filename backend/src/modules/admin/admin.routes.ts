@@ -30,6 +30,15 @@ const demoOnlyGuard = (_req: Request, _res: Response, next: NextFunction) => {
 // 1. Verify DEMO_MODE is active (REAL_MODE cannot invoke)
 // 2. Verify authentication
 // 3. Verify ADMIN authorization
-router.post('/reset-demo', demoOnlyGuard, authMiddleware, requireRole(UserRole.ADMIN), AdminController.resetDemo);
+router.post('/reset-demo', demoOnlyGuard, authMiddleware, requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN), AdminController.resetDemo);
+
+// POST /api/v1/admin/departments
+router.post('/departments', authMiddleware, requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN), AdminController.createDepartment);
+
+// POST /api/v1/admin/users/government
+router.post('/users/government', authMiddleware, requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN), AdminController.createGovernmentUser);
+
+// GET /api/v1/admin/users
+router.get('/users', authMiddleware, requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN), AdminController.listUsers);
 
 export { router as adminRouter };

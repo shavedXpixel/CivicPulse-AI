@@ -610,6 +610,17 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     return user;
   }
 
+  async listUsers(filter?: { role?: UserRole; department_id?: string }): Promise<UserProfile[]> {
+    let list = Array.from(this.users.values()).map((u) => ({ ...u }));
+    if (filter?.role) {
+      list = list.filter((u) => u.role === filter.role);
+    }
+    if (filter?.department_id) {
+      list = list.filter((u) => u.department_id === filter.department_id);
+    }
+    return list;
+  }
+
   async getCitizenProfile(userId: string): Promise<CitizenProfile | null> {
     return this.citizenProfiles.get(userId) || null;
   }
@@ -880,6 +891,11 @@ export class MockDatabaseProvider implements IDatabaseProvider {
   async getDepartment(id: string): Promise<Department | null> {
     const d = this.departments.get(id);
     return d ? { ...d } : null;
+  }
+
+  async createDepartment(department: Department): Promise<Department> {
+    this.departments.set(department.id, { ...department });
+    return { ...department };
   }
 
   async getDepartmentWorkload(id: string): Promise<DepartmentWorkload> {

@@ -16,7 +16,8 @@ import {
   ResolutionEvidence,
   VerificationResult,
   AppError,
-  ERROR_CODES
+  ERROR_CODES,
+  UserRole
 } from '@civicpulse/shared';
 import {
   IDatabaseProvider,
@@ -164,31 +165,107 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
   async createUser(user: UserProfile): Promise<UserProfile> {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id);
     const legacyUid = isUuid ? null : user.id;
+    const authUserId = user.auth_user_id || (user as any).auth_user_id || null;
     const now = new Date().toISOString();
 
-    const sql = `
-      INSERT INTO users (
-        legacy_firebase_uid, email, display_name, role, department_id, status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING *;
-    `;
+    let sql: string;
+    let params: any[];
 
-    const rows = await this.query(sql, [
-      legacyUid,
-      user.email,
-      user.display_name || user.email,
-      user.role,
-      user.department_id || null,
-      user.status || 'ACTIVE',
-      user.created_at || now,
-      user.updated_at || now
-    ]);
+    if (isUuid) {
+      sql = `
+        INSERT INTO users (
+          id, auth_user_id, legacy_firebase_uid, email, display_name, role, department_id, status, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ON CONFLICT (email) DO UPDATE SET
+          auth_user_id = COALESCE(users.auth_user_id, EXCLUDED.auth_user_id),
+          display_name = COALESCE(EXCLUDED.display_name, users.display_name),
+          updated_at = EXCLUDED.updated_at
+        RETURNING *;
+      `;
+      params = [
+        user.id,
+        authUserId,
+        legacyUid,
+        user.email,
+        user.display_name || user.email,
+        user.role,
+        user.department_id || null,
+        user.status || 'ACTIVE',
+        user.created_at || now,
+        user.updated_at || now
+      ];
+    } else {
+      sql = `
+        INSERT INTO users (
+          auth_user_id, legacy_firebase_uid, email, display_name, role, department_id, status, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ON CONFLICT (email) DO UPDATE SET
+          auth_user_id = COALESCE(users.auth_user_id, EXCLUDED.auth_user_id),
+          display_name = COALESCE(EXCLUDED.display_name, users.display_name),
+          updated_at = EXCLUDED.updated_at
+        RETURNING *;
+      `;
+      params = [
+        authUserId,
+        legacyUid,
+        user.email,
+        user.display_name || user.email,
+        user.role,
+        user.department_id || null,
+        user.status || 'ACTIVE',
+        user.created_at || now,
+        user.updated_at || now
+      ];
+    }
 
+    const rows = await this.query(sql, params);
     const r = rows[0];
     return {
       ...user,
-      id: r.legacy_firebase_uid || r.id
+      id: r.id,
+      auth_user_id: r.auth_user_id || undefined,
+      role: r.role,
+      status: r.status,
+      display_name: r.display_name,
+      department_id: r.department_id || undefined,
+      created_at: r.created_at?.toISOString ? r.created_at.toISOString() : r.created_at,
+      updated_at: r.updated_at?.toISOString ? r.updated_at.toISOString() : r.updated_at
     };
+  }
+
+  async listUsers(filter?: { role?: UserRole; department_id?: string }): Promise<UserProfile[]> {
+    let sql = `SELECT * FROM users`;
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (filter?.role) {
+      params.push(filter.role);
+      conditions.push(`role = $${params.length}`);
+    }
+    if (filter?.department_id) {
+      params.push(filter.department_id);
+      conditions.push(`department_id = $${params.length}`);
+    }
+
+    if (conditions.length > 0) {
+      sql += ` WHERE ` + conditions.join(' AND ');
+    }
+    sql += ` ORDER BY created_at DESC;`;
+
+    const rows = await this.query(sql, params);
+    return rows.map((r) => ({
+      id: r.id,
+      auth_user_id: r.auth_user_id || undefined,
+      email: r.email,
+      display_name: r.display_name,
+      role: r.role,
+      status: r.status,
+      department_id: r.department_id || undefined,
+      ward_id: r.ward_id || undefined,
+      created_at: r.created_at?.toISOString ? r.created_at.toISOString() : r.created_at,
+      updated_at: r.updated_at?.toISOString ? r.updated_at.toISOString() : r.updated_at,
+      last_login_at: r.last_login_at?.toISOString ? r.last_login_at.toISOString() : r.last_login_at
+    }));
   }
 
   async getCitizenProfile(userId: string): Promise<CitizenProfile | null> {
@@ -876,6 +953,38 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       name: r.name,
       short_name: r.short_name,
       description: r.description || ''
+    };
+  }
+
+  async createDepartment(department: Department): Promise<Department> {
+    const now = new Date().toISOString();
+    const sql = `
+      INSERT INTO departments (id, name, short_name, description, lead_officer, contact_phone, contact_email, jurisdiction_wards, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING *;
+    `;
+    const rows = await this.query(sql, [
+      department.id,
+      department.name,
+      department.short_name || department.id,
+      department.description || '',
+      department.lead_officer || null,
+      department.contact_phone || null,
+      department.contact_email || null,
+      department.jurisdiction_wards || null,
+      now,
+      now
+    ]);
+    const r = rows[0];
+    return {
+      id: r.id,
+      name: r.name,
+      short_name: r.short_name,
+      description: r.description || '',
+      lead_officer: r.lead_officer || undefined,
+      contact_phone: r.contact_phone || undefined,
+      contact_email: r.contact_email || undefined,
+      jurisdiction_wards: r.jurisdiction_wards || undefined
     };
   }
 

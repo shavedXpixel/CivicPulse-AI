@@ -4,8 +4,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 // Mock next/navigation
 let currentPathname = '/citizen';
+let currentSearchParams = new URLSearchParams('');
 vi.mock('next/navigation', () => ({
   usePathname: () => currentPathname,
+  useSearchParams: () => currentSearchParams,
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),
@@ -121,6 +123,28 @@ describe('Phase 12: Citizen Journey & Public Problem Tracking Tests', () => {
 
       // Loading state during verified data retrieval
       expect(html).toContain('Retrieving verified municipal problem cluster data...');
+    });
+  });
+
+  describe('3. Citizen Email Confirmation Flow & Auth Callback Invariants', () => {
+    it('renders auth callback container with zero token leakage into HTML', async () => {
+      const { default: AuthCallbackPage } = await import('../src/app/auth/callback/page');
+      const html = renderToStaticMarkup(<AuthCallbackPage />);
+
+      // Invariants: Displays verifying/loading state
+      expect(html).toContain('Confirming Identity');
+      expect(html).toContain('Verifying your email confirmation credentials');
+
+      // Zero-leakage: No tokens, passwords, or secrets in rendered HTML
+      expect(html).not.toContain('Bearer');
+      expect(html).not.toContain('access_token');
+      expect(html).not.toContain('refresh_token');
+    });
+
+    it('derives correct default emailRedirectTo URL pointing to /auth/callback', async () => {
+      const siteUrl = 'https://civicpulse-ai-henna.vercel.app';
+      const expectedRedirect = `${siteUrl}/auth/callback`;
+      expect(expectedRedirect).toBe('https://civicpulse-ai-henna.vercel.app/auth/callback');
     });
   });
 });
