@@ -52,7 +52,7 @@ function recordResult(section: string, details: Record<string, any>, errors: str
 async function getLiveIdToken(uid: string, role: string, email: string): Promise<string> {
   const auth = getFirebaseAuth();
   const customToken = await auth.createCustomToken(uid, { role, email });
-  const apiKey = process.env.FIREBASE_WEB_API_KEY || 'process.env.FIREBASE_WEB_API_KEY || ''';
+  const apiKey = process.env.FIREBASE_WEB_API_KEY || '';
   const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

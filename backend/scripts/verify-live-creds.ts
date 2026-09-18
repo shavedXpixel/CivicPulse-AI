@@ -34,7 +34,7 @@ async function main() {
     console.log('Firebase Auth custom token creation SUCCESS! Token length:', customToken.length);
 
     // Exchange custom token for real ID token using Identity Toolkit and the real Firebase Web API key
-    const firebaseWebApiKey = 'process.env.FIREBASE_WEB_API_KEY || ''';
+    const firebaseWebApiKey = process.env.FIREBASE_WEB_API_KEY || '';
     const exchangeUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${firebaseWebApiKey}`;
     const exchangeRes = await fetch(exchangeUrl, {
       method: 'POST',

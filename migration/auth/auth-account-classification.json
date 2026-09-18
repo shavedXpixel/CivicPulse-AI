@@ -1,0 +1,114 @@
+[
+  {
+    "legacy_firebase_uid": "fb_uid_admin_synthetic_01",
+    "email": "admin@example.com",
+    "role": "ADMIN",
+    "department_id": null,
+    "production_login_required": true,
+    "identity_class": "PRODUCTION_LOGIN",
+    "password_migration_possible": false,
+    "verification_state": {
+      "source_email_verified": false,
+      "migrated_email_confirmed": false
+    },
+    "provisioning_action": "RECOVERY_REQUIRED",
+    "public_users_id": "10000000-0000-4000-8000-000000000001",
+    "notes": "Authoritative municipal administrator. Provision server-side via Supabase Admin API with controlled administrator-assisted recovery."
+  },
+  {
+    "legacy_firebase_uid": "fb_uid_officer_synthetic_02",
+    "email": "officer@example.com",
+    "role": "DEPARTMENT_OFFICER",
+    "department_id": "WATCO",
+    "production_login_required": true,
+    "identity_class": "PRODUCTION_LOGIN",
+    "password_migration_possible": false,
+    "verification_state": {
+      "source_email_verified": false,
+      "migrated_email_confirmed": false
+    },
+    "provisioning_action": "RECOVERY_REQUIRED",
+    "public_users_id": "10000000-0000-4000-8000-000000000002",
+    "notes": "Authoritative WATCO department officer with active assignments and problem actions. Provision server-side with controlled administrator-assisted recovery."
+  },
+  {
+    "legacy_firebase_uid": "fb_uid_field_synthetic_03",
+    "email": "field@example.com",
+    "role": "FIELD_OFFICER",
+    "department_id": "WATCO",
+    "production_login_required": true,
+    "identity_class": "PRODUCTION_LOGIN",
+    "password_migration_possible": false,
+    "verification_state": {
+      "source_email_verified": false,
+      "migrated_email_confirmed": false
+    },
+    "provisioning_action": "RECOVERY_REQUIRED",
+    "public_users_id": "10000000-0000-4000-8000-000000000003",
+    "notes": "Authoritative WATCO field officer. Provision server-side with controlled administrator-assisted recovery."
+  },
+  {
+    "legacy_firebase_uid": "fb_uid_citizen_synthetic_04",
+    "email": "citizen2@example.com",
+    "role": "CITIZEN",
+    "department_id": null,
+    "production_login_required": true,
+    "identity_class": "PRODUCTION_LOGIN",
+    "password_migration_possible": false,
+    "verification_state": {
+      "source_email_verified": false,
+      "migrated_email_confirmed": false
+    },
+    "provisioning_action": "RECOVERY_REQUIRED",
+    "public_users_id": "10000000-0000-4000-8000-000000000004",
+    "notes": "Authoritative citizen reporter with 3 active signals in the dataset. Provision server-side with controlled administrator-assisted recovery."
+  },
+  {
+    "legacy_firebase_uid": "fb_uid_citizen_synthetic_05",
+    "email": "test-citizen@example.com",
+    "role": "CITIZEN",
+    "department_id": null,
+    "production_login_required": true,
+    "identity_class": "PRODUCTION_LOGIN",
+    "password_migration_possible": false,
+    "verification_state": {
+      "source_email_verified": false,
+      "migrated_email_confirmed": false
+    },
+    "provisioning_action": "RECOVERY_REQUIRED",
+    "public_users_id": "10000000-0000-4000-8000-000000000005",
+    "notes": "Authoritative citizen reporter with 1 signal in the dataset. Provision server-side with controlled administrator-assisted recovery."
+  },
+  {
+    "legacy_firebase_uid": "fb_uid_citizen_synthetic_06",
+    "email": "citizen.test@example.com",
+    "role": "CITIZEN",
+    "department_id": null,
+    "production_login_required": false,
+    "identity_class": "HISTORICAL_SYNTHETIC_IDENTITY",
+    "password_migration_possible": false,
+    "verification_state": {
+      "source_email_verified": false,
+      "migrated_email_confirmed": false
+    },
+    "provisioning_action": "HISTORICAL_ONLY",
+    "public_users_id": "10000000-0000-4000-8000-000000000007",
+    "notes": "Non-deliverable @example.com test citizen. Retain in domain tables; auth_user_id remains NULL."
+  },
+  {
+    "legacy_firebase_uid": "officer_live_verifier",
+    "email": "officer_live_verifier@firebase.civicpulse.local",
+    "role": "CITIZEN",
+    "department_id": null,
+    "production_login_required": false,
+    "identity_class": "HISTORICAL_SYNTHETIC_IDENTITY",
+    "password_migration_possible": false,
+    "verification_state": {
+      "source_email_verified": false,
+      "migrated_email_confirmed": false
+    },
+    "provisioning_action": "HISTORICAL_ONLY",
+    "public_users_id": "10000000-0000-4000-8000-000000000006",
+    "notes": "Historical custom-token test identity with no Firebase email or password provider. Retain public.users row with auth_user_id = NULL. No Supabase login account created."
+  }
+]

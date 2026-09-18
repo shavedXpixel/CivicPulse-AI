@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 import { getFirebaseAuth } from '../src/infrastructure/firebase/firebase-admin';
 
-const apiKey = process.env.FIREBASE_WEB_API_KEY || 'process.env.FIREBASE_WEB_API_KEY || ''';
+const apiKey = process.env.FIREBASE_WEB_API_KEY || '';
 const pw = process.argv[2];
 
 async function check(email: string) {

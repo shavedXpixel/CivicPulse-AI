@@ -1,0 +1,114 @@
+[
+  {
+    "public_users_id": "10000000-0000-4000-8000-000000000001",
+    "legacy_firebase_uid": "fb_uid_admin_synthetic_01",
+    "auth_user_id": "00000000-0000-4000-8000-000000000001",
+    "email": "admin@example.com",
+    "role": "ADMIN",
+    "department_id": null,
+    "source_verification_state": false,
+    "migrated_verification_state": false,
+    "recovery_delivery_lifecycle": {
+      "status": "PASSWORD_ESTABLISHED",
+      "delivered": true,
+      "password_established": true
+    },
+    "migration_status": "MAPPED"
+  },
+  {
+    "public_users_id": "10000000-0000-4000-8000-000000000002",
+    "legacy_firebase_uid": "fb_uid_officer_synthetic_02",
+    "auth_user_id": "00000000-0000-4000-8000-000000000002",
+    "email": "officer@example.com",
+    "role": "DEPARTMENT_OFFICER",
+    "department_id": "WATCO",
+    "source_verification_state": false,
+    "migrated_verification_state": false,
+    "recovery_delivery_lifecycle": {
+      "status": "PASSWORD_ESTABLISHED",
+      "delivered": true,
+      "password_established": true
+    },
+    "migration_status": "MAPPED"
+  },
+  {
+    "public_users_id": "10000000-0000-4000-8000-000000000003",
+    "legacy_firebase_uid": "fb_uid_field_synthetic_03",
+    "auth_user_id": "00000000-0000-4000-8000-000000000003",
+    "email": "field@example.com",
+    "role": "FIELD_OFFICER",
+    "department_id": "WATCO",
+    "source_verification_state": false,
+    "migrated_verification_state": false,
+    "recovery_delivery_lifecycle": {
+      "status": "PASSWORD_ESTABLISHED",
+      "delivered": true,
+      "password_established": true
+    },
+    "migration_status": "MAPPED"
+  },
+  {
+    "public_users_id": "10000000-0000-4000-8000-000000000004",
+    "legacy_firebase_uid": "fb_uid_citizen_synthetic_04",
+    "auth_user_id": "00000000-0000-4000-8000-000000000004",
+    "email": "citizen2@example.com",
+    "role": "CITIZEN",
+    "department_id": null,
+    "source_verification_state": false,
+    "migrated_verification_state": false,
+    "recovery_delivery_lifecycle": {
+      "status": "PASSWORD_ESTABLISHED",
+      "delivered": true,
+      "password_established": true
+    },
+    "migration_status": "MAPPED"
+  },
+  {
+    "public_users_id": "10000000-0000-4000-8000-000000000005",
+    "legacy_firebase_uid": "fb_uid_citizen_synthetic_05",
+    "auth_user_id": "00000000-0000-4000-8000-000000000005",
+    "email": "test-citizen@example.com",
+    "role": "CITIZEN",
+    "department_id": null,
+    "source_verification_state": false,
+    "migrated_verification_state": false,
+    "recovery_delivery_lifecycle": {
+      "status": "PASSWORD_ESTABLISHED",
+      "delivered": true,
+      "password_established": true
+    },
+    "migration_status": "MAPPED"
+  },
+  {
+    "public_users_id": "10000000-0000-4000-8000-000000000006",
+    "legacy_firebase_uid": "officer_live_verifier",
+    "auth_user_id": null,
+    "email": "officer_live_verifier@firebase.civicpulse.local",
+    "role": "CITIZEN",
+    "department_id": null,
+    "source_verification_state": false,
+    "migrated_verification_state": false,
+    "recovery_delivery_lifecycle": {
+      "status": "NOT_APPLICABLE",
+      "delivered": false,
+      "password_established": false
+    },
+    "migration_status": "HISTORICAL_RETAINED_UNMAPPED"
+  },
+  {
+    "public_users_id": "10000000-0000-4000-8000-000000000007",
+    "legacy_firebase_uid": "fb_uid_citizen_synthetic_06",
+    "auth_user_id": null,
+    "email": "citizen.test@example.com",
+    "role": "CITIZEN",
+    "department_id": null,
+    "source_verification_state": false,
+    "migrated_verification_state": false,
+    "recovery_delivery_lifecycle": {
+      "status": "NOT_APPLICABLE",
+      "delivered": false,
+      "password_established": false
+    },
+    "migration_status": "HISTORICAL_RETAINED_UNMAPPED"
+  }
+]

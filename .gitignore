@@ -46,10 +46,22 @@ Thumbs.db
 
 # Turbopack cache
 .turbo
+# Operator and migration artifacts
 secrets/
 .operator/
+migration/snapshots/
+raw_exports/
+dumps/
+*.dump
+*.dmp
+*.bak
+*recovery-link*
+*recovery_link*
+
 *.json
 !package.json
 !package-lock.json
 !tsconfig*.json
 !data/**/*.json
+!migration/auth/auth-account-classification.json
+!migration/auth/firebase-to-supabase-user-map.json

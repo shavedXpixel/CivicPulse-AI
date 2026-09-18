@@ -17,7 +17,7 @@ async function main() {
   const app = createApp();
 
   const citizenUid = 'fb_uid_citizen_synthetic_04'; // citizen2@example.com
-  const firebaseWebApiKey = 'process.env.FIREBASE_WEB_API_KEY || ''';
+  const firebaseWebApiKey = process.env.FIREBASE_WEB_API_KEY || '';
 
   console.log(`\n1. Authenticating real citizen user: ${citizenUid}...`);
   const citizenCustomToken = await auth.createCustomToken(citizenUid, { role: 'CITIZEN' });

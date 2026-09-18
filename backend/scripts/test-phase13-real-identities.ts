@@ -12,7 +12,7 @@ const app = createApp();
 async function getIdTokenForUid(uid: string): Promise<string> {
   const auth = getFirebaseAuth();
   const customToken = await auth.createCustomToken(uid);
-  const firebaseWebApiKey = process.env.FIREBASE_WEB_API_KEY || 'process.env.FIREBASE_WEB_API_KEY || ''';
+  const firebaseWebApiKey = process.env.FIREBASE_WEB_API_KEY || '';
   const exchangeUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${firebaseWebApiKey}`;
   const res = await fetch(exchangeUrl, {
     method: 'POST',

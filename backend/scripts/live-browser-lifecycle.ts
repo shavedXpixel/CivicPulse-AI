@@ -12,15 +12,15 @@ const BASE_URL = 'http://localhost:3000';
 const CREDENTIALS = {
   CITIZEN: {
     email: 'citizen.test@example.com',
-    password: process.env.CITIZEN_PASSWORD || 'REDACTED_PASSWORD'
+    password: process.env.CITIZEN_PASSWORD || ''
   },
   DEPT_OFFICER: {
     email: 'officer@example.com',
-    password: process.env.DEPT_OFFICER_PASSWORD || 'REDACTED_PASSWORD'
+    password: process.env.DEPT_OFFICER_PASSWORD || ''
   },
   FIELD_OFFICER: {
     email: 'field@example.com',
-    password: process.env.FIELD_OFFICER_PASSWORD || 'REDACTED_PASSWORD'
+    password: process.env.FIELD_OFFICER_PASSWORD || ''
   }
 };
 
@@ -74,6 +74,10 @@ export async function runBrowserLifecycle() {
   console.log('======================================================================');
   console.log(' CIVICPULSE AI — PHASE 13: PLAYWRIGHT BROWSER WORKFLOW VERIFICATION');
   console.log('======================================================================\n');
+
+  if (!CREDENTIALS.CITIZEN.password || !CREDENTIALS.DEPT_OFFICER.password || !CREDENTIALS.FIELD_OFFICER.password) {
+    throw new Error('CITIZEN_PASSWORD, DEPT_OFFICER_PASSWORD, and FIELD_OFFICER_PASSWORD environment variables are required.');
+  }
 
   const runId = `browser_run_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
   console.log(`[EXECUTION RUN ID]: ${runId}\n`);

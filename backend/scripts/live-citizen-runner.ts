@@ -21,7 +21,7 @@ import { ERROR_CODES } from '@civicpulse/shared';
 async function getLiveCitizenToken(uid: string, email: string): Promise<string> {
   const auth = getFirebaseAuth();
   const customToken = await auth.createCustomToken(uid, { role: 'CITIZEN', email });
-  const apiKey = process.env.FIREBASE_WEB_API_KEY || 'process.env.FIREBASE_WEB_API_KEY || ''';
+  const apiKey = process.env.FIREBASE_WEB_API_KEY || '';
   const res = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`,
     {
