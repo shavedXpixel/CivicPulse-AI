@@ -548,5 +548,5 @@ describe('Phase 15B.4 — Supabase Authentication & Security Negative Suite', ()
     } catch {
       // Network/offline in mock is acceptable
     }
-  });
+  }, 15000);
 });

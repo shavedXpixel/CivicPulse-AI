@@ -45,6 +45,9 @@ import { FirebaseAuthProvider } from './auth/firebase.auth.provider';
 import { PostgresDatabaseProvider } from './database/postgres.provider';
 import { R2StorageProvider } from './storage/r2.storage';
 import { OpenAIProvider } from './ai/openai.provider';
+import { IEmailProvider } from './email/email.interface';
+import { MockEmailProvider } from './email/mock.email';
+import { SmtpEmailProvider } from './email/smtp.email';
 
 class ProviderContainer {
   private static dbInstance: IDatabaseProvider | null = null;
@@ -57,6 +60,30 @@ class ProviderContainer {
   private static geographyInstance: IGeographyProvider | null = null;
   private static populationInstance: IPopulationProvider | null = null;
   private static facilityInstance: IFacilityProvider | null = null;
+  private static emailInstance: IEmailProvider | null = null;
+
+  public static getEmailProvider(): IEmailProvider {
+    if (!this.emailInstance) {
+      if (env.DEMO_MODE) {
+        if (env.EMAIL_PROVIDER === 'smtp') {
+          this.emailInstance = new SmtpEmailProvider();
+        } else {
+          this.emailInstance = new MockEmailProvider();
+        }
+      } else {
+        if (env.EMAIL_PROVIDER === 'smtp') {
+          this.emailInstance = new SmtpEmailProvider();
+        } else {
+          throw new AppError({
+            statusCode: 500,
+            code: ERROR_CODES.INTERNAL_ERROR,
+            message: `[ProviderContainer] Unsupported EMAIL_PROVIDER in REAL_MODE: '${env.EMAIL_PROVIDER}'. Must be 'smtp'. Mock email provider is strictly prohibited when DEMO_MODE=false.`
+          });
+        }
+      }
+    }
+    return this.emailInstance;
+  }
 
   public static getDatabaseProvider(): IDatabaseProvider {
     if (!this.dbInstance) {
@@ -259,6 +286,10 @@ class ProviderContainer {
     this.facilityInstance = provider;
   }
 
+  public static setEmailProvider(provider: IEmailProvider | null) {
+    this.emailInstance = provider;
+  }
+
   public static resetToGoldenDemo(): void {
     if (!env.DEMO_MODE) {
       throw new AppError({
@@ -289,6 +320,7 @@ class ProviderContainer {
     this.geographyInstance = null;
     this.populationInstance = null;
     this.facilityInstance = null;
+    this.emailInstance = null;
   }
 }
 
@@ -302,11 +334,15 @@ export const getSimulationProvider = () => ProviderContainer.getSimulationProvid
 export const getGeographyProvider = () => ProviderContainer.getGeographyProvider();
 export const getPopulationProvider = () => ProviderContainer.getPopulationProvider();
 export const getFacilityProvider = () => ProviderContainer.getFacilityProvider();
+export const getEmailProvider = () => ProviderContainer.getEmailProvider();
 
 export { ProviderContainer };
 export * from './database/database.interface';
 export * from './storage/storage.interface';
 export * from './auth/auth.interface';
+export * from './email/email.interface';
+export { MockEmailProvider } from './email/mock.email';
+export { SmtpEmailProvider } from './email/smtp.email';
 export * from './ai/ai.interface';
 export * from './ai/verification.interface';
 export * from './ai/governance.interface';

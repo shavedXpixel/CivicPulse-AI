@@ -11,7 +11,8 @@ import {
   Department,
   DepartmentWorkload,
   ProblemStatus,
-  UserRole
+  UserRole,
+  AdminAuditRecord
 } from '@civicpulse/shared';
 
 export interface SignalFilterCriteria {
@@ -43,9 +44,14 @@ export interface IDatabaseProvider {
   getUser(id: string): Promise<UserProfile | null>;
   getUserByAuthId?(authUserId: string): Promise<UserProfile | null>;
   createUser(user: UserProfile): Promise<UserProfile>;
+  updateUser?(id: string, updates: Partial<UserProfile>): Promise<UserProfile>;
   listUsers?(filter?: { role?: UserRole; department_id?: string }): Promise<UserProfile[]>;
   getCitizenProfile(userId: string): Promise<CitizenProfile | null>;
   createCitizenProfile(profile: CitizenProfile): Promise<CitizenProfile>;
+
+  // Administrative Audit Logs
+  createAdminAuditLog?(record: AdminAuditRecord): Promise<AdminAuditRecord>;
+  listAdminAuditLogs?(filter?: { target_email?: string; limit?: number }): Promise<AdminAuditRecord[]>;
 
   // Signals
   createSignal(signal: Signal): Promise<Signal>;

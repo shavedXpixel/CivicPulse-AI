@@ -18,7 +18,8 @@ import {
   VerificationResult,
   SignalStatus,
   EvidenceStatus,
-  ERROR_CODES
+  ERROR_CODES,
+  AdminAuditRecord
 } from '@civicpulse/shared';
 import { IDatabaseProvider, SignalFilterCriteria, ProblemFilterCriteria } from './database.interface';
 import { AppError } from '../../middleware/error.middleware';
@@ -72,6 +73,44 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
   async createUser(user: UserProfile): Promise<UserProfile> {
     await this.db.collection('users').doc(user.id).set(user);
     return user;
+  }
+
+  async updateUser(id: string, updates: Partial<UserProfile>): Promise<UserProfile> {
+    const docRef = this.db.collection('users').doc(id);
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: `User '${id}' not found.`
+      });
+    }
+    const existing = snap.data() as UserProfile;
+    const updated: UserProfile = {
+      ...existing,
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
+    await docRef.set(updated, { merge: true });
+    return updated;
+  }
+
+  async createAdminAuditLog(record: AdminAuditRecord): Promise<AdminAuditRecord> {
+    await this.db.collection('admin_audit_logs').doc(record.id).set(record);
+    return record;
+  }
+
+  async listAdminAuditLogs(filter?: { target_email?: string; limit?: number }): Promise<AdminAuditRecord[]> {
+    let query: Query = this.db.collection('admin_audit_logs');
+    if (filter?.target_email) {
+      query = query.where('target_email', '==', filter.target_email);
+    }
+    query = query.orderBy('created_at', 'desc');
+    if (filter?.limit) {
+      query = query.limit(filter.limit);
+    }
+    const snap = await query.get();
+    return snap.docs.map((doc: DocumentSnapshot) => doc.data() as AdminAuditRecord);
   }
 
   async listUsers(filter?: { role?: UserRole; department_id?: string }): Promise<UserProfile[]> {

@@ -11,6 +11,9 @@ router.get('/me', authMiddleware, AuthController.getMe);
 // POST /api/v1/auth/register-citizen (authoritative citizen self-provisioning)
 router.post('/register-citizen', AuthController.registerCitizen);
 
+// POST /api/v1/auth/activate-staff (transition invited government staff to ACTIVE)
+router.post('/activate-staff', authMiddleware, AuthController.activateStaff);
+
 // POST /api/v1/auth/switch-demo-persona (mount ONLY in isolated test/dev when DEMO_MODE is true)
 if (env.DEMO_MODE) {
   router.post('/switch-demo-persona', AuthController.switchDemoPersona);

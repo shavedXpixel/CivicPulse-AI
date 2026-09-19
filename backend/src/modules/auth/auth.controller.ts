@@ -70,12 +70,24 @@ export class AuthController {
         );
       }
 
-      // Verify token via AuthProvider (ES256 JWKS via Supabase in REAL_MODE)
-      const authProvider = getAuthProvider();
-      const payload = await authProvider.verifyToken(token);
+      const db = getDatabaseProvider();
 
-      const authUserId = payload.uid;
-      const authenticatedEmail = payload.email;
+      // Verify token via AuthProvider (ES256 JWKS via Supabase in REAL_MODE)
+      let authUserId: string;
+      let authenticatedEmail: string | undefined;
+      let userMeta: Record<string, any> | undefined;
+
+      if (env.DEMO_MODE && (token.startsWith('demo-token-') || token.startsWith('usr_'))) {
+        const demoUser = await db.getUser(token);
+        authUserId = demoUser?.auth_user_id || demoUser?.id || token;
+        authenticatedEmail = demoUser?.email || `${token}@civicpulse.org`;
+      } else {
+        const authProvider = getAuthProvider();
+        const payload = await authProvider.verifyToken(token);
+        authUserId = payload.uid;
+        authenticatedEmail = payload.email;
+        userMeta = payload.user_metadata as Record<string, any> | undefined;
+      }
 
       if (!authUserId || !authenticatedEmail) {
         return next(
@@ -87,14 +99,11 @@ export class AuthController {
         );
       }
 
-      const db = getDatabaseProvider();
-
       // Rule: Server-side authoritative role derivation. The only role allowed through public registration is CITIZEN.
       // Ignore any client-supplied role!
       const authoritativeRole = UserRole.CITIZEN;
 
       // Extract display name from token user_metadata or request body
-      const userMeta = payload.user_metadata as Record<string, any> | undefined;
       const metaName = userMeta?.full_name || userMeta?.name;
       const displayName = (metaName || req.body?.display_name || authenticatedEmail.split('@')[0] || 'Citizen').trim();
 
@@ -104,6 +113,17 @@ export class AuthController {
         user = await db.getUserByAuthId(authUserId);
       } else {
         user = await db.getUser(authUserId);
+      }
+
+      // If user profile already exists, verify it is not a government officer
+      if (user && user.role !== UserRole.CITIZEN) {
+        return next(
+          new AppError({
+            statusCode: 403,
+            code: ERROR_CODES.FORBIDDEN,
+            message: `Account is registered as a government account (${user.role}). Citizen self-provisioning is strictly forbidden.`
+          })
+        );
       }
 
       const now = new Date().toISOString();
@@ -195,6 +215,55 @@ export class AuthController {
         data: {
           token,
           user
+        }
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /api/v1/auth/activate-staff
+   * Transition an invited government staff member from INVITED to ACTIVE
+   * once they have confirmed their invitation and established their password.
+   */
+  public static async activateStaff(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        return next(
+          new AppError({
+            statusCode: 401,
+            code: ERROR_CODES.UNAUTHORIZED,
+            message: 'Authentication required to activate account.'
+          })
+        );
+      }
+
+      if (req.user.role !== UserRole.DEPARTMENT_OFFICER && req.user.role !== UserRole.FIELD_OFFICER) {
+        return next(
+          new AppError({
+            statusCode: 400,
+            code: ERROR_CODES.VALIDATION_ERROR,
+            message: 'Staff activation is reserved for government officer accounts.'
+          })
+        );
+      }
+
+      const db = getDatabaseProvider();
+
+      let updatedUser = req.user;
+      if (req.user.status === UserStatus.INVITED) {
+        if (typeof db.updateUser === 'function') {
+          updatedUser = await db.updateUser(req.user.id, {
+            status: UserStatus.ACTIVE
+          });
+        }
+      }
+
+      res.status(200).json({
+        data: {
+          user: updatedUser,
+          message: 'Government staff account activated successfully.'
         }
       });
     } catch (err) {

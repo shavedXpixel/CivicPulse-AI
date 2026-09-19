@@ -120,6 +120,17 @@ export async function authMiddleware(req: Request, _res: Response, next: NextFun
           updated_at: new Date().toISOString()
         };
       }
+
+      if (user.status === UserStatus.SUSPENDED || user.status === UserStatus.INACTIVE) {
+        return next(
+          new AppError({
+            statusCode: 403,
+            code: ERROR_CODES.FORBIDDEN,
+            message: user.status === UserStatus.SUSPENDED ? 'User account is suspended.' : 'User account is disabled.'
+          })
+        );
+      }
+
       req.user = user;
       return next();
     }
@@ -201,12 +212,12 @@ export async function authMiddleware(req: Request, _res: Response, next: NextFun
       }
     }
 
-    if (user.status === UserStatus.SUSPENDED) {
+    if (user.status === UserStatus.SUSPENDED || user.status === UserStatus.INACTIVE) {
       return next(
         new AppError({
           statusCode: 403,
           code: ERROR_CODES.FORBIDDEN,
-          message: 'User account is suspended.'
+          message: user.status === UserStatus.SUSPENDED ? 'User account is suspended.' : 'User account is disabled.'
         })
       );
     }

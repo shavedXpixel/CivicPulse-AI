@@ -23,4 +23,16 @@ router.post('/users/government', authMiddleware, requireRole(UserRole.ADMIN, Use
 // GET /api/v1/admin/users
 router.get('/users', authMiddleware, requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN), AdminController.listUsers);
 
+// POST /api/v1/admin/users/:id/resend-invite
+router.post('/users/:id/resend-invite', authMiddleware, requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN), AdminController.resendInvite);
+
+// POST /api/v1/admin/users/:id/disable
+router.post('/users/:id/disable', authMiddleware, requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN), AdminController.disableUser);
+
+// POST /api/v1/admin/users/:id/enable
+router.post('/users/:id/enable', authMiddleware, requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN), AdminController.enableUser);
+
+// GET /api/v1/admin/audit-logs
+router.get('/audit-logs', authMiddleware, requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN), AdminController.getAuditLogs);
+
 export { router as adminRouter };

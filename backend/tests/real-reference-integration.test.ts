@@ -312,7 +312,7 @@ describe('Phase 10 — Real Reference Data Integration', () => {
         problem.recurrence_score +
         problem.evidence_score;
       expect(problem.impact_score).toBe(totalScore);
-    });
+    }, 15000);
   });
 
   // =========================================================================

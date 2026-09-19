@@ -7,9 +7,26 @@ export enum UserRole {
 }
 
 export enum UserStatus {
+  INVITED = 'INVITED',
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
   SUSPENDED = 'SUSPENDED'
+}
+
+export interface AdminAuditRecord {
+  id: string;
+  actor_user_id: string;
+  actor_email?: string;
+  action: string;
+  target_user_id?: string;
+  target_email: string;
+  target_role: string;
+  department_id?: string;
+  result: string;
+  details?: Record<string, any>;
+  previous_hash?: string;
+  record_hash: string;
+  created_at: string;
 }
 
 export interface UserProfile {

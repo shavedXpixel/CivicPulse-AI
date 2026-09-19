@@ -455,7 +455,7 @@ describe('Phase 15B.5.3.8 — Production Authority & Access Control Test Suite',
     expect(res.status).toBe(201);
     expect(res.body.data.user.role).toBe(UserRole.DEPARTMENT_OFFICER);
     expect(res.body.data.user.department_id).toBe('WATCO');
-    expect(res.body.data.user.status).toBe(UserStatus.ACTIVE);
+    expect(res.body.data.user.status).toBe(UserStatus.INVITED);
   });
 
   it('Test 11: Admin CAN provision a FIELD_OFFICER account with valid department (201 Created)', async () => {
@@ -477,7 +477,7 @@ describe('Phase 15B.5.3.8 — Production Authority & Access Control Test Suite',
     expect(res.status).toBe(201);
     expect(res.body.data.user.role).toBe(UserRole.FIELD_OFFICER);
     expect(res.body.data.user.department_id).toBe('WATCO');
-    expect(res.body.data.user.status).toBe(UserStatus.ACTIVE);
+    expect(res.body.data.user.status).toBe(UserStatus.INVITED);
   });
 
   it('Test 12: Admin provisioning rejects non-existent department (404 Not Found)', async () => {

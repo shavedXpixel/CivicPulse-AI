@@ -63,7 +63,7 @@ describe('Phase 13: Real Government Experience & Operations Workflows', () => {
     } catch (err) {
       console.warn('Could not exchange live tokens (network or quota limitation):', err);
     }
-  });
+  }, 30000);
 
   describe('1. Live Firestore Identity Prerequisites', () => {
     it('verifies /departments/WATCO exists with canonical title', async () => {

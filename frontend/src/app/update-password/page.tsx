@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Lock, CheckCircle2, AlertCircle, Loader2, ArrowRight, Shield } from 'lucide-react';
 import { getSupabaseClient } from '../../lib/supabase-client';
+import { apiClient } from '../../lib/api-client';
 
 function UpdatePasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isInvite = searchParams.get('type') === 'invite';
 
   const urlError = searchParams.get('error') || searchParams.get('error_code');
   const urlErrorDesc = searchParams.get('error_description');
@@ -78,12 +80,12 @@ function UpdatePasswordContent() {
         }
       }
 
-      // 3. Listen for PASSWORD_RECOVERY event
+      // 3. Listen for PASSWORD_RECOVERY or USER_UPDATED or SIGNED_IN event
       const {
         data: { subscription },
       } = supabase.auth.onAuthStateChange((event, session) => {
         if (!isMounted) return;
-        if (event === 'PASSWORD_RECOVERY' || (session && event === 'SIGNED_IN')) {
+        if (event === 'PASSWORD_RECOVERY' || event === 'USER_UPDATED' || (session && event === 'SIGNED_IN')) {
           setHasRecoverySession(true);
           setCheckingSession(false);
           setSessionError(null);
@@ -173,6 +175,22 @@ function UpdatePasswordContent() {
         throw new Error(error.message);
       }
 
+      // If invited government staff member, transition public.users to ACTIVE
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          await apiClient.post(
+            '/api/v1/auth/activate-staff',
+            {},
+            { Authorization: `Bearer ${session.access_token}` }
+          ).catch((err) => {
+            console.warn('Staff activation notification completed with status:', err.message);
+          });
+        }
+      } catch {
+        // Continue with completion
+      }
+
       // Password successfully changed
       setSuccess(true);
 
@@ -206,13 +224,15 @@ function UpdatePasswordContent() {
           </span>
         </Link>
         <div className="text-[10px] font-mono uppercase tracking-widest text-civic-terracotta font-semibold">
-          Account Security & Access
+          {isInvite ? 'Government Staff Onboarding' : 'Account Security & Access'}
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-ink-primary">
-          Set New Password
+          {isInvite ? 'Complete Staff Account Setup' : 'Set New Password'}
         </h1>
         <p className="text-xs text-ink-secondary max-w-sm mx-auto leading-relaxed">
-          Create a new password to restore access to your CivicPulse municipal or citizen account.
+          {isInvite
+            ? 'Establish your municipal officer password to activate your CivicPulse government account.'
+            : 'Create a new password to restore access to your CivicPulse municipal or citizen account.'}
         </p>
       </div>
 
@@ -260,10 +280,12 @@ function UpdatePasswordContent() {
               <div className="p-4 rounded-sm bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 space-y-2">
                 <div className="flex items-center gap-2 font-bold text-emerald-900">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Password Updated Successfully</span>
+                  <span>{isInvite ? 'Staff Account Activated Successfully' : 'Password Updated Successfully'}</span>
                 </div>
                 <p className="leading-relaxed text-emerald-800">
-                  Your credentials have been securely updated. You can now sign in with your new password.
+                  {isInvite
+                    ? 'Your municipal officer credentials have been established. You can now sign in.'
+                    : 'Your credentials have been securely updated. You can now sign in with your new password.'}
                 </p>
                 <p className="text-[11px] text-emerald-700">
                   Redirecting to the login screen automatically...
@@ -337,10 +359,10 @@ function UpdatePasswordContent() {
                 {submitting ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Updating Password...</span>
+                    <span>{isInvite ? 'Activating Account...' : 'Updating Password...'}</span>
                   </>
                 ) : (
-                  <span>Update Password</span>
+                  <span>{isInvite ? 'Activate Account & Set Password' : 'Update Password'}</span>
                 )}
               </button>
 

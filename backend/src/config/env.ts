@@ -47,7 +47,16 @@ const EnvSchema = z.object({
   AI_EMBEDDING_DIMENSIONS: z.coerce.number().default(1536),
   AI_MODEL_VERIFICATION: z.string().optional().default('gpt-4o'),
   AI_MODEL_GOVERNANCE: z.string().optional().default('gpt-4o'),
-  AI_MODEL_SIMULATION: z.string().optional().default('gpt-4o-mini')
+  AI_MODEL_SIMULATION: z.string().optional().default('gpt-4o-mini'),
+
+  // Phase 15B.5.3.16A — Transactional Email Delivery
+  EMAIL_PROVIDER: z.enum(['smtp', 'mock']).default('mock'),
+  SMTP_HOST: z.string().optional().default(''),
+  SMTP_PORT: z.coerce.number().optional().default(587),
+  SMTP_USER: z.string().optional().default(''),
+  SMTP_PASSWORD: z.string().optional().default(''),
+  SMTP_SECURE: z.preprocess((val) => val === 'true' || val === true, z.boolean()).default(false),
+  EMAIL_FROM: z.string().optional().default('CivicPulse Authority <notifications@civicpulse.gov.in>')
 });
 
 const parsed = EnvSchema.parse(process.env);

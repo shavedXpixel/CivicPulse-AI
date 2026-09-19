@@ -28,7 +28,8 @@ import {
   EvidenceType,
   BeforeOrAfter,
   EvidenceStatus,
-  VerificationResultStatus
+  VerificationResultStatus,
+  AdminAuditRecord
 } from '@civicpulse/shared';
 import { IDatabaseProvider, SignalFilterCriteria, ProblemFilterCriteria } from './database.interface';
 import { AppError } from '../../middleware/error.middleware';
@@ -46,6 +47,7 @@ export class MockDatabaseProvider implements IDatabaseProvider {
   private departments = new Map<string, Department>();
   private resolutionEvidence = new Map<string, ResolutionEvidence[]>();
   private verificationResults = new Map<string, VerificationResult[]>();
+  private adminAuditLogs: AdminAuditRecord[] = [];
 
   constructor() {
     this.seedMinimalFixtures();
@@ -608,6 +610,85 @@ export class MockDatabaseProvider implements IDatabaseProvider {
   async createUser(user: UserProfile): Promise<UserProfile> {
     this.users.set(user.id, user);
     return user;
+  }
+
+  async updateUser(id: string, updates: Partial<UserProfile>): Promise<UserProfile> {
+    let foundKey = id;
+    let existing = this.users.get(id);
+    if (!existing) {
+      for (const [k, u] of this.users.entries()) {
+        if ((u as any).auth_user_id === id || u.id === id) {
+          foundKey = k;
+          existing = u;
+          break;
+        }
+      }
+    }
+    if (!existing) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: `User '${id}' not found.`
+      });
+    }
+    const updated: UserProfile = {
+      ...existing,
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
+    this.users.set(foundKey, updated);
+    return { ...updated };
+  }
+
+  private auditChainLock: Promise<void> = Promise.resolve();
+
+  async createAdminAuditLog(record: AdminAuditRecord): Promise<AdminAuditRecord> {
+    const currentLock = this.auditChainLock;
+    let releaseLock!: () => void;
+    this.auditChainLock = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+
+    await currentLock;
+    try {
+      const previousHash = this.adminAuditLogs.length > 0
+        ? this.adminAuditLogs[this.adminAuditLogs.length - 1].record_hash
+        : 'GENESIS_CIVICPULSE_ADMIN_AUDIT';
+
+      const hashPayload = [
+        previousHash,
+        record.id,
+        record.actor_user_id,
+        record.action,
+        record.target_email.toLowerCase(),
+        record.target_role,
+        record.department_id || 'NONE',
+        record.result || 'SUCCESS',
+        record.created_at || new Date().toISOString()
+      ].join('|');
+
+      const { createHash } = await import('crypto');
+      const recordHash = createHash('sha256').update(hashPayload).digest('hex');
+
+      record.previous_hash = previousHash;
+      record.record_hash = recordHash;
+
+      this.adminAuditLogs.push({ ...record });
+      return { ...record };
+    } finally {
+      releaseLock();
+    }
+  }
+
+  async listAdminAuditLogs(filter?: { target_email?: string; limit?: number }): Promise<AdminAuditRecord[]> {
+    let list = [...this.adminAuditLogs].reverse();
+    if (filter?.target_email) {
+      list = list.filter((a) => a.target_email.toLowerCase() === filter.target_email!.toLowerCase());
+    }
+    if (filter?.limit) {
+      list = list.slice(0, filter.limit);
+    }
+    return list;
   }
 
   async listUsers(filter?: { role?: UserRole; department_id?: string }): Promise<UserProfile[]> {

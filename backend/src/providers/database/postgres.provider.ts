@@ -17,7 +17,8 @@ import {
   VerificationResult,
   AppError,
   ERROR_CODES,
-  UserRole
+  UserRole,
+  AdminAuditRecord
 } from '@civicpulse/shared';
 import {
   IDatabaseProvider,
@@ -231,6 +232,161 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       created_at: r.created_at?.toISOString ? r.created_at.toISOString() : r.created_at,
       updated_at: r.updated_at?.toISOString ? r.updated_at.toISOString() : r.updated_at
     };
+  }
+
+  async updateUser(id: string, updates: Partial<UserProfile>): Promise<UserProfile> {
+    const fields: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+
+    if (updates.status !== undefined) {
+      fields.push(`status = $${idx++}`);
+      values.push(updates.status);
+    }
+    if (updates.display_name !== undefined) {
+      fields.push(`display_name = $${idx++}`);
+      values.push(updates.display_name);
+    }
+    if (updates.department_id !== undefined) {
+      fields.push(`department_id = $${idx++}`);
+      values.push(updates.department_id);
+    }
+    if (updates.role !== undefined) {
+      fields.push(`role = $${idx++}`);
+      values.push(updates.role);
+    }
+    fields.push(`updated_at = $${idx++}`);
+    values.push(new Date().toISOString());
+
+    values.push(id);
+    const sql = `
+      UPDATE users
+      SET ${fields.join(', ')}
+      WHERE id::text = $${idx} OR legacy_firebase_uid = $${idx} OR auth_user_id::text = $${idx}
+      RETURNING *;
+    `;
+    const rows = await this.query(sql, values);
+    if (rows.length === 0) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: `User '${id}' not found.`
+      });
+    }
+    const r = rows[0];
+    return {
+      id: r.id,
+      auth_user_id: r.auth_user_id || undefined,
+      email: r.email,
+      display_name: r.display_name,
+      role: r.role,
+      status: r.status,
+      department_id: r.department_id || undefined,
+      ward_id: r.ward_id || undefined,
+      created_at: r.created_at?.toISOString ? r.created_at.toISOString() : r.created_at,
+      updated_at: r.updated_at?.toISOString ? r.updated_at.toISOString() : r.updated_at
+    };
+  }
+
+  async createAdminAuditLog(record: AdminAuditRecord): Promise<AdminAuditRecord> {
+    const pool = this.getPool();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Serializes concurrent audit writes across processes using a PostgreSQL transactional advisory lock
+      await client.query('SELECT pg_advisory_xact_lock(155316);');
+
+      // Fetch the latest record_hash atomically under the lock
+      const latestRes = await client.query(
+        'SELECT record_hash FROM admin_audit_logs ORDER BY created_at DESC, id DESC LIMIT 1;'
+      );
+      const previousHash = (latestRes.rows.length > 0 && latestRes.rows[0].record_hash)
+        ? latestRes.rows[0].record_hash
+        : 'GENESIS_CIVICPULSE_ADMIN_AUDIT';
+
+      // Compute cryptographic hash with the authoritative previous_hash
+      const hashPayload = [
+        previousHash,
+        record.id,
+        record.actor_user_id,
+        record.action,
+        record.target_email.toLowerCase(),
+        record.target_role,
+        record.department_id || 'NONE',
+        record.result || 'SUCCESS',
+        record.created_at || new Date().toISOString()
+      ].join('|');
+      const { createHash } = await import('crypto');
+      const recordHash = createHash('sha256').update(hashPayload).digest('hex');
+
+      record.previous_hash = previousHash;
+      record.record_hash = recordHash;
+
+      const sql = `
+        INSERT INTO admin_audit_logs (
+          id, actor_user_id, actor_email, action, target_user_id, target_email,
+          target_role, department_id, result, details, previous_hash, record_hash, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        RETURNING *;
+      `;
+      const params = [
+        record.id,
+        record.actor_user_id,
+        record.actor_email || null,
+        record.action,
+        record.target_user_id || null,
+        record.target_email,
+        record.target_role,
+        record.department_id || null,
+        record.result || 'SUCCESS',
+        record.details ? JSON.stringify(record.details) : null,
+        record.previous_hash,
+        record.record_hash,
+        record.created_at || new Date().toISOString()
+      ];
+      await client.query(sql, params);
+      await client.query('COMMIT');
+      return record;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async listAdminAuditLogs(filter?: { target_email?: string; limit?: number }): Promise<AdminAuditRecord[]> {
+    let sql = `SELECT * FROM admin_audit_logs`;
+    const conditions: string[] = [];
+    const params: any[] = [];
+    if (filter?.target_email) {
+      params.push(filter.target_email);
+      conditions.push(`target_email = $${params.length}`);
+    }
+    if (conditions.length > 0) {
+      sql += ` WHERE ` + conditions.join(' AND ');
+    }
+    sql += ` ORDER BY created_at DESC`;
+    if (filter?.limit) {
+      params.push(filter.limit);
+      sql += ` LIMIT $${params.length}`;
+    }
+    const rows = await this.query(sql, params);
+    return rows.map((r) => ({
+      id: r.id,
+      actor_user_id: r.actor_user_id,
+      actor_email: r.actor_email || undefined,
+      action: r.action,
+      target_user_id: r.target_user_id || undefined,
+      target_email: r.target_email,
+      target_role: r.target_role,
+      department_id: r.department_id || undefined,
+      result: r.result,
+      details: typeof r.details === 'string' ? JSON.parse(r.details) : r.details || undefined,
+      previous_hash: r.previous_hash || undefined,
+      record_hash: r.record_hash,
+      created_at: r.created_at?.toISOString ? r.created_at.toISOString() : r.created_at
+    }));
   }
 
   async listUsers(filter?: { role?: UserRole; department_id?: string }): Promise<UserProfile[]> {

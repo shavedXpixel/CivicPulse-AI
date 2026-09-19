@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { env } from '../../config/env';
 import { ProviderContainer, getDatabaseProvider } from '../../providers';
 import { AppError } from '../../middleware/error.middleware';
-import { ERROR_CODES, UserRole, Department } from '@civicpulse/shared';
+import { ERROR_CODES, UserRole, UserStatus, Department, UserProfile } from '@civicpulse/shared';
+import { AdminAuditService } from './admin-audit.service';
 
 export class AdminController {
   /**
@@ -138,9 +139,16 @@ export class AdminController {
    * ADMIN-only: Provision a government officer (DEPARTMENT_OFFICER or FIELD_OFFICER).
    * Password Privacy: Admin never sets, views, retrieves, or stores passwords.
    */
+  /**
+   * POST /api/v1/admin/users/government
+   * ADMIN-only: Provision a government officer (DEPARTMENT_OFFICER or FIELD_OFFICER).
+   * Lifecycle: Newly invited staff start in INVITED status.
+   * Password Privacy: Admin never sets, views, retrieves, or stores passwords.
+   */
   public static async createGovernmentUser(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { email, display_name, role, department_id } = req.body;
+      const { email, role, department_id } = req.body;
+      const rawName = req.body.full_name || req.body.display_name;
 
       if (!email || typeof email !== 'string' || !email.includes('@')) {
         return next(
@@ -152,12 +160,12 @@ export class AdminController {
         );
       }
 
-      if (!display_name || typeof display_name !== 'string' || !display_name.trim()) {
+      if (!rawName || typeof rawName !== 'string' || !rawName.trim()) {
         return next(
           new AppError({
             statusCode: 400,
             code: ERROR_CODES.VALIDATION_ERROR,
-            message: 'Officer display name is required.'
+            message: 'Officer full name or display name is required.'
           })
         );
       }
@@ -197,7 +205,7 @@ export class AdminController {
       }
 
       const cleanEmail = email.trim().toLowerCase();
-      const cleanDisplayName = display_name.trim();
+      const cleanDisplayName = rawName.trim();
 
       // Explicitly disallow passwords in admin provisioning request
       if ((req.body as any).password) {
@@ -227,9 +235,10 @@ export class AdminController {
       }
 
       // Safe production invitation flow (Password Privacy)
-      // Strictly uses inviteUserByEmail; never returns or exposes raw invite links or passwords
+      // Uses inviteUserByEmail with redirect to account-setup page
       let authUserId: string | null = null;
       let inviteSent = false;
+      const targetRedirect = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/update-password?type=invite`;
 
       if (env.SUPABASE_URL && (env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY)) {
         const { createClient } = await import('@supabase/supabase-js');
@@ -245,7 +254,8 @@ export class AdminController {
               full_name: cleanDisplayName,
               role,
               department_id
-            }
+            },
+            redirectTo: targetRedirect
           }
         );
 
@@ -269,25 +279,323 @@ export class AdminController {
       }
 
       const now = new Date().toISOString();
-      const newUser: any = {
+      // Explicit Lifecycle State: Newly provisioned government staff starts in INVITED status
+      const newUser: UserProfile = {
         id: authUserId,
         auth_user_id: authUserId,
         email: cleanEmail,
         display_name: cleanDisplayName,
         role: role as UserRole,
         department_id,
-        status: 'ACTIVE',
+        status: UserStatus.INVITED,
         created_at: now,
         updated_at: now
       };
 
       const createdUser = await db.createUser(newUser);
 
+      // Persist administrative audit record with cryptographic hash chain
+      await AdminAuditService.recordAction({
+        actor_user_id: req.user?.id || 'admin',
+        actor_email: req.user?.email || 'admin@civicpulse.gov.in',
+        action: 'PROVISION_USER',
+        target_user_id: createdUser.id,
+        target_email: cleanEmail,
+        target_role: role,
+        department_id,
+        result: 'SUCCESS',
+        details: { notice: 'Official government invitation dispatched to officer via Supabase Auth' }
+      });
+
       res.status(201).json({
         data: {
           user: createdUser,
           invitation_sent: inviteSent,
           notice: 'Official government invitation dispatched to officer via Supabase Auth.'
+        }
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /api/v1/admin/users/:id/resend-invite
+   * ADMIN-only: Resend/reissue an invitation for a pending unconfirmed INVITED government officer.
+   */
+  public static async resendInvite(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const db = getDatabaseProvider();
+      const user = await db.getUser(id);
+      if (!user) {
+        return next(
+          new AppError({
+            statusCode: 404,
+            code: ERROR_CODES.NOT_FOUND,
+            message: `User '${id}' not found.`
+          })
+        );
+      }
+
+      if (user.role !== UserRole.DEPARTMENT_OFFICER && user.role !== UserRole.FIELD_OFFICER) {
+        return next(
+          new AppError({
+            statusCode: 400,
+            code: ERROR_CODES.VALIDATION_ERROR,
+            message: 'Invitations can only be managed for government staff accounts (DEPARTMENT_OFFICER or FIELD_OFFICER).'
+          })
+        );
+      }
+
+      // Check lifecycle status
+      if (user.status === UserStatus.ACTIVE) {
+        return next(
+          new AppError({
+            statusCode: 400,
+            code: ERROR_CODES.VALIDATION_ERROR,
+            message: `Account for '${user.email}' is already activated. Cannot resend invitation.`
+          })
+        );
+      }
+
+      if (user.status === UserStatus.INACTIVE || user.status === UserStatus.SUSPENDED) {
+        return next(
+          new AppError({
+            statusCode: 400,
+            code: ERROR_CODES.VALIDATION_ERROR,
+            message: `Account for '${user.email}' is currently ${user.status.toLowerCase()}. Please re-enable the account first.`
+          })
+        );
+      }
+
+      // Pending invitation reissue
+      const targetRedirect = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/update-password?type=invite`;
+      let actionLink: string | null = null;
+
+      if (env.SUPABASE_URL && (env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY)) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabaseKey = env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY;
+        const supabaseAdmin = createClient(env.SUPABASE_URL, supabaseKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        });
+
+        const authId = user.auth_user_id || user.id;
+        try {
+          const { data: userData } = await supabaseAdmin.auth.admin.getUserById(authId);
+          if (userData?.user?.email_confirmed_at) {
+            if (typeof db.updateUser === 'function') {
+              await db.updateUser(user.id, { status: UserStatus.ACTIVE });
+            }
+            return next(
+              new AppError({
+                statusCode: 400,
+                code: ERROR_CODES.VALIDATION_ERROR,
+                message: `Account for '${user.email}' is already confirmed and active.`
+              })
+            );
+          }
+        } catch {
+          // Continue with reissue
+        }
+
+        // Generate reissued invitation link server-side (never exposed to client/logs)
+        const { data: linkData, error: inviteErr } = await supabaseAdmin.auth.admin.generateLink({
+          type: 'invite',
+          email: user.email!,
+          options: {
+            redirectTo: targetRedirect
+          }
+        });
+
+        if (inviteErr || !linkData?.properties?.action_link) {
+          return next(
+            new AppError({
+              statusCode: 502,
+              code: ERROR_CODES.INTERNAL_ERROR,
+              message: `Failed to reissue invitation via Supabase Auth: ${inviteErr?.message || 'Missing action link'}`
+            })
+          );
+        }
+
+        actionLink = linkData.properties.action_link;
+      } else {
+        // Dev / Test environment mock action link
+        actionLink = `${targetRedirect}#access_token=mock_invite_token_${user.id}`;
+      }
+
+      // Retrieve department name for professional branding
+      let departmentName = user.department_id || 'Municipal Operations';
+      if (user.department_id) {
+        const dept = await db.getDepartment(user.department_id);
+        if (dept?.name) {
+          departmentName = dept.name;
+        }
+      }
+
+      // Deliver actual government invitation email via EmailProvider abstraction
+      const emailProvider = ProviderContainer.getEmailProvider();
+      await emailProvider.sendGovernmentInvitation({
+        to: user.email!,
+        fullName: user.display_name || 'Municipal Officer',
+        role: user.role,
+        departmentName,
+        actionLink
+      });
+
+      // Record administrative audit log (safe metadata only; zero credentials or action links)
+      await AdminAuditService.recordAction({
+        actor_user_id: req.user?.id || 'admin',
+        actor_email: req.user?.email || 'admin@civicpulse.gov.in',
+        action: 'RESEND_INVITE',
+        target_user_id: user.id,
+        target_email: user.email!,
+        target_role: user.role,
+        department_id: user.department_id,
+        result: 'SUCCESS',
+        details: { notice: 'Government officer invitation reissued and dispatched via email' }
+      });
+
+      res.status(200).json({
+        data: {
+          success: true,
+          message: `Official government invitation successfully resent to ${user.email}.`
+        }
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /api/v1/admin/users/:id/disable
+   * ADMIN-only: Disable/deactivate a user account.
+   */
+  public static async disableUser(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const db = getDatabaseProvider();
+      const user = await db.getUser(id);
+      if (!user) {
+        return next(
+          new AppError({
+            statusCode: 404,
+            code: ERROR_CODES.NOT_FOUND,
+            message: `User '${id}' not found.`
+          })
+        );
+      }
+
+      if (user.id === req.user?.id || (user as any).auth_user_id === req.user?.id) {
+        return next(
+          new AppError({
+            statusCode: 400,
+            code: ERROR_CODES.VALIDATION_ERROR,
+            message: 'Administrators cannot disable their own active administrative account.'
+          })
+        );
+      }
+
+      let updated = user;
+      if (typeof db.updateUser === 'function') {
+        updated = await db.updateUser(user.id, { status: UserStatus.INACTIVE });
+      }
+
+      if (env.SUPABASE_URL && (env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY)) {
+        try {
+          const { createClient } = await import('@supabase/supabase-js');
+          const supabaseKey = env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY;
+          const supabaseAdmin = createClient(env.SUPABASE_URL, supabaseKey, {
+            auth: { autoRefreshToken: false, persistSession: false }
+          });
+          const authId = user.auth_user_id || user.id;
+          await supabaseAdmin.auth.admin.updateUserById(authId, {
+            ban_duration: '876600h'
+          });
+        } catch (e: any) {
+          console.warn('Could not ban Supabase user during account disable:', e.message);
+        }
+      }
+
+      await AdminAuditService.recordAction({
+        actor_user_id: req.user?.id || 'admin',
+        actor_email: req.user?.email || 'admin@civicpulse.gov.in',
+        action: 'DISABLE_USER',
+        target_user_id: user.id,
+        target_email: user.email!,
+        target_role: user.role,
+        department_id: user.department_id,
+        result: 'SUCCESS',
+        details: { previous_status: user.status, new_status: UserStatus.INACTIVE }
+      });
+
+      res.status(200).json({
+        data: {
+          user: updated,
+          message: `User '${user.email}' disabled successfully.`
+        }
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /api/v1/admin/users/:id/enable
+   * ADMIN-only: Re-enable an inactive or suspended user account.
+   */
+  public static async enableUser(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const db = getDatabaseProvider();
+      const user = await db.getUser(id);
+      if (!user) {
+        return next(
+          new AppError({
+            statusCode: 404,
+            code: ERROR_CODES.NOT_FOUND,
+            message: `User '${id}' not found.`
+          })
+        );
+      }
+
+      let updated = user;
+      if (typeof db.updateUser === 'function') {
+        updated = await db.updateUser(user.id, { status: UserStatus.ACTIVE });
+      }
+
+      if (env.SUPABASE_URL && (env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY)) {
+        try {
+          const { createClient } = await import('@supabase/supabase-js');
+          const supabaseKey = env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY;
+          const supabaseAdmin = createClient(env.SUPABASE_URL, supabaseKey, {
+            auth: { autoRefreshToken: false, persistSession: false }
+          });
+          const authId = user.auth_user_id || user.id;
+          await supabaseAdmin.auth.admin.updateUserById(authId, {
+            ban_duration: 'none'
+          });
+        } catch (e: any) {
+          console.warn('Could not unban Supabase user during account enable:', e.message);
+        }
+      }
+
+      await AdminAuditService.recordAction({
+        actor_user_id: req.user?.id || 'admin',
+        actor_email: req.user?.email || 'admin@civicpulse.gov.in',
+        action: 'ENABLE_USER',
+        target_user_id: user.id,
+        target_email: user.email!,
+        target_role: user.role,
+        department_id: user.department_id,
+        result: 'SUCCESS',
+        details: { previous_status: user.status, new_status: UserStatus.ACTIVE }
+      });
+
+      res.status(200).json({
+        data: {
+          user: updated,
+          message: `User '${user.email}' re-enabled successfully.`
         }
       });
     } catch (err) {
@@ -311,6 +619,25 @@ export class AdminController {
       res.status(200).json({
         data: {
           users
+        }
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * GET /api/v1/admin/audit-logs
+   * ADMIN-only: List administrative audit records with hash integrity metadata.
+   */
+  public static async getAuditLogs(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const target_email = req.query.target_email as string | undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+      const logs = await AdminAuditService.listAuditLogs({ target_email, limit });
+      res.status(200).json({
+        data: {
+          logs
         }
       });
     } catch (err) {

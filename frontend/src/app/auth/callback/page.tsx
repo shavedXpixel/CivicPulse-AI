@@ -76,9 +76,19 @@ function CallbackContent() {
 
         const session = sessionData.session;
 
-        // Check if this callback was triggered by a password recovery flow
+        // Check if this callback was triggered by a password recovery or staff invitation flow
         const type = searchParams.get('type');
         const next = searchParams.get('next');
+        const role = session.user.user_metadata?.role;
+        const isGovernmentRole = role === 'DEPARTMENT_OFFICER' || role === 'FIELD_OFFICER';
+
+        if (type === 'invite' || isGovernmentRole) {
+          if (isMounted) {
+            router.push('/update-password?type=invite');
+          }
+          return;
+        }
+
         if (type === 'recovery' || next === '/update-password') {
           if (isMounted) {
             router.push('/update-password');
