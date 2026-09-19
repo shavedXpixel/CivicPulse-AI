@@ -1,4 +1,5 @@
 import { GovernanceQueryIntent } from '@civicpulse/shared';
+import { env } from '../../config/env';
 
 export interface ClassifiedQueryPlan {
   intent: GovernanceQueryIntent;
@@ -29,7 +30,7 @@ export class GovernanceClassifier {
     const prbMatch = question.match(/PRB-\d{4}-\d{4}/i);
     if (prbMatch) {
       extracted_entities.problem_id = prbMatch[0].toUpperCase();
-    } else if (q.includes('water problem') || q.includes('nayapalli') || q.includes('819')) {
+    } else if (env.DEMO_MODE && (q.includes('water problem') || q.includes('nayapalli') || q.includes('819'))) {
       extracted_entities.problem_id = 'PRB-2026-0819';
     }
 
@@ -68,9 +69,10 @@ export class GovernanceClassifier {
 
     // 3. WHY_RANKED Intent
     if (
-      (q.includes('why') && (q.includes('rank') || q.includes('score') || q.includes('highest') || q.includes('above') || q.includes('water'))) ||
-      q.includes('why is the water problem') ||
-      q.includes('why is prb') ||
+      q.includes('why is') ||
+      q.includes('why ranked') ||
+      q.includes('highest priority') ||
+      q.includes('severity explanation') ||
       q.includes('factor breakdown')
     ) {
       return {
@@ -78,7 +80,7 @@ export class GovernanceClassifier {
         tools: ['getTopProblems', 'getProblemDetails'],
         extracted_entities: {
           ...extracted_entities,
-          problem_id: extracted_entities.problem_id || 'PRB-2026-0819'
+          problem_id: extracted_entities.problem_id || (env.DEMO_MODE ? 'PRB-2026-0819' : undefined)
         }
       };
     }
@@ -98,7 +100,7 @@ export class GovernanceClassifier {
         tools: ['getResolutionPerformance', 'getProblemDetails'],
         extracted_entities: {
           ...extracted_entities,
-          problem_id: extracted_entities.problem_id || 'PRB-2026-0819'
+          problem_id: extracted_entities.problem_id || (env.DEMO_MODE ? 'PRB-2026-0819' : undefined)
         }
       };
     }
@@ -131,7 +133,7 @@ export class GovernanceClassifier {
         tools: ['getProblemDetails', 'getProblemTimeline'],
         extracted_entities: {
           ...extracted_entities,
-          problem_id: extracted_entities.problem_id || 'PRB-2026-0819'
+          problem_id: extracted_entities.problem_id || (env.DEMO_MODE ? 'PRB-2026-0819' : undefined)
         }
       };
     }

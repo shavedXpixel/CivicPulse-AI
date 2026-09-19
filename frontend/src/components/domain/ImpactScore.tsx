@@ -38,16 +38,16 @@ export function ImpactScore({
           <span className="text-xs font-normal text-ink-secondary ml-1">/100</span>
         </div>
         <span
-          className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${tier.bg} ${tier.color}`}
+          className={`px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-bold tracking-wider ${tier.bg} ${tier.color}`}
         >
           {tier.label}
         </span>
       </div>
 
       {showBar && (
-        <div className="w-full bg-canvas-muted rounded-full h-2 overflow-hidden">
+        <div className="w-full bg-ink-border/50 h-1.5 overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all duration-500 ${tier.bar}`}
+            className={`h-full transition-all duration-300 ${tier.bar}`}
             style={{ width: `${normalizedScore}%` }}
           />
         </div>

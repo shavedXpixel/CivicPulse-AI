@@ -6,14 +6,18 @@ import { ActionType, AssignmentPriority } from '../types/workflow';
 import { VerificationStatus } from '../types/evidence';
 
 export const CoordinatesSchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180)
+  lat: z.number().min(-90, 'Latitude must be between -90 and 90').max(90, 'Latitude must be between -90 and 90'),
+  lng: z.number().min(-180, 'Longitude must be between -180 and 180').max(180, 'Longitude must be between -180 and 180')
 });
+
+export const LocationSourceSchema = z.enum(['GPS', 'MANUAL']);
 
 export const CreateSignalSchema = z.object({
   original_text: z.string().min(3, 'Description must be at least 3 characters').max(5000, 'Description cannot exceed 5000 characters'),
   category: z.string().optional().nullable(),
   location: CoordinatesSchema.optional().nullable(),
+  location_source: LocationSourceSchema.optional().nullable(),
+  location_accuracy_m: z.number().nonnegative('Accuracy must be non-negative').optional().nullable(),
   ward_id: z.string().optional().nullable(),
   location_reference: z.string().max(500).optional().nullable(),
   media_ids: z.array(z.string()).optional().default([]),

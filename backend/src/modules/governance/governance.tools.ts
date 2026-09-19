@@ -357,7 +357,7 @@ export class GovernanceTools {
       ward_id: p.ward_id,
       critical_exposure_score: p.critical_exposure_score,
       impact_score: p.impact_score,
-      critical_facility: (p as any).critical_facility || (p as any).critical_facility_name || (p.id === 'PRB-2026-0819' ? 'DAV Public School' : 'Designated Municipal Asset')
+      critical_facility: (p as any).critical_facility || (p as any).critical_facility_name || 'Designated Municipal Asset'
     }));
 
     return {

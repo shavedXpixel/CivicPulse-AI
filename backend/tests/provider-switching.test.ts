@@ -3,12 +3,14 @@ import {
   ProviderContainer,
   MockDatabaseProvider,
   FirestoreDatabaseProvider,
+  PostgresDatabaseProvider,
   getDatabaseProvider
 } from '../src/providers';
 import { env } from '../src/config/env';
 
 describe('Phase 10: Centralized Database Provider Switching', () => {
   const originalDemoMode = env.DEMO_MODE;
+  const originalDbProvider = env.DATABASE_PROVIDER;
 
   beforeEach(() => {
     ProviderContainer.resetAllProviders();
@@ -16,6 +18,7 @@ describe('Phase 10: Centralized Database Provider Switching', () => {
 
   afterEach(() => {
     (env as any).DEMO_MODE = originalDemoMode;
+    (env as any).DATABASE_PROVIDER = originalDbProvider;
     ProviderContainer.resetAllProviders();
   });
 
@@ -27,8 +30,18 @@ describe('Phase 10: Centralized Database Provider Switching', () => {
     expect(db).toBeInstanceOf(MockDatabaseProvider);
   });
 
-  it('returns FirestoreDatabaseProvider when DEMO_MODE=false', () => {
+  it('returns PostgresDatabaseProvider when DEMO_MODE=false and DATABASE_PROVIDER=postgres', () => {
     (env as any).DEMO_MODE = false;
+    (env as any).DATABASE_PROVIDER = 'postgres';
+    ProviderContainer.resetAllProviders();
+
+    const db = getDatabaseProvider();
+    expect(db).toBeInstanceOf(PostgresDatabaseProvider);
+  });
+
+  it('returns FirestoreDatabaseProvider when DEMO_MODE=false and DATABASE_PROVIDER=firestore', () => {
+    (env as any).DEMO_MODE = false;
+    (env as any).DATABASE_PROVIDER = 'firestore';
     ProviderContainer.resetAllProviders();
 
     const db = getDatabaseProvider();
@@ -50,10 +63,11 @@ describe('Phase 10: Centralized Database Provider Switching', () => {
     expect(dbMock).toBeInstanceOf(MockDatabaseProvider);
 
     (env as any).DEMO_MODE = false;
+    (env as any).DATABASE_PROVIDER = 'postgres';
     ProviderContainer.resetAllProviders();
 
     const dbReal = getDatabaseProvider();
-    expect(dbReal).toBeInstanceOf(FirestoreDatabaseProvider);
+    expect(dbReal).toBeInstanceOf(PostgresDatabaseProvider);
   });
 
   it('DEMO_MODE preserves Golden Demo problem PRB-2026-0819 with score 92', async () => {

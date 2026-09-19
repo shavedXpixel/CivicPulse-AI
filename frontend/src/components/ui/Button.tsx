@@ -21,20 +21,20 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseStyles =
-      'inline-flex items-center justify-center font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-blue/50 focus-visible:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none select-none';
+      'inline-flex items-center justify-center font-medium rounded-md transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-civic-terracotta focus-visible:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none select-none';
 
     const sizeStyles = {
       sm: 'text-xs px-2.5 py-1.5 gap-1.5',
-      md: 'text-sm px-4 py-2 gap-2',
-      lg: 'text-base px-5 py-2.5 gap-2.5',
+      md: 'text-xs sm:text-sm px-3.5 py-2 gap-2',
+      lg: 'text-sm sm:text-base px-4.5 py-2.5 gap-2.5',
     }[size];
 
     const variantStyles = {
-      primary: 'bg-civic-blue text-white hover:bg-civic-blueDark shadow-subtle',
-      secondary: 'bg-canvas-subtle text-ink-primary hover:bg-canvas-muted border border-ink-border',
-      outline: 'bg-white text-ink-primary hover:bg-canvas-subtle border border-ink-border shadow-subtle',
+      primary: 'bg-civic-terracotta text-white hover:bg-civic-terracottaDark shadow-none',
+      secondary: 'bg-canvas-card text-ink-primary hover:bg-canvas-subtle border border-ink-border shadow-none',
+      outline: 'bg-transparent text-ink-primary hover:bg-canvas-subtle border border-ink-border shadow-none',
       ghost: 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle',
-      danger: 'bg-civic-rose text-white hover:bg-red-700 shadow-subtle',
+      danger: 'bg-civic-rose text-white hover:bg-red-800 shadow-none',
     }[variant];
 
     return (

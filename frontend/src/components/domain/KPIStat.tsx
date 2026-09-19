@@ -35,18 +35,18 @@ export function KPIStat({
   }[trend || 'neutral'];
 
   return (
-    <div className="p-5 rounded-xl border border-ink-border bg-white shadow-card space-y-2">
-      <div className="flex items-center justify-between text-xs text-ink-secondary font-medium">
+    <div className="p-5 rounded-sm border border-ink-border bg-canvas-card space-y-2 shadow-none">
+      <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-widest text-ink-secondary">
         <span>{label}</span>
         {icon && <span className="text-ink-tertiary">{icon}</span>}
       </div>
 
-      <div className="flex items-baseline justify-between">
-        <div className="text-2xl sm:text-3xl font-extrabold text-ink-primary tracking-tight">
+      <div className="flex items-baseline justify-between pt-1">
+        <div className="text-2xl sm:text-3xl font-extrabold text-ink-primary tracking-tight font-mono">
           {value}
         </div>
         {trend && trendValue && (
-          <div className={`flex items-center gap-1 text-xs font-semibold ${getTrendColor()}`}>
+          <div className={`flex items-center gap-1 text-[11px] font-mono font-semibold ${getTrendColor()}`}>
             <TrendIcon className="w-3.5 h-3.5" />
             <span>{trendValue}</span>
           </div>
@@ -54,7 +54,7 @@ export function KPIStat({
       </div>
 
       {comparison && (
-        <div className="text-[11px] text-ink-tertiary pt-1">
+        <div className="text-[11px] text-ink-tertiary font-sans pt-1 border-t border-ink-border/50">
           {comparison}
         </div>
       )}

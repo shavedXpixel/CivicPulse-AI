@@ -235,9 +235,9 @@ export function ResolutionWorkspace({
   const isCitizen = userRole === 'CITIZEN';
 
   return (
-    <div className="rounded-xl border border-ink-border bg-white shadow-card overflow-hidden space-y-0">
+    <div className="border border-ink-border bg-canvas-card overflow-hidden space-y-0">
       {/* Top Header & Telemetry Bar */}
-      <div className="p-5 border-b border-ink-border/80 bg-gradient-to-r from-canvas-subtle via-white to-canvas-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="p-5 border-b border-ink-border bg-canvas-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-mono font-bold tracking-wider text-ink-secondary uppercase flex items-center gap-1.5">
@@ -272,7 +272,7 @@ export function ResolutionWorkspace({
           {(isAssignedFieldOfficer || isDepartmentOfficerOrAdmin) && (
             <button
               onClick={() => setIsSubmitModalOpen(true)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-civic-blue text-white hover:bg-blue-700 shadow-subtle flex items-center gap-1.5 transition-colors"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-civic-terracotta text-white hover:bg-civic-terracottaDark flex items-center gap-1.5 transition-colors"
             >
               <Camera className="w-3.5 h-3.5" />
               <span>Submit Resolution Proof</span>
@@ -313,7 +313,7 @@ export function ResolutionWorkspace({
           onClick={() => setActiveTab('comparison')}
           className={`py-3 border-b-2 flex items-center gap-1.5 transition-colors ${
             activeTab === 'comparison'
-              ? 'border-civic-blue text-civic-blue'
+              ? 'border-civic-terracotta text-civic-terracotta font-semibold'
               : 'border-transparent text-ink-secondary hover:text-ink-primary'
           }`}
         >
@@ -360,7 +360,7 @@ export function ResolutionWorkspace({
               <div className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* BEFORE CARD */}
-                  <div className="p-4 rounded-xl border border-rose-200 bg-rose-50/30 space-y-3">
+                  <div className="p-5 border border-ink-border bg-canvas-subtle/50 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-civic-roseLight text-civic-rose uppercase border border-rose-200">
                         BEFORE • Disruption State
@@ -397,7 +397,7 @@ export function ResolutionWorkspace({
                   </div>
 
                   {/* AFTER CARD */}
-                  <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/30 space-y-3">
+                  <div className="p-5 border border-ink-border bg-canvas-subtle/50 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-civic-emeraldLight text-emerald-800 uppercase border border-emerald-200">
                         AFTER • Remediated Infrastructure
@@ -435,7 +435,7 @@ export function ResolutionWorkspace({
                 </div>
 
                 {/* Comparative Observations Grid */}
-                <div className="p-4 rounded-xl border border-ink-border bg-canvas-subtle space-y-3 text-xs">
+                <div className="p-5 border-t border-ink-border bg-canvas-card space-y-3 text-xs">
                   <span className="font-bold text-ink-primary uppercase tracking-wider text-[11px] flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-civic-amber" />
                     <span>Observable Visual Deltas (AI & Telemetry Analysis)</span>

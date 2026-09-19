@@ -3,20 +3,20 @@
 @tailwind utilities;
 
 :root {
-  /* Design Tokens per docs/04_DESIGN.md Section 7 */
-  --background: #F8FAFC;
-  --surface: #FFFFFF;
-  --surface-muted: #F1F5F9;
-  --text-primary: #0F172A;
-  --text-secondary: #475569;
-  --text-tertiary: #94A3B8;
-  --border: #E2E8F0;
-  --brand: #0284C7;
-  --brand-hover: #0369A1;
-  --success: #16A34A;
-  --warning: #D97706;
-  --danger: #DC2626;
-  --info: #0284C7;
+  /* Editorial Civic Infrastructure Design Tokens */
+  --background: #F4F0EA;
+  --surface: #FCFAF7;
+  --surface-muted: #ECE7DF;
+  --text-primary: #1A1816;
+  --text-secondary: #5C5852;
+  --text-tertiary: #948F86;
+  --border: #DDD7CD;
+  --brand: #C85A32;
+  --brand-hover: #A84320;
+  --success: #2E6F40;
+  --warning: #B26A00;
+  --danger: #B83232;
+  --info: #C85A32;
 }
 
 body {
@@ -29,26 +29,38 @@ body {
 
 /* Subtle clean scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #F1F5F9;
+  background: #ECE7DF;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
-  border-radius: 3px;
+  background: #DDD7CD;
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
+  background: #948F86;
 }
 
 @layer utilities {
   .subtle-border {
-    border: 1px solid #E2E8F0;
+    border: 1px solid #DDD7CD;
+  }
+  .grid-rule-r {
+    border-right: 1px solid #DDD7CD;
+  }
+  .grid-rule-b {
+    border-bottom: 1px solid #DDD7CD;
+  }
+  .grid-rule-l {
+    border-left: 1px solid #DDD7CD;
+  }
+  .grid-rule-t {
+    border-top: 1px solid #DDD7CD;
   }
 }
 

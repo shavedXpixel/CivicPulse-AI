@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { CitizenShell } from '../../../components/shells/CitizenShell';
 import {
   Camera,
-  MapPin,
   CheckCircle2,
   ArrowLeft,
   ArrowRight,
@@ -14,60 +13,41 @@ import {
   X,
   AlertCircle,
   Loader2,
-  RefreshCw,
   Lock,
-  Compass,
   Sparkles,
   Info,
   Edit3,
-  ShieldCheck,
-  Check
+  ShieldCheck
 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
+import { Input } from '../../../components/ui/Input';
 import { Textarea } from '../../../components/ui/Textarea';
 import { apiClient } from '../../../lib/api-client';
 import { SignalAIPreview } from '../../../components/citizen/SignalAIPreview';
+import { LocationPicker, LocationPickerValue } from '../../../components/domain/LocationPicker';
 import { useAuth } from '../../../context/AuthContext';
-
-const BHUBANESWAR_WARDS = [
-  { id: 'WARD-018', name: 'Ward 18 (Nayapalli)', lat: 20.2961, lng: 85.8245, address: 'VIP Road, Jayadev Vihar Crossing, Nayapalli' },
-  { id: 'WARD-004', name: 'Ward 04 (Saheed Nagar)', lat: 20.2882, lng: 85.8436, address: 'Janpath, Block B, Saheed Nagar' },
-  { id: 'WARD-022', name: 'Ward 22 (Patia)', lat: 20.3533, lng: 85.8193, address: 'KIIT Road, Chandrasekharpur - Patia Corridor' },
-  { id: 'WARD-012', name: 'Ward 12 (Old Town)', lat: 20.2405, lng: 85.8342, address: 'Rath Road, Near Lingaraj Temple Area' },
-  { id: 'WARD-009', name: 'Ward 09 (Khandagiri)', lat: 20.2589, lng: 85.7876, address: 'Near Khandagiri Square, NH-16 Service Road' },
-];
 
 const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB Canonical MVP Limit
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
 
-const DEMO_DESCRIPTION_DEFAULT =
-  'Huge water pipeline burst outside 4th cross road, water is flowing into basements and roads are completely flooded.';
-
 type ReportStage = 'describe' | 'location' | 'media' | 'review' | 'processing' | 'result';
 
 function CitizenReportContent() {
-  const { user, isDemoMode, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const intakeMode = searchParams.get('mode') || 'text';
 
   const [stage, setStage] = useState<ReportStage>('describe');
 
   // Stage 1: Description state
-  const [description, setDescription] = useState(
-    isDemoMode ? DEMO_DESCRIPTION_DEFAULT : ''
-  );
+  const [description, setDescription] = useState('');
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
 
-  // Stage 2: Location state
-  const [selectedWard, setSelectedWard] = useState(BHUBANESWAR_WARDS[0]!);
-  const [customCoordinates, setCustomCoordinates] = useState<{ lat: number; lng: number } | null>(null);
-  const [isLocating, setIsLocating] = useState(false);
-  const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'acquired' | 'unavailable' | 'denied'>('idle');
-  const [locationMessage, setLocationMessage] = useState<string | null>(null);
-  const [manualLat, setManualLat] = useState<string>('');
-  const [manualLng, setManualLng] = useState<string>('');
+// Stage 2: Location state
+  // Initialized to null to guarantee that initial visual fallback center coordinates
+  // are NEVER submitted automatically without explicit user selection/confirmation.
+  const [selectedLocation, setSelectedLocation] = useState<LocationPickerValue | null>(null);
   const [manualLocationRef, setManualLocationRef] = useState<string>('');
-  const [useManualEntry, setUseManualEntry] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
   // Stage 3: Media state
@@ -88,53 +68,6 @@ function CitizenReportContent() {
     cluster?: any;
     ai_analysis?: any;
   } | null>(null);
-
-  // Request browser GPS geolocation
-  const handleRequestGeolocation = useCallback(() => {
-    if (typeof window === 'undefined' || !navigator.geolocation) {
-      setLocationStatus('unavailable');
-      setLocationMessage('Browser geolocation is not supported on this device.');
-      return;
-    }
-
-    setIsLocating(true);
-    setLocationStatus('locating');
-    setLocationMessage(null);
-    setLocationError(null);
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setIsLocating(false);
-        const coords = {
-          lat: Number(position.coords.latitude.toFixed(6)),
-          lng: Number(position.coords.longitude.toFixed(6)),
-        };
-        setCustomCoordinates(coords);
-        setLocationStatus('acquired');
-        setLocationMessage(
-          `GPS Acquired: ${coords.lat.toFixed(4)}° N, ${coords.lng.toFixed(4)}° E (accuracy ±${Math.round(position.coords.accuracy || 10)}m)`
-        );
-      },
-      (error) => {
-        setIsLocating(false);
-        if (error.code === error.PERMISSION_DENIED) {
-          setLocationStatus('denied');
-          setLocationMessage('Geolocation permission denied. You can enter coordinates or a landmark manually below.');
-        } else {
-          setLocationStatus('unavailable');
-          setLocationMessage(`Location unavailable (${error.message}). You can enter coordinates or a landmark manually below.`);
-        }
-      },
-      { timeout: 10000, enableHighAccuracy: true, maximumAge: 60000 }
-    );
-  }, []);
-
-  // In REAL_MODE, automatically request GPS on mount
-  useEffect(() => {
-    if (!isDemoMode && locationStatus === 'idle') {
-      handleRequestGeolocation();
-    }
-  }, [isDemoMode, locationStatus, handleRequestGeolocation]);
 
   // Stage 3: Media handlers
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -178,15 +111,18 @@ function CitizenReportContent() {
 
   const handleNextFromLocation = () => {
     setLocationError(null);
-    if (useManualEntry) {
-      if (manualLat.trim() && manualLng.trim()) {
-        const lat = parseFloat(manualLat);
-        const lng = parseFloat(manualLng);
-        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-          setLocationError('Please enter valid coordinates (-90 to 90 lat, -180 to 180 lng).');
-          return;
-        }
-      }
+    if (!selectedLocation || typeof selectedLocation.lat !== 'number' || typeof selectedLocation.lng !== 'number') {
+      setLocationError('Please position the pin on the map or click Confirm Location before continuing.');
+      return;
+    }
+    if (
+      selectedLocation.lat < -90 ||
+      selectedLocation.lat > 90 ||
+      selectedLocation.lng < -180 ||
+      selectedLocation.lng > 180
+    ) {
+      setLocationError('Coordinates out of valid range (-90 to 90 lat, -180 to 180 lng).');
+      return;
     }
     setStage('media');
   };
@@ -203,9 +139,9 @@ function CitizenReportContent() {
       return;
     }
 
-    // REAL_MODE requires authenticated user
-    if (!isDemoMode && !user) {
-      setSubmitError('You must be signed in to submit a citizen report in REAL_MODE. Please sign in to continue.');
+    // Requires authenticated user
+    if (!user) {
+      setSubmitError('You must be signed in to submit a citizen report. Please sign in to continue.');
       return;
     }
 
@@ -231,31 +167,19 @@ function CitizenReportContent() {
       let locationRef: string | undefined = undefined;
       let wardId: string | undefined = undefined;
 
-      if (isDemoMode) {
-        // DEMO_MODE: preserve Ward 18 Golden Demo behavior
-        activeCoords = customCoordinates || {
-          lat: selectedWard.lat,
-          lng: selectedWard.lng,
+      if (selectedLocation) {
+        activeCoords = {
+          lat: selectedLocation.lat,
+          lng: selectedLocation.lng,
         };
-        wardId = selectedWard.id;
-        locationRef = selectedWard.address;
-      } else {
-        // REAL_MODE: derive coordinates from GPS or manual input, never hardcode Ward 18
-        if (useManualEntry && manualLat.trim() && manualLng.trim()) {
-          const lat = parseFloat(manualLat);
-          const lng = parseFloat(manualLng);
-          activeCoords = { lat, lng };
-        } else if (customCoordinates) {
-          activeCoords = customCoordinates;
-        }
-
-        if (manualLocationRef.trim()) {
-          locationRef = manualLocationRef.trim();
-        }
-
-        // ward_id is intentionally omitted in REAL_MODE so the backend IGeographyProvider resolves it
-        wardId = undefined;
       }
+
+      if (manualLocationRef.trim()) {
+        locationRef = manualLocationRef.trim();
+      }
+
+      // ward_id is resolved by backend IGeographyProvider from coordinates
+      wardId = undefined;
 
       // 1. Create Signal & Run Automated Ingestion Pipeline
       const signalRes = await apiClient.post<{
@@ -276,6 +200,8 @@ function CitizenReportContent() {
           original_text: description.trim(),
           ward_id: wardId,
           location: activeCoords,
+          location_source: selectedLocation?.source || 'MANUAL',
+          location_accuracy_m: selectedLocation?.accuracy_m,
           location_reference: locationRef,
           auto_process: true,
         }
@@ -324,7 +250,7 @@ function CitizenReportContent() {
 
   const handleReset = () => {
     setCreatedSignal(null);
-    setDescription(isDemoMode ? DEMO_DESCRIPTION_DEFAULT : '');
+    setDescription('');
     handleRemovePhoto();
     setStage('describe');
     setSubmitError(null);
@@ -368,15 +294,15 @@ function CitizenReportContent() {
           </p>
         </div>
 
-        {/* REAL_MODE Unauthenticated Alert */}
-        {!isDemoMode && !user && !authLoading && (
+        {/* Unauthenticated Alert */}
+        {!user && !authLoading && (
           <div className="p-4 rounded-xl border border-amber-300 bg-amber-50 text-xs text-amber-900 space-y-2">
             <div className="flex items-center gap-2 font-bold text-amber-800">
               <Lock className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>Authentication Required in REAL_MODE</span>
+              <span>Authentication Required</span>
             </div>
             <p className="leading-relaxed">
-              You must be signed in with a citizen account to submit real civic reports. Reports will be securely associated with your verified profile.
+              You must be signed in with a citizen account to submit civic reports. Reports will be securely associated with your verified profile.
             </p>
             <div className="pt-1">
               <Link href="/login?redirect=/citizen/report">
@@ -388,11 +314,14 @@ function CitizenReportContent() {
           </div>
         )}
 
-        {/* Stepper Progress Bar (Stages 1 to 4) */}
+        {/* Document Header & Form Track */}
         {stage !== 'processing' && stage !== 'result' && (
-          <div className="pt-1 pb-2">
-            <div className="flex items-center justify-between relative">
-              <div className="absolute top-1/2 -translate-y-1/2 inset-x-0 h-0.5 bg-ink-border -z-0" />
+          <div className="border-b border-ink-border pb-4 space-y-3">
+            <div className="flex items-center justify-between text-[10px] font-mono text-ink-tertiary uppercase tracking-widest">
+              <span>FORM REF: CP-INT-01 // PUBLIC SERVICE INTAKE</span>
+              <span>STEP {currentStepIndex + 1} OF {steps.length}</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {steps.map((s, idx) => {
                 const isCompleted = currentStepIndex > idx;
                 const isCurrent = stage === s.id;
@@ -402,30 +331,20 @@ function CitizenReportContent() {
                     type="button"
                     disabled={currentStepIndex < idx}
                     onClick={() => setStage(s.id as ReportStage)}
-                    className="relative z-10 flex flex-col items-center group cursor-pointer disabled:cursor-not-allowed"
+                    className={`p-2.5 rounded-sm border text-left transition-colors font-mono disabled:cursor-not-allowed ${
+                      isCurrent
+                        ? 'border-civic-terracotta bg-canvas-card text-ink-primary'
+                        : isCompleted
+                        ? 'border-ink-border bg-canvas-subtle/50 text-ink-secondary'
+                        : 'border-ink-border/50 bg-canvas text-ink-tertiary opacity-60'
+                    }`}
                   >
-                    <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                        isCompleted
-                          ? 'bg-civic-blue text-white shadow-subtle'
-                          : isCurrent
-                          ? 'bg-white border-2 border-civic-blue text-civic-blue ring-4 ring-civic-blueLight'
-                          : 'bg-canvas-subtle border border-ink-border text-ink-tertiary'
-                      }`}
-                    >
-                      {isCompleted ? <Check className="w-3.5 h-3.5" /> : s.stepNum}
+                    <div className="text-[9px] uppercase tracking-wider font-semibold text-civic-terracotta">
+                      0{s.stepNum}
                     </div>
-                    <span
-                      className={`text-[10px] mt-1 font-medium transition-colors ${
-                        isCurrent
-                          ? 'text-civic-blue font-bold'
-                          : isCompleted
-                          ? 'text-ink-primary'
-                          : 'text-ink-tertiary'
-                      }`}
-                    >
+                    <div className="text-xs font-semibold truncate">
                       {s.label}
-                    </span>
+                    </div>
                   </button>
                 );
               })}
@@ -448,13 +367,13 @@ function CitizenReportContent() {
         {/* STAGE 1: DESCRIBE                                                         */}
         {/* ========================================================================= */}
         {stage === 'describe' && (
-          <div className="space-y-5 bg-white p-5 rounded-2xl border border-ink-border shadow-card">
+          <div className="space-y-5 bg-canvas-card p-6 rounded-sm border border-ink-border shadow-none">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-civic-blueLight text-civic-blue text-xs font-bold flex items-center justify-center">
+                <span className="w-5 h-5 rounded-sm bg-canvas-subtle border border-ink-border text-civic-terracotta text-xs font-mono font-bold flex items-center justify-center">
                   1
                 </span>
-                <h3 className="text-sm font-bold text-ink-primary">
+                <h3 className="text-sm font-bold text-ink-primary uppercase tracking-wider font-mono">
                   Describe the Issue
                 </h3>
               </div>
@@ -525,206 +444,56 @@ function CitizenReportContent() {
         {/* STAGE 2: LOCATION                                                         */}
         {/* ========================================================================= */}
         {stage === 'location' && (
-          <div className="space-y-5 bg-white p-5 rounded-2xl border border-ink-border shadow-card">
+          <div className="space-y-5 bg-canvas-card p-6 rounded-sm border border-ink-border shadow-none">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-civic-blueLight text-civic-blue text-xs font-bold flex items-center justify-center">
+                <span className="w-5 h-5 rounded-sm bg-canvas-subtle border border-ink-border text-civic-terracotta text-xs font-mono font-bold flex items-center justify-center">
                   2
                 </span>
-                <h3 className="text-sm font-bold text-ink-primary">
+                <h3 className="text-sm font-bold text-ink-primary uppercase tracking-wider font-mono">
                   Incident Location
                 </h3>
               </div>
               <p className="text-xs text-ink-secondary pl-7">
-                Use your device GPS coordinates or enter manual coordinates / nearby landmark.
+                Place the pin on the real map or use your device location to position the civic incident accurately.
               </p>
             </div>
 
-            {isDemoMode ? (
-              /* DEMO_MODE: Preserves Ward 18 Golden Demo behavior */
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs font-semibold text-ink-primary">
-                  <span>Location & Ward (Demo Mode)</span>
-                  <button
-                    type="button"
-                    onClick={handleRequestGeolocation}
-                    disabled={isLocating}
-                    className="text-civic-blue hover:underline font-medium flex items-center gap-1"
-                  >
-                    {isLocating && <Loader2 className="w-3 h-3 animate-spin" />}
-                    <span>Use Device GPS</span>
-                  </button>
-                </div>
+            {/* REAL INTERACTIVE MAP LOCATION PICKER */}
+            <LocationPicker
+              initialValue={selectedLocation}
+              onChange={(val) => {
+                setSelectedLocation(val);
+                setLocationError(null);
+              }}
+              onConfirm={(val) => {
+                setSelectedLocation(val);
+                setLocationError(null);
+              }}
+            />
 
-                <div className="p-3.5 rounded-xl border border-ink-border bg-white space-y-2">
-                  <div className="flex items-center gap-2 text-xs">
-                    <MapPin className="w-4 h-4 text-civic-rose shrink-0" />
-                    <select
-                      value={selectedWard.id}
-                      onChange={(e) => {
-                        const found = BHUBANESWAR_WARDS.find((w) => w.id === e.target.value);
-                        if (found) setSelectedWard(found);
-                      }}
-                      className="w-full text-xs font-medium text-ink-primary bg-transparent focus:outline-none cursor-pointer"
-                    >
-                      {BHUBANESWAR_WARDS.map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.name} — {w.address}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="text-[11px] font-mono text-ink-secondary pl-6">
-                    Coordinates: {customCoordinates ? `${customCoordinates.lat.toFixed(4)}° N, ${customCoordinates.lng.toFixed(4)}° E (GPS)` : `${selectedWard.lat}° N, ${selectedWard.lng}° E`}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* REAL_MODE: Real GPS + Manual fallback */
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-ink-primary flex items-center gap-1.5">
-                    <Compass className="w-3.5 h-3.5 text-civic-blue" />
-                    <span>Real Incident Coordinates</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleRequestGeolocation}
-                    disabled={isLocating}
-                    className="text-civic-blue hover:underline font-medium flex items-center gap-1 text-xs"
-                  >
-                    {isLocating ? (
-                      <>
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        <span>Locating...</span>
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-3 h-3" />
-                        <span>Refresh GPS</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+            {/* OPTIONAL LANDMARK / DESCRIPTIVE REFERENCE */}
+            <div className="space-y-1.5 pt-1">
+              <label className="block text-[11px] font-mono uppercase tracking-wider text-ink-secondary">
+                Nearby Landmark or Address Reference (Optional)
+              </label>
+              <Input
+                type="text"
+                placeholder="e.g. Near Damana Square, opposite Post Office, VIP Road"
+                value={manualLocationRef}
+                onChange={(e) => setManualLocationRef(e.target.value)}
+                className="text-xs"
+              />
+              <p className="text-[10px] text-ink-tertiary font-mono">
+                Municipal ward jurisdiction is authoritatively resolved on the server via BMC GIS polygon reference data.
+              </p>
+            </div>
 
-                {/* GPS Status Visualizer */}
-                {isLocating ? (
-                  <div className="p-4 rounded-xl border border-ink-border bg-canvas-subtle text-xs flex items-center gap-3">
-                    <Loader2 className="w-4 h-4 animate-spin text-civic-blue shrink-0" />
-                    <span className="text-ink-secondary">Requesting high-accuracy device coordinates via browser GPS…</span>
-                  </div>
-                ) : customCoordinates ? (
-                  <div className="p-3.5 rounded-xl border border-civic-emerald/40 bg-emerald-50/50 space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900">
-                        <CheckCircle2 className="w-4 h-4 text-civic-emerald shrink-0" />
-                        <span>Current Location (Browser GPS)</span>
-                      </div>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">
-                        GPS Locked
-                      </span>
-                    </div>
-                    <div className="text-xs font-mono text-emerald-950 font-bold">
-                      {customCoordinates.lat.toFixed(5)}° N, {customCoordinates.lng.toFixed(5)}° E
-                    </div>
-                    {locationMessage && (
-                      <div className="text-[11px] text-emerald-800/80 italic">
-                        {locationMessage}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="p-3.5 rounded-xl border border-amber-300 bg-amber-50 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
-                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span>GPS Coordinates Not Acquired</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleRequestGeolocation}
-                        className="text-xs text-civic-blue hover:underline font-semibold"
-                      >
-                        Retry GPS
-                      </button>
-                    </div>
-                    <p className="text-[11px] text-amber-900/90 leading-relaxed">
-                      {locationMessage || 'Browser location permission was not granted or signal timed out. Please enter coordinates or a landmark manually below.'}
-                    </p>
-                  </div>
-                )}
-
-                {/* Manual Coordinates / Landmark Fallback Section */}
-                <div className="p-3.5 rounded-xl border border-ink-border bg-canvas-subtle space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-ink-primary">
-                      {useManualEntry ? 'Location entered manually' : 'Manual Coordinates / Landmark Fallback'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setUseManualEntry(!useManualEntry)}
-                      className="text-xs text-civic-blue hover:underline font-medium"
-                    >
-                      {useManualEntry ? 'Use GPS instead' : 'Enter manual coordinates'}
-                    </button>
-                  </div>
-
-                  {(useManualEntry || !customCoordinates) && (
-                    <div className="space-y-2.5 pt-1">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-[11px] font-medium text-ink-secondary mb-1">
-                            Latitude
-                          </label>
-                          <input
-                            type="number"
-                            step="any"
-                            placeholder="e.g. 20.2961"
-                            value={manualLat}
-                            onChange={(e) => setManualLat(e.target.value)}
-                            className="w-full text-xs font-mono p-2 rounded-lg border border-ink-border bg-white focus:outline-none focus:border-civic-blue"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-medium text-ink-secondary mb-1">
-                            Longitude
-                          </label>
-                          <input
-                            type="number"
-                            step="any"
-                            placeholder="e.g. 85.8245"
-                            value={manualLng}
-                            onChange={(e) => setManualLng(e.target.value)}
-                            className="w-full text-xs font-mono p-2 rounded-lg border border-ink-border bg-white focus:outline-none focus:border-civic-blue"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-medium text-ink-secondary mb-1">
-                          Landmark or Address Reference
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Near Damana Square, near Big Bazaar crossing"
-                          value={manualLocationRef}
-                          onChange={(e) => setManualLocationRef(e.target.value)}
-                          className="w-full text-xs p-2 rounded-lg border border-ink-border bg-white focus:outline-none focus:border-civic-blue text-ink-primary"
-                        />
-                      </div>
-                      <p className="text-[10px] text-ink-tertiary">
-                        Municipal ward boundaries are authoritatively resolved on the server via BMC GIS polygon reference data.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {locationError && (
-                  <p className="text-xs text-civic-rose font-medium flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    <span>{locationError}</span>
-                  </p>
-                )}
-              </div>
+            {locationError && (
+              <p className="text-xs text-civic-rose font-medium flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>{locationError}</span>
+              </p>
             )}
 
             <div className="pt-2 flex items-center justify-between">
@@ -752,13 +521,13 @@ function CitizenReportContent() {
         {/* STAGE 3: MEDIA                                                            */}
         {/* ========================================================================= */}
         {stage === 'media' && (
-          <div className="space-y-5 bg-white p-5 rounded-2xl border border-ink-border shadow-card">
+          <div className="space-y-5 bg-canvas-card p-6 rounded-sm border border-ink-border shadow-none">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-civic-blueLight text-civic-blue text-xs font-bold flex items-center justify-center">
+                <span className="w-5 h-5 rounded-sm bg-canvas-subtle border border-ink-border text-civic-terracotta text-xs font-mono font-bold flex items-center justify-center">
                   3
                 </span>
-                <h3 className="text-sm font-bold text-ink-primary">
+                <h3 className="text-sm font-bold text-ink-primary uppercase tracking-wider font-mono">
                   Attach Photo Evidence (Optional)
                 </h3>
               </div>
@@ -850,13 +619,13 @@ function CitizenReportContent() {
         {/* STAGE 4: REVIEW                                                           */}
         {/* ========================================================================= */}
         {stage === 'review' && (
-          <div className="space-y-5 bg-white p-5 rounded-2xl border border-ink-border shadow-card">
+          <div className="space-y-5 bg-canvas-card p-6 rounded-sm border border-ink-border shadow-none">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-civic-blueLight text-civic-blue text-xs font-bold flex items-center justify-center">
+                <span className="w-5 h-5 rounded-sm bg-canvas-subtle border border-ink-border text-civic-terracotta text-xs font-mono font-bold flex items-center justify-center">
                   4
                 </span>
-                <h3 className="text-sm font-bold text-ink-primary">
+                <h3 className="text-sm font-bold text-ink-primary uppercase tracking-wider font-mono">
                   Review Your Civic Report
                 </h3>
               </div>
@@ -900,23 +669,17 @@ function CitizenReportContent() {
                   <span>Edit</span>
                 </button>
               </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-ink-primary">
-                  {isDemoMode
-                    ? selectedWard.name
-                    : manualLocationRef ||
-                      (customCoordinates
-                        ? `${customCoordinates.lat.toFixed(4)}° N, ${customCoordinates.lng.toFixed(4)}° E`
-                        : manualLat
-                        ? `${manualLat}° N, ${manualLng}° E`
-                        : 'Bhubaneswar (Municipal Area)')}
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="font-bold text-ink-primary">
+                  {selectedLocation
+                    ? `${selectedLocation.lat.toFixed(5)}° N, ${selectedLocation.lng.toFixed(5)}° E`
+                    : 'Bhubaneswar (Municipal Area)'}
+                  {manualLocationRef ? ` (${manualLocationRef})` : ''}
                 </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-canvas-muted text-ink-secondary border border-ink-border">
-                  {isDemoMode
-                    ? 'Demo Ward'
-                    : customCoordinates && !useManualEntry
-                    ? 'Current location (GPS)'
-                    : 'Location entered manually'}
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-xs bg-canvas-card text-ink-secondary border border-ink-border uppercase">
+                  {selectedLocation?.source === 'GPS'
+                    ? `GPS${selectedLocation.accuracy_m ? ` (±${selectedLocation.accuracy_m}m)` : ''}`
+                    : 'Manual Pin'}
                 </span>
               </div>
             </div>
@@ -979,11 +742,11 @@ function CitizenReportContent() {
               <Button
                 variant="primary"
                 onClick={handleFinalSubmit}
-                disabled={!isDemoMode && !user}
+                disabled={!user}
                 className="gap-2 text-xs"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>{!isDemoMode && !user ? 'Sign in to Submit' : 'Submit Civic Report'}</span>
+                <span>{!user ? 'Sign in to Submit' : 'Submit Civic Report'}</span>
               </Button>
             </div>
           </div>
@@ -1087,11 +850,9 @@ function CitizenReportContent() {
               <div className="flex justify-between items-center">
                 <span className="text-ink-secondary">Ward / Location:</span>
                 <span className="font-semibold text-ink-primary">
-                  {isDemoMode
-                    ? selectedWard.name
-                    : createdSignal.ward_name ||
-                      createdSignal.ward_id ||
-                      (customCoordinates ? `${customCoordinates.lat.toFixed(4)}° N, ${customCoordinates.lng.toFixed(4)}° E` : 'Bhubaneswar')}
+                  {createdSignal.ward_name ||
+                    createdSignal.ward_id ||
+                    (selectedLocation ? `${selectedLocation.lat.toFixed(4)}° N, ${selectedLocation.lng.toFixed(4)}° E` : 'Bhubaneswar')}
                 </span>
               </div>
 

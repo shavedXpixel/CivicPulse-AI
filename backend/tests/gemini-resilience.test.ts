@@ -6,7 +6,7 @@ import {
   isTransientError,
   calculateBackoffWithJitter
 } from '../src/providers/ai/gemini.provider';
-import { ProviderContainer, MockDatabaseProvider } from '../src/providers';
+import { ProviderContainer, MockDatabaseProvider, FirebaseAuthProvider } from '../src/providers';
 import { SignalRepository } from '../src/modules/signals/signal.repository';
 import { SignalAIService } from '../src/modules/signals/signal-ai.service';
 import { env } from '../src/config/env';
@@ -383,9 +383,11 @@ describe('Gemini 503 Resilience, Bounded Exponential Backoff & Model Fallback', 
     let mockDb: MockDatabaseProvider;
 
     beforeEach(() => {
+      (env as any).AUTH_PROVIDER = 'firebase';
       ProviderContainer.resetAllProviders();
       mockDb = new MockDatabaseProvider();
       ProviderContainer.setDatabaseProvider(mockDb);
+      ProviderContainer.setAuthProvider(new FirebaseAuthProvider());
       (env as any).DEMO_MODE = false;
 
       // Authenticate via token mock

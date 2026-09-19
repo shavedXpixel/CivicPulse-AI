@@ -43,7 +43,7 @@ interface CitizenSignal {
 }
 
 export default function CitizenIssuesPage() {
-  const { user, isDemoMode, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [signals, setSignals] = useState<CitizenSignal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -76,15 +76,13 @@ export default function CitizenIssuesPage() {
       return;
     }
 
-    // In REAL_MODE: if user is not signed in, stop loading and prompt login
-    if (!isDemoMode && !user) {
+    if (!user) {
       setIsLoading(false);
       return;
     }
 
-    // In DEMO_MODE or authenticated REAL_MODE, load citizen reports
     loadReports();
-  }, [isDemoMode, authLoading, user, loadReports]);
+  }, [authLoading, user, loadReports]);
 
   return (
     <CitizenShell>
@@ -111,26 +109,24 @@ export default function CitizenIssuesPage() {
             My Submitted Reports
           </h1>
           <p className="text-xs text-ink-secondary">
-            {isDemoMode
-              ? 'Personal signal records tracked securely under your citizen profile.'
-              : 'Real reports submitted by your authenticated citizen profile, persisted in PostgreSQL.'}
+            Real reports submitted by your authenticated citizen profile, persisted in PostgreSQL.
           </p>
         </div>
 
-        {/* REAL_MODE unauthenticated state */}
-        {!isDemoMode && !authLoading && !user ? (
-          <div className="p-8 text-center rounded-2xl border border-ink-border bg-white shadow-card space-y-4">
-            <div className="w-12 h-12 rounded-full bg-canvas-subtle text-ink-tertiary mx-auto flex items-center justify-center">
-              <Lock className="w-6 h-6 text-civic-blue" />
+        {/* Unauthenticated state */}
+        {!authLoading && !user ? (
+          <div className="p-8 text-center rounded-sm border border-ink-border bg-canvas-card shadow-none space-y-4">
+            <div className="w-10 h-10 rounded-sm bg-canvas-subtle border border-ink-border text-ink-tertiary mx-auto flex items-center justify-center">
+              <Lock className="w-5 h-5 text-civic-terracotta" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-sm font-bold text-ink-primary">Authentication Required</h3>
-              <p className="text-xs text-ink-secondary max-w-sm mx-auto">
+              <h3 className="text-sm font-bold text-ink-primary font-mono uppercase tracking-wider">Authentication Required</h3>
+              <p className="text-xs text-ink-secondary max-w-sm mx-auto leading-relaxed">
                 Sign in with your citizen account to securely view and track the status of your submitted municipal reports.
               </p>
             </div>
             <Link href="/login" className="inline-block pt-1">
-              <Button variant="primary" size="sm">
+              <Button variant="primary" size="sm" className="font-mono text-xs">
                 Sign In as Citizen
               </Button>
             </Link>
@@ -138,7 +134,7 @@ export default function CitizenIssuesPage() {
         ) : (
           <>
             {error && (
-              <div className="p-4 rounded-xl border border-civic-rose/30 bg-rose-50 text-xs text-rose-900 flex items-start justify-between gap-3">
+              <div className="p-4 rounded-sm border border-civic-rose/30 bg-rose-50 text-xs text-rose-900 flex items-start justify-between gap-3 font-mono">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-civic-rose shrink-0 mt-0.5" />
                   <span>{error}</span>
@@ -146,12 +142,12 @@ export default function CitizenIssuesPage() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={loadReports}
-                    className="text-xs font-semibold text-civic-blue hover:underline flex items-center gap-1"
+                    className="text-xs font-semibold text-civic-terracotta hover:underline flex items-center gap-1"
                   >
                     <RefreshCw className="w-3 h-3" />
                     <span>Retry</span>
                   </button>
-                  {!isDemoMode && !user && (
+                  {!user && (
                     <Link href="/login" className="text-xs font-semibold text-civic-rose hover:underline">
                       Sign In
                     </Link>
@@ -161,27 +157,25 @@ export default function CitizenIssuesPage() {
             )}
 
             {isLoading ? (
-              <div className="p-12 text-center text-ink-secondary space-y-3">
-                <Loader2 className="w-6 h-6 animate-spin mx-auto text-civic-blue" />
+              <div className="p-12 text-center text-ink-secondary space-y-3 font-mono">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto text-civic-terracotta" />
                 <p className="text-xs">
-                  {isDemoMode ? 'Loading demo reports from server...' : 'Retrieving your reports from PostgreSQL...'}
+                  Retrieving your reports from PostgreSQL...
                 </p>
               </div>
             ) : signals.length === 0 ? (
-              <div className="p-8 text-center rounded-2xl border border-ink-border bg-white shadow-card space-y-4">
-                <div className="w-12 h-12 rounded-full bg-canvas-subtle text-ink-tertiary mx-auto flex items-center justify-center">
-                  <Building2 className="w-6 h-6" />
+              <div className="p-8 text-center rounded-sm border border-ink-border bg-canvas-card shadow-none space-y-4">
+                <div className="w-10 h-10 rounded-sm bg-canvas-subtle border border-ink-border text-ink-tertiary mx-auto flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-civic-terracotta" />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-sm font-bold text-ink-primary">No Reports Yet</h3>
-                  <p className="text-xs text-ink-secondary">
-                    {isDemoMode
-                      ? 'You have not submitted any municipal signals under this profile.'
-                      : 'You have not submitted any municipal signals under this citizen account.'}
+                  <h3 className="text-sm font-bold text-ink-primary font-mono uppercase tracking-wider">No Reports Yet</h3>
+                  <p className="text-xs text-ink-secondary leading-relaxed">
+                    You have not submitted any municipal signals under this citizen account.
                   </p>
                 </div>
                 <Link href="/citizen/report" className="inline-block">
-                  <Button variant="primary" size="sm">
+                  <Button variant="primary" size="sm" className="font-mono text-xs">
                     Submit a Report
                   </Button>
                 </Link>
@@ -199,16 +193,16 @@ export default function CitizenIssuesPage() {
                   return (
                     <div
                       key={sig.id}
-                      className="p-5 rounded-2xl border border-ink-border bg-white shadow-card space-y-4 hover:border-civic-blue/40 transition-colors"
+                      className="p-5 rounded-sm border border-ink-border bg-canvas-card shadow-none space-y-4 hover:border-ink-secondary transition-colors"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono font-bold text-civic-blue">
+                            <span className="text-[11px] font-mono font-bold text-civic-terracotta">
                               #{sig.id}
                             </span>
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                              className={`px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-semibold border ${
                                 sig.processing_status === 'COMPLETED'
                                   ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                   : 'bg-amber-50 text-amber-900 border-amber-200'

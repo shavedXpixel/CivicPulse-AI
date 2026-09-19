@@ -190,12 +190,12 @@ export function ProblemList({
 
         <div className="flex items-center gap-2 self-end sm:self-auto">
           {/* View Mode Toggle */}
-          <div className="flex items-center rounded-lg border border-ink-border bg-white p-0.5 shadow-subtle">
+          <div className="flex items-center rounded-sm border border-ink-border bg-canvas-card p-0.5 shadow-none">
             <button
               onClick={() => setViewMode('table')}
-              className={`p-1.5 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors ${
+              className={`p-1.5 rounded-sm text-xs font-mono font-semibold flex items-center gap-1 transition-colors ${
                 viewMode === 'table'
-                  ? 'bg-civic-blue text-white shadow-xs'
+                  ? 'bg-civic-terracotta text-white shadow-none'
                   : 'text-ink-secondary hover:text-ink-primary'
               }`}
               title="Table View"
@@ -205,9 +205,9 @@ export function ProblemList({
             </button>
             <button
               onClick={() => setViewMode('cards')}
-              className={`p-1.5 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors ${
+              className={`p-1.5 rounded-sm text-xs font-mono font-semibold flex items-center gap-1 transition-colors ${
                 viewMode === 'cards'
-                  ? 'bg-civic-blue text-white shadow-xs'
+                  ? 'bg-civic-terracotta text-white shadow-none'
                   : 'text-ink-secondary hover:text-ink-primary'
               }`}
               title="Card View"
@@ -218,12 +218,12 @@ export function ProblemList({
           </div>
 
           {/* Sort Dropdown */}
-          <div className="flex items-center gap-1 bg-white border border-ink-border rounded-lg px-2.5 py-1.5 shadow-subtle text-xs">
+          <div className="flex items-center gap-1 bg-canvas-card border border-ink-border rounded-sm px-2.5 py-1.5 shadow-none text-xs">
             <ArrowUpDown className="w-3.5 h-3.5 text-ink-tertiary shrink-0" />
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-transparent border-none text-ink-primary font-medium focus:outline-none cursor-pointer"
+              className="bg-transparent border-none text-ink-primary font-mono text-[11px] focus:outline-none cursor-pointer"
             >
               <option value="impact">Highest Impact</option>
               <option value="sla">SLA Urgency</option>
@@ -235,8 +235,8 @@ export function ProblemList({
       </div>
 
       {/* Filter Chips / Dropdowns Strip */}
-      <div className="p-3.5 rounded-xl bg-white border border-ink-border shadow-subtle flex flex-wrap items-center gap-2.5 text-xs">
-        <div className="flex items-center gap-1 text-ink-secondary font-semibold mr-1">
+      <div className="p-3 rounded-sm bg-canvas-card border border-ink-border shadow-none flex flex-wrap items-center gap-2.5 text-xs">
+        <div className="flex items-center gap-1 text-ink-secondary font-mono text-[11px] uppercase tracking-wider font-semibold mr-1">
           <SlidersHorizontal className="w-3.5 h-3.5" />
           <span>Filters:</span>
         </div>
@@ -390,10 +390,10 @@ export function ProblemList({
         />
       ) : viewMode === 'table' ? (
         /* Dense Enterprise Operations Table */
-        <div className="overflow-x-auto rounded-xl border border-ink-border bg-white shadow-card">
+        <div className="overflow-x-auto rounded-sm border border-ink-border bg-canvas-card shadow-none">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-ink-border bg-canvas-subtle text-ink-secondary uppercase tracking-wider text-[10px] font-bold">
+              <tr className="border-b border-ink-border bg-canvas-subtle text-ink-secondary uppercase tracking-widest text-[10px] font-mono font-bold">
                 <th className="py-3 px-4">ID</th>
                 <th className="py-3 px-4">Problem Cluster</th>
                 <th className="py-3 px-4">Ward</th>
@@ -405,7 +405,7 @@ export function ProblemList({
                 <th className="py-3 px-4 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-ink-border/60">
+            <tbody className="divide-y divide-ink-border">
               {paginatedProblems.map((p) => {
                 const impactScore = p.impact_score ?? p.impactScore ?? 50;
                 const impactLevel = p.impact_level || p.severity || 'MEDIUM';
@@ -420,16 +420,16 @@ export function ProblemList({
                     className="hover:bg-canvas-subtle/70 transition-colors group cursor-pointer"
                   >
                     <td className="py-3 px-4 font-mono font-bold text-ink-primary whitespace-nowrap">
-                      <Link href={`/dashboard/problems/${p.id}`} className="hover:text-civic-blue">
+                      <Link href={`/dashboard/problems/${p.id}`} className="hover:text-civic-terracotta">
                         {p.id}
                       </Link>
                     </td>
                     <td className="py-3 px-4 max-w-xs">
                       <Link href={`/dashboard/problems/${p.id}`} className="block">
-                        <span className="font-semibold text-ink-primary group-hover:text-civic-blue transition-colors line-clamp-1">
+                        <span className="font-semibold text-ink-primary group-hover:text-civic-terracotta transition-colors line-clamp-1">
                           {p.title}
                         </span>
-                        <span className="text-[10px] uppercase tracking-wider text-ink-tertiary">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-ink-tertiary">
                           {(p.category || 'CIVIC').replace(/_/g, ' ')}
                         </span>
                       </Link>
@@ -449,7 +449,7 @@ export function ProblemList({
                           }`}
                         />
                         <span className="font-mono font-bold text-ink-primary">{impactScore}</span>
-                        <span className="text-[10px] text-ink-tertiary">({impactLevel})</span>
+                        <span className="text-[10px] font-mono text-ink-tertiary">({impactLevel})</span>
                       </div>
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap">
@@ -461,7 +461,7 @@ export function ProblemList({
                     <td className="py-3 px-4 whitespace-nowrap">
                       {sla ? (
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold flex items-center gap-1 w-fit ${
+                          className={`px-2 py-0.5 rounded-sm text-[10px] font-mono font-bold flex items-center gap-1 w-fit ${
                             sla.status === 'BREACHED'
                               ? 'bg-rose-100 text-rose-800'
                               : sla.status === 'AT_RISK'
@@ -475,7 +475,7 @@ export function ProblemList({
                           <span>{sla.status}</span>
                         </span>
                       ) : (
-                        <span className="text-ink-tertiary text-[11px]">—</span>
+                        <span className="text-ink-tertiary text-[11px] font-mono">—</span>
                       )}
                     </td>
                     <td className="py-3 px-4 text-center font-mono font-semibold text-ink-primary whitespace-nowrap">
@@ -484,7 +484,7 @@ export function ProblemList({
                     <td className="py-3 px-4 text-right whitespace-nowrap">
                       <Link
                         href={`/dashboard/problems/${p.id}`}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-canvas-subtle border border-ink-border hover:bg-white text-ink-primary font-semibold text-[11px] transition-colors"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm bg-canvas-subtle border border-ink-border hover:bg-canvas-card hover:border-ink-secondary text-ink-primary font-mono font-medium text-[11px] transition-colors"
                       >
                         <span>Manage</span>
                         <ExternalLink className="w-3 h-3 text-ink-tertiary" />

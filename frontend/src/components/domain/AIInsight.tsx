@@ -21,21 +21,21 @@ export function AIInsight({
   }[confidence];
 
   return (
-    <div className="rounded-xl border border-ink-border bg-canvas-subtle/60 p-4 space-y-2.5 text-xs">
+    <div className="rounded-sm border border-ink-border bg-canvas-subtle/40 p-4 space-y-2.5 text-xs">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 font-semibold text-ink-primary">
-          <Info className="w-3.5 h-3.5 text-civic-blue" />
+          <Info className="w-3.5 h-3.5 text-civic-terracotta" />
           <span>{title}</span>
         </div>
         <div className="flex items-center gap-1 text-[11px] font-mono">
           <ShieldCheck className="w-3 h-3 text-ink-tertiary" />
-          <span className={`px-1.5 py-0.2 rounded font-medium ${confStyles}`}>
+          <span className={`px-1.5 py-0.5 rounded-sm font-medium ${confStyles}`}>
             {confidence} Confidence
           </span>
         </div>
       </div>
 
-      <div className="text-ink-secondary leading-relaxed">
+      <div className="text-ink-secondary leading-relaxed font-sans">
         {children}
       </div>
 
@@ -45,7 +45,7 @@ export function AIInsight({
           {citations.map((cite, i) => (
             <span
               key={i}
-              className="px-2 py-0.5 rounded bg-white border border-ink-border text-[10px] font-mono text-ink-secondary"
+              className="px-2 py-0.5 rounded-sm bg-canvas-card border border-ink-border text-[10px] font-mono text-ink-secondary"
             >
               {cite}
             </span>

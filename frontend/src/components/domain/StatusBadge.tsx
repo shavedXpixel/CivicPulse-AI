@@ -32,37 +32,37 @@ export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
         return {
           label: 'New Signal',
           icon: AlertCircle,
-          color: 'text-rose-800 bg-civic-roseLight border-civic-rose/20',
+          color: 'text-rose-900 bg-civic-roseLight border-civic-rose/30',
         };
       case 'TRIAGED':
         return {
           label: 'Triaged',
           icon: Clock,
-          color: 'text-amber-900 bg-civic-amberLight border-civic-amber/20',
+          color: 'text-amber-950 bg-civic-amberLight border-civic-amber/30',
         };
       case 'ASSIGNED':
         return {
           label: 'Assigned',
           icon: UserCheck,
-          color: 'text-blue-900 bg-civic-blueLight border-civic-blue/20',
+          color: 'text-ink-primary bg-civic-blueLight border-civic-blue/30',
         };
       case 'IN_PROGRESS':
         return {
           label: 'In Progress',
           icon: Wrench,
-          color: 'text-blue-900 bg-blue-100 border-blue-200',
+          color: 'text-ink-primary bg-canvas-subtle border-ink-border',
         };
       case 'AWAITING_VERIFICATION':
         return {
           label: 'Awaiting Verification',
           icon: FileCheck2,
-          color: 'text-purple-900 bg-purple-100 border-purple-200',
+          color: 'text-amber-950 bg-amber-50 border-amber-300',
         };
       case 'RESOLVED':
         return {
           label: 'Resolved',
           icon: CheckCircle2,
-          color: 'text-emerald-900 bg-civic-emeraldLight border-civic-emerald/20',
+          color: 'text-emerald-950 bg-civic-emeraldLight border-civic-emerald/30',
         };
       case 'CLOSED':
         return {
@@ -74,7 +74,7 @@ export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
         return {
           label: 'Reopened',
           icon: RotateCcw,
-          color: 'text-rose-900 bg-rose-100 border-rose-200',
+          color: 'text-rose-950 bg-rose-50 border-rose-300',
         };
       default:
         return {
@@ -86,13 +86,13 @@ export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
   })();
 
   const Icon = config.icon;
-  const sizeClasses = size === 'sm' ? 'text-[11px] px-2 py-0.5 gap-1' : 'text-xs px-2.5 py-1 gap-1.5';
+  const sizeClasses = size === 'sm' ? 'text-[10px] px-1.5 py-0.5 gap-1 font-mono' : 'text-[11px] px-2 py-0.5 gap-1.5 font-mono';
 
   return (
     <span
-      className={`inline-flex items-center rounded-full font-medium border ${sizeClasses} ${config.color}`}
+      className={`inline-flex items-center rounded-sm font-medium border ${sizeClasses} ${config.color}`}
     >
-      <Icon className="w-3.5 h-3.5 shrink-0" />
+      <Icon className="w-3 h-3 shrink-0" />
       <span>{config.label}</span>
     </span>
   );

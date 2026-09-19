@@ -19,20 +19,25 @@ export interface OfficerShellProps {
 export function OfficerShell({ children }: OfficerShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, userProfile, isDemoMode, signOut } = useAuth();
+  const { user, userProfile, signOut } = useAuth();
 
-  const navigation = [
+  interface NavItem {
+    name: string;
+    href: string;
+    icon: any;
+    badge?: string;
+  }
+
+  const navigation: NavItem[] = [
     {
       name: 'My Work / Officer Queue',
       href: '/officer',
       icon: Briefcase,
-      badge: isDemoMode ? '3 Active' : undefined,
     },
     {
       name: 'Assigned Problems',
-      href: isDemoMode ? '/dashboard/problems/PRB-2026-0819' : '/officer',
+      href: '/officer',
       icon: AlertTriangle,
-      badge: isDemoMode ? 'Golden Demo' : undefined,
     },
     { name: 'Priority Problems', href: '/dashboard/problems', icon: History },
   ];
@@ -40,17 +45,17 @@ export function OfficerShell({ children }: OfficerShellProps) {
   return (
     <div className="min-h-screen bg-canvas text-ink-primary flex flex-col pb-16 md:pb-0">
       {/* Top Header */}
-      <header className="sticky top-0 z-40 bg-white border-b border-ink-border">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-canvas-card border-b border-ink-border">
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link href="/officer" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-civic-blue flex items-center justify-center text-white font-bold text-xs">
+            <div className="w-7 h-7 rounded-sm bg-ink-primary flex items-center justify-center text-canvas-card font-mono font-bold text-xs">
               FO
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-sm tracking-tight text-ink-primary">
-                CivicPulse <span className="text-xs font-semibold text-civic-blue">Field Ops</span>
+                CivicPulse <span className="text-xs font-mono font-semibold text-civic-terracotta">Field Ops</span>
               </span>
-              <span className="text-[10px] text-ink-tertiary">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-ink-tertiary">
                 {userProfile?.department_id || 'WATCO'} Field Division • Bhubaneswar
               </span>
             </div>
@@ -66,13 +71,13 @@ export function OfficerShell({ children }: OfficerShellProps) {
                   key={item.name}
                   href={item.href}
                   className={`flex items-center gap-1.5 transition-colors ${
-                    isActive ? 'text-civic-blue font-semibold' : 'hover:text-ink-primary'
+                    isActive ? 'text-civic-terracotta font-semibold' : 'hover:text-ink-primary'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
                   <span>{item.name}</span>
                   {item.badge && (
-                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-civic-blueLight text-civic-blueDark">
+                    <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-semibold bg-canvas-subtle border border-ink-border text-ink-primary">
                       {item.badge}
                     </span>
                   )}
@@ -83,9 +88,9 @@ export function OfficerShell({ children }: OfficerShellProps) {
 
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-2 text-xs text-ink-secondary">
-              <ShieldCheck className="w-3.5 h-3.5 text-civic-blue" />
+              <ShieldCheck className="w-3.5 h-3.5 text-civic-terracotta" />
               <span className="font-semibold text-ink-primary">
-                {userProfile?.display_name || user?.displayName || (isDemoMode ? 'Officer Rajesh K.' : user?.email || 'Field Officer')}
+                {userProfile?.display_name || user?.displayName || user?.email || 'Field Officer'}
               </span>
             </div>
             <button
@@ -94,7 +99,7 @@ export function OfficerShell({ children }: OfficerShellProps) {
                 router.push('/login');
               }}
               className="text-xs font-medium text-ink-tertiary hover:text-ink-primary p-1 rounded hover:bg-canvas transition-colors"
-              title={isDemoMode ? 'Switch Role' : 'Sign Out'}
+              title="Sign Out"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -109,7 +114,7 @@ export function OfficerShell({ children }: OfficerShellProps) {
 
       {/* Mobile Bottom Navigation Bar */}
       <nav
-        className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-ink-border md:hidden"
+        className="fixed bottom-0 inset-x-0 z-40 bg-canvas-card border-t border-ink-border md:hidden"
         aria-label="Mobile Officer Navigation"
       >
         <div className="grid grid-cols-3 h-16 max-w-md mx-auto items-center">
@@ -121,7 +126,7 @@ export function OfficerShell({ children }: OfficerShellProps) {
                 key={item.name}
                 href={item.href}
                 className={`flex flex-col items-center justify-center py-1 transition-colors ${
-                  isActive ? 'text-civic-blue font-semibold' : 'text-ink-secondary hover:text-ink-primary'
+                  isActive ? 'text-civic-terracotta font-semibold' : 'text-ink-secondary hover:text-ink-primary'
                 }`}
               >
                 <Icon className="w-5 h-5 mb-0.5" />

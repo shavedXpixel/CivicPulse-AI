@@ -1,13 +1,11 @@
 import { getCurrentIdToken } from './firebase-client';
 import { getCurrentSessionToken, isSupabaseConfigured } from './supabase-client';
 
-const DEFAULT_TOKEN = 'demo-token-citizen';
-
 export function getAuthToken(): string {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('civicpulse_auth_token') || DEFAULT_TOKEN;
+    return localStorage.getItem('civicpulse_auth_token') || '';
   }
-  return DEFAULT_TOKEN;
+  return '';
 }
 
 export function setAuthToken(token: string): void {
@@ -24,17 +22,10 @@ export function clearAuthToken(): void {
 
 /**
  * Resolves the active authorization token asynchronously.
- * In DEMO_MODE: returns the stored persona demo token.
- * In REAL_MODE: queries Supabase access token (or fallback Firebase ID token).
+ * Production runtime: queries Supabase access token (or fallback Firebase ID token).
+ * Returns empty string if unauthenticated.
  */
 export async function getAuthTokenAsync(): Promise<string> {
-  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
-  if (isDemoMode) {
-    return getAuthToken();
-  }
-
-  // REAL_MODE: Auth provider is authoritative.
-  // Never fall back to demo persona tokens stored in localStorage.
   if (typeof window !== 'undefined') {
     if (isSupabaseConfigured()) {
       try {
@@ -55,7 +46,6 @@ export async function getAuthTokenAsync(): Promise<string> {
     } catch {
       // Token retrieval failed
     }
-    return '';
   }
 
   return '';
@@ -88,25 +78,14 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const customHeaders = (options.headers as Record<string, string>) || {};
-  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
-  
+
   let token = '';
-  if (isDemoMode) {
-    if (customHeaders['Authorization']) {
-      token = customHeaders['Authorization'].replace(/^Bearer\s+/i, '');
-    } else {
-      token = await getAuthTokenAsync();
-    }
+  const customAuth = customHeaders['Authorization']?.replace(/^Bearer\s+/i, '').trim();
+  const isJwt = customAuth && customAuth.split('.').length === 3;
+  if (isJwt) {
+    token = customAuth;
   } else {
-    // REAL_MODE: Firebase Authentication is authoritative.
-    // Never allow synthetic demo tokens (or non-JWT tokens) to override the authenticated Firebase session.
-    const customAuth = customHeaders['Authorization']?.replace(/^Bearer\s+/i, '').trim();
-    const isJwt = customAuth && customAuth.split('.').length === 3;
-    if (isJwt) {
-      token = customAuth;
-    } else {
-      token = await getAuthTokenAsync();
-    }
+    token = await getAuthTokenAsync();
   }
 
   if (token && token.startsWith('Bearer ')) {

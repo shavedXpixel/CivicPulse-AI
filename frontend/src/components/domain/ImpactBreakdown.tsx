@@ -93,23 +93,23 @@ export function ImpactBreakdown({
           return (
             <div
               key={factor.label}
-              className="p-2.5 rounded-lg bg-canvas-subtle/50 border border-ink-border text-xs space-y-1.5"
+              className="p-2.5 rounded-sm bg-canvas-subtle/50 border border-ink-border text-xs space-y-1.5"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 font-medium text-ink-primary">
                   <Icon className="w-3.5 h-3.5 text-ink-tertiary" />
                   <span>{factor.label}</span>
                 </div>
-                <div className="flex items-center gap-2 text-[11px]">
+                <div className="flex items-center gap-2 text-[11px] font-mono">
                   <span className="text-ink-tertiary">Weight {factor.weight}</span>
-                  <span className="font-semibold text-ink-primary">
+                  <span className="font-bold text-ink-primary">
                     {factor.value}/{factor.max}
                   </span>
                 </div>
               </div>
-              <div className="w-full bg-canvas-muted rounded-full h-1 overflow-hidden">
+              <div className="w-full bg-ink-border/50 h-1 overflow-hidden">
                 <div
-                  className="bg-civic-blue h-full rounded-full transition-all"
+                  className="bg-civic-terracotta h-full transition-all"
                   style={{ width: `${pct}%` }}
                 />
               </div>

@@ -80,7 +80,16 @@ export class DashboardController {
         );
       }
 
-      const mapProblems = await DashboardService.getMapData(req.user);
+      const filters = {
+        department_id: req.query.department_id as string | undefined,
+        status: req.query.status as string | undefined,
+        severity: req.query.severity as string | undefined,
+        impact_level: req.query.impact_level as string | undefined,
+        startDate: req.query.startDate as string | undefined,
+        endDate: req.query.endDate as string | undefined
+      };
+
+      const mapProblems = await DashboardService.getMapData(req.user, filters);
       res.status(200).json({
         data: mapProblems
       });

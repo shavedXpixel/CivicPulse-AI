@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app';
-import { ProviderContainer, MockDatabaseProvider } from '../src/providers';
+import { ProviderContainer, MockDatabaseProvider, FirebaseAuthProvider } from '../src/providers';
 import { env } from '../src/config/env';
 import {
   UserRole,
@@ -21,8 +21,10 @@ describe('Phase 10 Step 4: Real-Mode Signal → Analysis → Clustering → Prob
   const officerUid = 'real_officer_pipeline_01';
 
   beforeEach(() => {
+    (env as any).AUTH_PROVIDER = 'firebase';
     ProviderContainer.resetAllProviders();
     ProviderContainer.setDatabaseProvider(new MockDatabaseProvider());
+    ProviderContainer.setAuthProvider(new FirebaseAuthProvider());
     (env as any).DEMO_MODE = false;
     app = createApp();
 

@@ -59,10 +59,12 @@ export class GovernanceService {
             retrievedData.problems = res.problems;
             evidenceLabelsSet.add(res.evidence_label);
           } else if (toolName === 'getProblemDetails') {
-            const probId = plan.extracted_entities.problem_id || 'PRB-2026-0819';
-            const res = await GovernanceTools.getProblemDetails(user, { problem_id: probId });
-            retrievedData.problem = res.problem;
-            evidenceLabelsSet.add(res.evidence_label);
+            const probId = plan.extracted_entities.problem_id || (env.DEMO_MODE ? 'PRB-2026-0819' : undefined);
+            if (probId) {
+              const res = await GovernanceTools.getProblemDetails(user, { problem_id: probId });
+              retrievedData.problem = res.problem;
+              evidenceLabelsSet.add(res.evidence_label);
+            }
           } else if (toolName === 'getWardImpact') {
             const res = await GovernanceTools.getWardImpact(user, {
               ward_id: plan.extracted_entities.ward_id
@@ -99,16 +101,20 @@ export class GovernanceService {
             retrievedData.facility_problems = res.facility_problems;
             evidenceLabelsSet.add(res.evidence_label);
           } else if (toolName === 'getResolutionPerformance') {
-            const probId = plan.extracted_entities.problem_id || 'PRB-2026-0819';
-            const res = await GovernanceTools.getResolutionPerformance(user, { problem_id: probId });
-            retrievedData.evidence = res.evidence;
-            retrievedData.verification = res.verification;
-            evidenceLabelsSet.add(res.evidence_label);
+            const probId = plan.extracted_entities.problem_id || (env.DEMO_MODE ? 'PRB-2026-0819' : undefined);
+            if (probId) {
+              const res = await GovernanceTools.getResolutionPerformance(user, { problem_id: probId });
+              retrievedData.evidence = res.evidence;
+              retrievedData.verification = res.verification;
+              evidenceLabelsSet.add(res.evidence_label);
+            }
           } else if (toolName === 'getProblemTimeline') {
-            const probId = plan.extracted_entities.problem_id || 'PRB-2026-0819';
-            const res = await GovernanceTools.getProblemTimeline(user, { problem_id: probId });
-            retrievedData.actions = res.actions;
-            evidenceLabelsSet.add(res.evidence_label);
+            const probId = plan.extracted_entities.problem_id || (env.DEMO_MODE ? 'PRB-2026-0819' : undefined);
+            if (probId) {
+              const res = await GovernanceTools.getProblemTimeline(user, { problem_id: probId });
+              retrievedData.actions = res.actions;
+              evidenceLabelsSet.add(res.evidence_label);
+            }
           }
         } catch (err) {
           // If a scoped query fails (e.g. Department Officer query on another department), bubble 403

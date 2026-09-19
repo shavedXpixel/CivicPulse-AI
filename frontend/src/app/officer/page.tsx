@@ -19,7 +19,6 @@ import {
   AlertTriangle,
   Play,
   RefreshCw,
-  UserCheck,
   ShieldAlert,
 } from 'lucide-react';
 
@@ -28,8 +27,7 @@ interface AssignmentWithProblem extends Assignment {
 }
 
 export default function OfficerPage() {
-  const { user, userProfile, isDemoMode, loading: authLoading } = useAuth();
-  const [officerToken, setOfficerToken] = useState<'demo-token-officer' | 'demo-token-field-drainage'>('demo-token-officer');
+  const { user, userProfile, loading: authLoading } = useAuth();
   const [assignments, setAssignments] = useState<AssignmentWithProblem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -40,10 +38,8 @@ export default function OfficerPage() {
     setLoading(true);
     setActionError(null);
     try {
-      const headers = isDemoMode ? { Authorization: `Bearer ${officerToken}` } : undefined;
       const res = await apiClient.get<{ data: AssignmentWithProblem[] }>(
-        '/api/v1/assignments?assigned_to=me',
-        headers
+        '/api/v1/assignments?assigned_to=me'
       );
       if (res?.data) {
         setAssignments(res.data);
@@ -53,30 +49,28 @@ export default function OfficerPage() {
     } finally {
       setLoading(false);
     }
-  }, [officerToken, isDemoMode]);
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
-    if (!isDemoMode && !user) {
+    if (!user) {
       setLoading(false);
       return;
     }
     fetchAssignments();
-  }, [authLoading, isDemoMode, user, fetchAssignments]);
+  }, [authLoading, user, fetchAssignments]);
 
   const handleStartWork = async (problemId: string) => {
     setActionLoading(problemId);
     setActionSuccess(null);
     setActionError(null);
     try {
-      const headers = isDemoMode ? { Authorization: `Bearer ${officerToken}` } : undefined;
       await apiClient.post(
         `/api/v1/problems/${problemId}/actions`,
         {
           action: 'STARTED_WORK',
           note: 'Field crew deployed on site and initiated maintenance protocol.',
-        },
-        headers
+        }
       );
       setActionSuccess(`Work successfully commenced on problem ${problemId}! State transitioned to IN_PROGRESS.`);
       await fetchAssignments();
@@ -96,14 +90,12 @@ export default function OfficerPage() {
     setActionSuccess(null);
     setActionError(null);
     try {
-      const headers = isDemoMode ? { Authorization: `Bearer ${officerToken}` } : undefined;
       await apiClient.post(
         `/api/v1/problems/${problemId}/actions`,
         {
           action: 'VERIFICATION_REQUESTED',
           note: 'Field repairs completed. Restored infrastructure submitted for supervisory verification.',
-        },
-        headers
+        }
       );
       setActionSuccess(`Verification requested for ${problemId}! State transitioned to AWAITING_VERIFICATION.`);
       await fetchAssignments();
@@ -121,7 +113,6 @@ export default function OfficerPage() {
   return (
     <OfficerShell>
       <div className="space-y-6">
-        {/* Header with Officer Persona Switcher (Demo Mode Only) */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <PageHeader
             title="Field Operations Queue"
@@ -132,48 +123,18 @@ export default function OfficerPage() {
               </span>
             }
           />
-
-          {/* Persona Switcher for Verification in DEMO_MODE */}
-          {isDemoMode && (
-            <div className="flex items-center gap-2 bg-white p-1.5 rounded-lg border border-ink-border shadow-subtle text-xs">
-              <span className="text-ink-tertiary font-medium px-2 flex items-center gap-1">
-                <UserCheck className="w-3.5 h-3.5 text-civic-blue" />
-                <span>Officer Scope:</span>
-              </span>
-              <button
-                onClick={() => setOfficerToken('demo-token-officer')}
-                className={`px-2.5 py-1 rounded font-semibold transition-colors ${
-                  officerToken === 'demo-token-officer'
-                    ? 'bg-civic-blue text-white shadow-subtle'
-                    : 'text-ink-secondary hover:bg-canvas-subtle'
-                }`}
-              >
-                Rajesh K. (WATCO)
-              </button>
-              <button
-                onClick={() => setOfficerToken('demo-token-field-drainage')}
-                className={`px-2.5 py-1 rounded font-semibold transition-colors ${
-                  officerToken === 'demo-token-field-drainage'
-                    ? 'bg-civic-blue text-white shadow-subtle'
-                    : 'text-ink-secondary hover:bg-canvas-subtle'
-                }`}
-              >
-                Suresh P. (Drainage)
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Action alerts */}
         {actionSuccess && (
-          <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center gap-2">
+          <div className="p-3.5 bg-emerald-50 border border-emerald-300 font-mono text-xs text-emerald-900 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span className="font-semibold">{actionSuccess}</span>
           </div>
         )}
 
         {actionError && (
-          <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-900 flex items-center gap-2">
+          <div className="p-3.5 bg-rose-50 border border-rose-300 font-mono text-xs text-rose-900 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
             <span className="font-semibold">{actionError}</span>
           </div>
@@ -181,18 +142,16 @@ export default function OfficerPage() {
 
         {/* Work Queue List */}
         {loading ? (
-          <div className="p-8 rounded-xl border border-ink-border bg-white shadow-card flex items-center justify-center text-xs text-ink-tertiary gap-2">
-            <RefreshCw className="w-4 h-4 animate-spin text-civic-blue" />
+          <div className="p-8 border border-ink-border bg-canvas-card flex items-center justify-center text-xs text-ink-tertiary gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin text-civic-terracotta" />
             <span>Loading scoped officer tasks...</span>
           </div>
         ) : assignments.length === 0 ? (
-          <div className="p-12 rounded-xl border border-ink-border bg-white shadow-card text-center space-y-2">
+          <div className="p-12 border border-ink-border bg-canvas-card text-center space-y-2">
             <CheckCircle2 className="w-8 h-8 text-civic-emerald mx-auto" />
             <h3 className="text-sm font-bold text-ink-primary">No Operational Problems Assigned</h3>
             <p className="text-xs text-ink-secondary max-w-sm mx-auto">
-              {isDemoMode
-                ? 'You are current on all assigned tasks. New dispatches will appear here once explicitly assigned by department leadership.'
-                : `No active work orders are currently assigned to ${userProfile?.display_name || user?.email || 'your officer account'}. As emergency dispatches or infrastructure work orders are assigned by WATCO leadership, they will appear here in real time.`}
+              No active work orders are currently assigned to {userProfile?.display_name || user?.email || 'your officer account'}. As emergency dispatches or infrastructure work orders are assigned by department leadership, they will appear here in real time.
             </p>
           </div>
         ) : (
@@ -217,7 +176,7 @@ export default function OfficerPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                            isCritical ? 'bg-civic-roseLight text-civic-rose' : 'bg-civic-blueLight text-civic-blueDark'
+                            isCritical ? 'bg-civic-roseLight text-civic-rose' : 'bg-civic-blueLight text-civic-terracottaDark'
                           }`}
                         >
                           {isCritical ? 'EMERGENCY DISPATCH' : 'SCHEDULED WORK ORDER'}
@@ -225,13 +184,8 @@ export default function OfficerPage() {
                         <span className="text-xs font-mono text-ink-tertiary">
                           Assignment #{assignment.id} • Problem #{assignment.problem_id}
                         </span>
-                        {problem?.is_demo && (
-                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                            DEMO SEED
-                          </span>
-                        )}
                       </div>
-                      <h2 className="text-lg font-bold text-ink-primary">
+                      <h2 className="text-xl font-serif font-bold text-ink-primary">
                         {problem?.title || `Problem Incident #${assignment.problem_id}`}
                       </h2>
                     </div>
@@ -304,9 +258,8 @@ export default function OfficerPage() {
                   <div className="pt-2 flex flex-wrap items-center gap-3">
                     {problem?.status === 'ASSIGNED' && (
                       <Button
-                        variant="primary"
                         size="md"
-                        className="gap-2 bg-civic-blue hover:bg-blue-700"
+                        className="gap-2 bg-civic-terracotta text-white hover:bg-civic-terracottaDark font-mono uppercase text-xs"
                         disabled={actionLoading === problem.id}
                         onClick={() => handleStartWork(problem.id)}
                       >
@@ -317,9 +270,8 @@ export default function OfficerPage() {
 
                     {problem?.status === 'IN_PROGRESS' && (
                       <Button
-                        variant="primary"
                         size="md"
-                        className="gap-2 bg-civic-emerald hover:bg-emerald-700"
+                        className="gap-2 bg-civic-terracotta text-white hover:bg-civic-terracottaDark font-mono uppercase text-xs"
                         disabled={actionLoading === problem.id}
                         onClick={() => handleRequestVerification(problem.id)}
                       >
@@ -342,7 +294,7 @@ export default function OfficerPage() {
 
                     <Link
                       href={`/dashboard/problems/${assignment.problem_id}`}
-                      className="text-xs font-semibold text-civic-blue hover:underline ml-auto"
+                      className="text-xs font-semibold text-civic-terracotta hover:underline ml-auto"
                     >
                       Inspect Problem Dossier →
                     </Link>
@@ -358,7 +310,7 @@ export default function OfficerPage() {
           <h3 className="text-sm font-bold text-ink-primary uppercase tracking-wider">
             Completed Tasks Today
           </h3>
-          <div className="p-4 rounded-xl border border-ink-border bg-white shadow-card flex items-center justify-between text-xs">
+          <div className="p-4 border border-ink-border bg-canvas-card flex items-center justify-between text-xs">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-ink-primary">Valve Pressure Check #WO-398</span>

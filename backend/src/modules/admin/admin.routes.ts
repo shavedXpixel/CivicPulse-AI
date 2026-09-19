@@ -1,36 +1,18 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router } from 'express';
 import { authMiddleware } from '../../middleware/auth.middleware';
 import { requireRole } from '../../middleware/rbac.middleware';
-import { UserRole, ERROR_CODES } from '@civicpulse/shared';
-import { AppError } from '../../middleware/error.middleware';
+import { UserRole } from '@civicpulse/shared';
 import { env } from '../../config/env';
 import { AdminController } from './admin.controller';
 
 const router = Router();
 
-/**
- * Strict presentation safety guard:
- * Unconditionally blocks demo reset requests when DEMO_MODE is false, protecting REAL_MODE and Firestore.
- */
-const demoOnlyGuard = (_req: Request, _res: Response, next: NextFunction) => {
-  if (!env.DEMO_MODE) {
-    return next(
-      new AppError({
-        statusCode: 403,
-        code: ERROR_CODES.FORBIDDEN,
-        message: 'Demo reset is strictly disabled when DEMO_MODE is false (REAL_MODE active). Firestore data is protected.'
-      })
-    );
-  }
-  next();
-};
-
 // POST /api/v1/admin/reset-demo
-// Order of defense:
-// 1. Verify DEMO_MODE is active (REAL_MODE cannot invoke)
-// 2. Verify authentication
-// 3. Verify ADMIN authorization
-router.post('/reset-demo', demoOnlyGuard, authMiddleware, requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN), AdminController.resetDemo);
+// Mounted ONLY in isolated test/dev runtime when DEMO_MODE is true.
+// In production runtime (DEMO_MODE=false), this route does not exist -> 404.
+if (env.DEMO_MODE) {
+  router.post('/reset-demo', authMiddleware, requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN), AdminController.resetDemo);
+}
 
 // POST /api/v1/admin/departments
 router.post('/departments', authMiddleware, requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN), AdminController.createDepartment);

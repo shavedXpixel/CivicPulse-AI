@@ -7,30 +7,33 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Light-first civic infrastructure palette (docs/04_DESIGN.md)
+        // Editorial Civic Infrastructure Palette (Warm paper, dark ink, terracotta accent)
         canvas: {
-          DEFAULT: '#F8FAFC', // Slate 50 near-white base
-          subtle: '#F1F5F9',  // Slate 100
-          card: '#FFFFFF',    // Pure white for panels
-          muted: '#E2E8F0',   // Slate 200
+          DEFAULT: '#F4F0EA', // Warm paper / cream base
+          subtle: '#ECE7DF',  // Editorial section tint
+          card: '#FCFAF7',    // Crisp warm paper surface
+          muted: '#E4DFD5',   // Subtle rule tone
         },
         ink: {
-          primary: '#0F172A',   // Deep graphite (Slate 900)
-          secondary: '#475569', // Muted charcoal (Slate 600)
-          tertiary: '#94A3B8',  // Subtle slate (Slate 400)
-          border: '#E2E8F0',    // Subtle line separator (Slate 200)
+          primary: '#1A1816',   // Deep printer ink / carbon
+          secondary: '#5C5852', // Warm graphite
+          tertiary: '#948F86',  // Technical stone / pencil gray
+          border: '#DDD7CD',    // Thin architectural grid line
         },
         civic: {
-          blue: '#0284C7',     // Restrained Civic Sky/Blue
-          blueDark: '#0369A1', // Deep Civic Blue
-          blueLight: '#E0F2FE',// Soft Blue Tint
-          teal: '#0D9488',     // Muted Teal
-          amber: '#D97706',    // Muted Amber for medium priority
-          amberLight: '#FEF3C7',
-          emerald: '#16A34A',  // Muted Emerald for resolved/active
-          emeraldLight: '#DCFCE7',
-          rose: '#DC2626',     // Muted Rose for high severity
-          roseLight: '#FEE2E2',
+          blue: '#C85A32',     // Restrained Terracotta primary accent
+          blueDark: '#A84320', // Deep Terracotta rust
+          blueLight: '#F7EBE4',// Soft Terracotta cream tint
+          terracotta: '#C85A32',
+          terracottaDark: '#A84320',
+          terracottaLight: '#F7EBE4',
+          teal: '#2E6F40',     // Subtle Olive
+          amber: '#B26A00',    // Muted Ochre
+          amberLight: '#F9EED9',
+          emerald: '#2E6F40',  // Muted Olive Emerald
+          emeraldLight: '#E6EFE8',
+          rose: '#B83232',     // Muted Brick Red
+          roseLight: '#F9E8E8',
         },
       },
       fontFamily: {
@@ -38,16 +41,18 @@ const config: Config = {
         mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
       },
       boxShadow: {
-        'subtle': '0 1px 2px 0 rgba(15, 23, 42, 0.04)',
-        'card': '0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.05)',
-        'elevated': '0 4px 12px -2px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.04)',
+        'none': 'none',
+        'subtle': '0 1px 2px 0 rgba(26, 24, 22, 0.04)',
+        'card': 'none',
+        'elevated': '0 2px 8px 0 rgba(26, 24, 22, 0.06)',
       },
       borderRadius: {
-        'sm': '6px',
-        'md': '8px',
-        'lg': '10px',
-        'xl': '12px',
-        '2xl': '16px',
+        'none': '0px',
+        'sm': '2px',
+        'md': '4px',
+        'lg': '6px',
+        'xl': '8px',
+        '2xl': '12px',
       },
     },
   },

@@ -4,9 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { GovernmentShell } from '../../../components/shells/GovernmentShell';
 import { PageHeader } from '../../../components/ui/PageHeader';
-import { DEMO_DEPARTMENTS } from '../../../lib/mockData';
 import { apiClient } from '../../../lib/api-client';
-import { useAuth } from '../../../context/AuthContext';
 import { Department, DepartmentWorkload } from '@civicpulse/shared';
 import { Building2, AlertTriangle, ShieldAlert, CheckCircle2, RefreshCw, ArrowRight } from 'lucide-react';
 
@@ -15,7 +13,6 @@ interface DepartmentWithWorkload extends Department {
 }
 
 export default function DepartmentsPage() {
-  const { isDemoMode } = useAuth();
   const [departments, setDepartments] = useState<DepartmentWithWorkload[]>([]);
   const [officersByDept, setOfficersByDept] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
@@ -51,20 +48,18 @@ export default function DepartmentsPage() {
       }
     } catch (err: any) {
       console.warn('Could not load departments from API:', err);
-      if (!isDemoMode) {
-        setError(err.message || 'Failed to load departmental workloads.');
-        setDepartments([]);
-      }
+      setError(err.message || 'Failed to load departmental workloads.');
+      setDepartments([]);
     } finally {
       setLoading(false);
     }
-  }, [isDemoMode]);
+  }, []);
 
   useEffect(() => {
     loadDepartmentData();
   }, [loadDepartmentData]);
 
-  const displayDepts = departments.length > 0 ? departments : (isDemoMode ? (DEMO_DEPARTMENTS as any[]) : []);
+  const displayDepts = departments;
 
   return (
     <GovernmentShell>
@@ -109,8 +104,8 @@ export default function DepartmentsPage() {
         )}
 
         {loading ? (
-          <div className="p-12 rounded-xl border border-ink-border bg-white shadow-card flex items-center justify-center text-xs text-ink-tertiary gap-2">
-            <RefreshCw className="w-4 h-4 animate-spin text-civic-blue" />
+          <div className="p-12 border border-ink-border bg-canvas-card flex items-center justify-center text-xs font-mono text-ink-muted gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin text-civic-terracotta" />
             <span>Loading departmental operations workload...</span>
           </div>
         ) : displayDepts.length > 0 ? (
@@ -127,74 +122,74 @@ export default function DepartmentsPage() {
               return (
                 <div
                   key={deptId}
-                  className="p-6 rounded-xl border border-ink-border bg-white shadow-card space-y-4 hover:shadow-cardHover transition-shadow"
+                  className="p-6 border border-ink-border bg-canvas-card space-y-4"
                 >
-                  <div className="flex items-start justify-between border-b border-ink-border/60 pb-3">
+                  <div className="flex items-start justify-between border-b border-ink-border pb-3">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-civic-blue shrink-0" />
-                        <h3 className="text-sm font-bold text-ink-primary">{dept.name}</h3>
+                        <Building2 className="w-4 h-4 text-civic-terracotta shrink-0" />
+                        <h3 className="text-base font-serif font-bold text-ink-primary">{dept.name}</h3>
                       </div>
-                      <span className="text-[11px] font-mono text-ink-tertiary">
-                        Code: {dept.short_name || dept.id} • Tier 1 Municipal
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-ink-muted">
+                        Code: {dept.short_name || dept.id} • Tier 1
                       </span>
                     </div>
 
                     {breachedCount > 0 ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-civic-roseLight text-civic-rose flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-xs text-[10px] font-mono font-bold uppercase bg-rose-50 text-civic-terracotta border border-rose-300 flex items-center gap-1">
                         <ShieldAlert className="w-3 h-3" />
                         <span>{breachedCount} Breached</span>
                       </span>
                     ) : atRiskCount > 0 ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-civic-amberLight text-amber-900 flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-xs text-[10px] font-mono font-bold uppercase bg-amber-50 text-amber-900 border border-amber-300 flex items-center gap-1">
                         <AlertTriangle className="w-3 h-3" />
                         <span>{atRiskCount} At Risk</span>
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-civic-emeraldLight text-emerald-800 flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-xs text-[10px] font-mono font-bold uppercase bg-emerald-50 text-emerald-800 border border-emerald-300 flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" />
                         <span>Compliant</span>
                       </span>
                     )}
                   </div>
 
-                  <p className="text-xs text-ink-secondary line-clamp-2">
+                  <p className="text-xs text-ink-secondary line-clamp-2 leading-relaxed">
                     {dept.description || 'Municipal public works and engineering division.'}
                   </p>
 
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="p-3 rounded-lg bg-canvas-subtle border border-ink-border space-y-0.5">
-                      <div className="text-[10px] text-ink-tertiary uppercase tracking-wider font-semibold">
-                        ACTIVE IN PROGRESS
+                  <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                    <div className="p-3 bg-canvas-subtle border border-ink-border space-y-0.5">
+                      <div className="text-[10px] text-ink-muted uppercase tracking-wider font-semibold">
+                        ACTIVE WORK
                       </div>
-                      <div className="text-lg font-bold text-ink-primary">
+                      <div className="text-base font-bold text-ink-primary">
                         {activeCount}
                       </div>
                     </div>
 
-                    <div className="p-3 rounded-lg bg-canvas-subtle border border-ink-border space-y-0.5">
-                      <div className="text-[10px] text-ink-tertiary uppercase tracking-wider font-semibold">
-                        CRITICAL / HIGH
+                    <div className="p-3 bg-canvas-subtle border border-ink-border space-y-0.5">
+                      <div className="text-[10px] text-ink-muted uppercase tracking-wider font-semibold">
+                        HIGH IMPACT
                       </div>
-                      <div className="text-lg font-bold text-civic-rose">
+                      <div className="text-base font-bold text-civic-terracotta">
                         {highImpactCount}
                       </div>
                     </div>
 
-                    <div className="p-3 rounded-lg bg-canvas-subtle border border-ink-border space-y-0.5">
-                      <div className="text-[10px] text-ink-tertiary uppercase tracking-wider font-semibold">
+                    <div className="p-3 bg-canvas-subtle border border-ink-border space-y-0.5">
+                      <div className="text-[10px] text-ink-muted uppercase tracking-wider font-semibold">
                         SLA AT RISK
                       </div>
-                      <div className="text-lg font-bold text-civic-amber">
+                      <div className="text-base font-bold text-amber-800">
                         {atRiskCount}
                       </div>
                     </div>
 
-                    <div className="p-3 rounded-lg bg-canvas-subtle border border-ink-border space-y-0.5">
-                      <div className="text-[10px] text-ink-tertiary uppercase tracking-wider font-semibold">
+                    <div className="p-3 bg-canvas-subtle border border-ink-border space-y-0.5">
+                      <div className="text-[10px] text-ink-muted uppercase tracking-wider font-semibold">
                         TOTAL QUEUED
                       </div>
-                      <div className="text-lg font-bold text-civic-blue">
+                      <div className="text-base font-bold text-ink-primary">
                         {totalAssigned}
                       </div>
                     </div>
@@ -202,14 +197,14 @@ export default function DepartmentsPage() {
 
                   {officersByDept[deptId] && officersByDept[deptId].length > 0 && (
                     <div className="pt-2 border-t border-ink-border/40 text-[11px] space-y-1.5">
-                      <span className="font-semibold text-ink-primary">
+                      <span className="font-mono text-[10px] uppercase text-ink-muted">
                         Department Personnel ({officersByDept[deptId].length}):
                       </span>
                       <div className="flex flex-wrap gap-1.5">
                         {officersByDept[deptId].map((off: any) => (
                           <span
                             key={off.id}
-                            className="px-2 py-0.5 rounded bg-canvas-subtle border border-ink-border text-ink-secondary text-[10px] font-mono"
+                            className="px-2 py-0.5 bg-canvas-subtle border border-ink-border text-ink-secondary text-[10px] font-mono"
                           >
                             {off.display_name} • {off.role.replace(/_/g, ' ')}
                           </span>
@@ -218,7 +213,7 @@ export default function DepartmentsPage() {
                     </div>
                   )}
 
-                  <div className="pt-2 border-t border-ink-border/60 flex items-center justify-between text-xs font-semibold text-civic-blue">
+                  <div className="pt-2 border-t border-ink-border flex items-center justify-between text-xs font-mono uppercase text-civic-terracotta">
                     <Link
                       href={`/dashboard/problems?department=${deptId}`}
                       className="hover:underline flex items-center gap-1 w-full justify-between"
@@ -232,10 +227,10 @@ export default function DepartmentsPage() {
             })}
           </div>
         ) : (
-          <div className="p-12 rounded-xl border border-ink-border bg-white text-center space-y-2">
-            <Building2 className="w-8 h-8 text-ink-tertiary mx-auto" />
-            <p className="text-sm font-semibold text-ink-primary">No departments recorded</p>
-            <p className="text-xs text-ink-secondary">
+          <div className="p-12 border border-ink-border bg-canvas-card text-center space-y-2">
+            <Building2 className="w-8 h-8 text-ink-muted mx-auto" />
+            <p className="text-sm font-serif font-bold text-ink-primary">No departments recorded</p>
+            <p className="text-xs text-ink-secondary font-mono">
               Municipal department directory has no active agency records.
             </p>
           </div>

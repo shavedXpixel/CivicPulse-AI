@@ -27,13 +27,13 @@ export function FilterBar({
   onReset,
 }: FilterBarProps) {
   return (
-    <div className="p-4 rounded-xl border border-ink-border bg-white shadow-card space-y-3">
+    <div className="p-4 rounded-sm border border-ink-border bg-canvas-card shadow-none space-y-3">
       <div className="flex items-center justify-between text-xs font-mono text-ink-secondary">
         <div className="flex items-center gap-2">
-          <Filter className="w-3.5 h-3.5 text-civic-blue" />
-          <span className="font-semibold uppercase tracking-wider">Operational Filters</span>
+          <Filter className="w-3.5 h-3.5 text-civic-terracotta" />
+          <span className="font-semibold uppercase tracking-widest text-[10px] text-ink-primary">Operational Filters</span>
         </div>
-        <Button variant="ghost" size="sm" onClick={onReset} className="h-7 text-xs">
+        <Button variant="ghost" size="sm" onClick={onReset} className="h-7 text-xs font-mono">
           <RotateCcw className="w-3 h-3 mr-1" />
           <span>Reset Filters</span>
         </Button>

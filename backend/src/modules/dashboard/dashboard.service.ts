@@ -143,21 +143,115 @@ export class DashboardService {
   }
 
   /**
-   * Returns geo-located problems for map rendering scoped to caller.
+   * Returns geo-located problems for map rendering scoped to caller with RBAC enforcement.
    */
-  public static async getMapData(user: UserProfile): Promise<ProblemCluster[]> {
+  public static async getMapData(
+    user: UserProfile,
+    filters?: {
+      department_id?: string;
+      status?: string;
+      severity?: string;
+      impact_level?: string;
+      startDate?: string;
+      endDate?: string;
+    }
+  ): Promise<ProblemCluster[]> {
     const db = getDatabaseProvider();
     const result = await db.listProblemClusters({ limit: 100 });
     let problems = result.data;
 
-    if (user.role === UserRole.FIELD_OFFICER) {
+    // 1. Strict Server-Side RBAC Enforcement
+    if (user.role === UserRole.CITIZEN) {
+      // Citizens only see problem locations linked to their own reports
+      const citizenSignals = await db.listSignals({ citizen_id: user.id, limit: 100 });
+      const problemIds = new Set(
+        citizenSignals.data
+          .map((s) => s.problem_cluster_id)
+          .filter((id): id is string => Boolean(id))
+      );
+
+      let citizenProblems = problems.filter((p) => problemIds.has(p.id));
+
+      // If signals are not yet attached to clusters, surface signal locations as standalone points
+      if (citizenProblems.length === 0 && citizenSignals.data.length > 0) {
+        citizenProblems = citizenSignals.data
+          .filter((s) => s.location && typeof s.location.lat === 'number' && typeof s.location.lng === 'number')
+          .map((s) => ({
+            id: s.id,
+            title: s.original_text ? s.original_text.slice(0, 80) : 'Citizen Report',
+            category: s.category || 'MUNICIPAL',
+            department_id: s.recommended_department,
+            ward_id: s.ward_id,
+            location: s.location,
+            status: ProblemStatus.NEW,
+            signal_count: 1,
+            impact_score: 50,
+            impact_level: ImpactLevel.MEDIUM,
+            severity_score: 10,
+            population_score: 10,
+            duration_score: 10,
+            concentration_score: 10,
+            critical_exposure_score: 5,
+            recurrence_score: 5,
+            evidence_score: 0,
+            first_detected_at: s.created_at,
+            last_updated_at: s.updated_at,
+            created_at: s.created_at
+          } as ProblemCluster));
+      }
+
+      problems = citizenProblems;
+    } else if (user.role === UserRole.FIELD_OFFICER) {
+      // Field officers only receive assigned problem locations
       problems = problems.filter((p) => p.assigned_to === user.id);
-    } else if (user.role === UserRole.DEPARTMENT_OFFICER && user.department_id) {
+    } else if (user.role === UserRole.DEPARTMENT_OFFICER) {
+      // Department officers strictly receive their own department locations
+      // Query manipulation attempt to override department is ignored
+      if (!user.department_id) {
+        return [];
+      }
       problems = problems.filter((p) => p.department_id === user.department_id);
+    } else if ((user.role === UserRole.ADMIN || user.role === UserRole.SYSTEM_ADMIN) && filters?.department_id) {
+      // Admins may optionally filter by department
+      problems = problems.filter((p) => p.department_id === filters.department_id);
     }
 
+    // 2. Real Filter Application
+    if (filters?.status) {
+      problems = problems.filter((p) => p.status === filters.status);
+    }
+
+    const targetSeverity = filters?.impact_level || filters?.severity;
+    if (targetSeverity) {
+      problems = problems.filter((p) => p.impact_level === targetSeverity);
+    }
+
+    if (filters?.startDate) {
+      const startMs = new Date(filters.startDate).getTime();
+      if (!isNaN(startMs)) {
+        problems = problems.filter((p) => new Date(p.created_at).getTime() >= startMs);
+      }
+    }
+
+    if (filters?.endDate) {
+      const endMs = new Date(filters.endDate).getTime();
+      if (!isNaN(endMs)) {
+        problems = problems.filter((p) => new Date(p.created_at).getTime() <= endMs);
+      }
+    }
+
+    // 3. Valid Geographic Coordinates Only (-90..90, -180..180)
     return problems
-      .filter((p) => p.location && p.location.lat && p.location.lng)
+      .filter(
+        (p) =>
+          p.location &&
+          typeof p.location.lat === 'number' &&
+          typeof p.location.lng === 'number' &&
+          p.location.lat >= -90 &&
+          p.location.lat <= 90 &&
+          p.location.lng >= -180 &&
+          p.location.lng <= 180
+      )
       .map((p) => ({
         ...p,
         sla_state: SLAService.computeSLAState(p)

@@ -24,7 +24,7 @@ import { apiClient } from '../../lib/api-client';
 import { UserRole, UserProfile, Department } from '@civicpulse/shared';
 
 export default function AdminPage() {
-  const { user, userProfile, loading: authLoading, isDemoMode, getIdToken } = useAuth();
+  const { user, userProfile, loading: authLoading, getIdToken } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'provisioning' | 'users' | 'departments' | 'specs'>('provisioning');
 
@@ -55,12 +55,9 @@ export default function AdminPage() {
   const [userSearch, setUserSearch] = useState('');
 
   const getHeaders = useCallback(async (): Promise<Record<string, string> | undefined> => {
-    if (isDemoMode) {
-      return { Authorization: 'Bearer demo-token-admin' };
-    }
     const token = await getIdToken();
     return token ? { Authorization: `Bearer ${token}` } : undefined;
-  }, [isDemoMode, getIdToken]);
+  }, [getIdToken]);
 
   const loadDirectoryData = useCallback(async () => {
     setLoadingData(true);
@@ -195,9 +192,8 @@ export default function AdminPage() {
     }
   };
 
-  // Check RBAC permission in REAL_MODE
+  // Check RBAC permission
   const isAuthorizedAdmin =
-    isDemoMode ||
     userProfile?.role === UserRole.ADMIN ||
     userProfile?.role === UserRole.SYSTEM_ADMIN;
 
@@ -219,7 +215,7 @@ export default function AdminPage() {
           description="Authoritative government identity provisioning, municipal department registry, and platform compliance."
           badge={
             <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-purple-100 text-purple-900 border border-purple-200">
-              {isDemoMode ? 'ADMIN_SHELL' : 'LIVE AUTHORITY'}
+              LIVE AUTHORITY
             </span>
           }
           actions={
@@ -259,7 +255,7 @@ export default function AdminPage() {
 
         {/* Error Alert */}
         {dataError && (
-          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-900 flex items-start gap-2">
+          <div className="p-3 bg-rose-50 border border-rose-300 font-mono text-xs text-rose-900 flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             <span>{dataError}</span>
           </div>
@@ -269,7 +265,7 @@ export default function AdminPage() {
         <div className="flex items-center gap-2 border-b border-ink-border pb-2 overflow-x-auto text-xs font-semibold">
           <button
             onClick={() => setActiveTab('provisioning')}
-            className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+            className={`px-4 py-2 font-mono uppercase text-xs transition-colors flex items-center gap-2 ${
               activeTab === 'provisioning'
                 ? 'bg-ink-primary text-white shadow-subtle'
                 : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
@@ -280,7 +276,7 @@ export default function AdminPage() {
           </button>
           <button
             onClick={() => setActiveTab('users')}
-            className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+            className={`px-4 py-2 font-mono uppercase text-xs transition-colors flex items-center gap-2 ${
               activeTab === 'users'
                 ? 'bg-ink-primary text-white shadow-subtle'
                 : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
@@ -291,7 +287,7 @@ export default function AdminPage() {
           </button>
           <button
             onClick={() => setActiveTab('departments')}
-            className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+            className={`px-4 py-2 font-mono uppercase text-xs transition-colors flex items-center gap-2 ${
               activeTab === 'departments'
                 ? 'bg-ink-primary text-white shadow-subtle'
                 : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
@@ -302,7 +298,7 @@ export default function AdminPage() {
           </button>
           <button
             onClick={() => setActiveTab('specs')}
-            className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+            className={`px-4 py-2 font-mono uppercase text-xs transition-colors flex items-center gap-2 ${
               activeTab === 'specs'
                 ? 'bg-ink-primary text-white shadow-subtle'
                 : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
@@ -318,9 +314,9 @@ export default function AdminPage() {
           <div className="space-y-8">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Form 1: Create Department */}
-              <div className="bg-white p-6 rounded-2xl border border-ink-border shadow-card space-y-5">
+              <div className="bg-canvas-card p-6 border border-ink-border space-y-5">
                 <div className="flex items-center gap-2.5 pb-3 border-b border-ink-border">
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-civic-blue flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-civic-terracotta flex items-center justify-center">
                     <Building2 className="w-4 h-4" />
                   </div>
                   <div>
@@ -330,14 +326,14 @@ export default function AdminPage() {
                 </div>
 
                 {deptSuccess && (
-                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2">
+                  <div className="p-3 bg-emerald-50 border border-emerald-300 font-mono text-xs text-emerald-900 flex items-start gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <span>{deptSuccess}</span>
                   </div>
                 )}
 
                 {deptError && (
-                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-900 flex items-start gap-2">
+                  <div className="p-3 bg-rose-50 border border-rose-300 font-mono text-xs text-rose-900 flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                     <span>{deptError}</span>
                   </div>
@@ -353,7 +349,7 @@ export default function AdminPage() {
                       value={deptCode}
                       onChange={(e) => setDeptCode(e.target.value)}
                       placeholder="BMC_ROADS"
-                      className="w-full px-3 py-2 rounded-lg border border-ink-border bg-canvas-subtle focus:bg-white focus:outline-none focus:border-civic-blue uppercase font-mono text-ink-primary transition-colors"
+                      className="w-full px-3 py-2 rounded-lg border border-ink-border bg-canvas-subtle focus:bg-white focus:outline-none focus:border-civic-terracotta uppercase font-mono text-ink-primary transition-colors"
                     />
                   </div>
 
@@ -365,7 +361,7 @@ export default function AdminPage() {
                       value={deptName}
                       onChange={(e) => setDeptName(e.target.value)}
                       placeholder="BMC Roads & Infrastructure Division"
-                      className="w-full px-3 py-2 rounded-lg border border-ink-border bg-canvas-subtle focus:bg-white focus:outline-none focus:border-civic-blue text-ink-primary transition-colors"
+                      className="w-full px-3 py-2 rounded-lg border border-ink-border bg-canvas-subtle focus:bg-white focus:outline-none focus:border-civic-terracotta text-ink-primary transition-colors"
                     />
                   </div>
 
@@ -376,14 +372,14 @@ export default function AdminPage() {
                       value={deptDesc}
                       onChange={(e) => setDeptDesc(e.target.value)}
                       placeholder="Citywide municipal road maintenance, pothole repairs, and asphalt engineering."
-                      className="w-full px-3 py-2 rounded-lg border border-ink-border bg-canvas-subtle focus:bg-white focus:outline-none focus:border-civic-blue text-ink-primary transition-colors"
+                      className="w-full px-3 py-2 rounded-lg border border-ink-border bg-canvas-subtle focus:bg-white focus:outline-none focus:border-civic-terracotta text-ink-primary transition-colors"
                     />
                   </div>
 
                   <button
                     type="submit"
                     disabled={deptSubmitting || !isAuthorizedAdmin}
-                    className="w-full py-2.5 px-4 rounded-lg font-semibold bg-civic-blue text-white hover:bg-civic-blueDark transition-colors shadow-subtle flex items-center justify-center gap-2 disabled:opacity-60"
+                    className="w-full py-2.5 px-4 rounded-lg font-semibold bg-civic-terracotta text-white hover:bg-civic-terracottaDark transition-colors font-mono uppercase text-xs flex items-center justify-center gap-2 disabled:opacity-60"
                   >
                     {deptSubmitting ? (
                       <>
@@ -398,7 +394,7 @@ export default function AdminPage() {
               </div>
 
               {/* Form 2: Provision Government Officer */}
-              <div className="bg-white p-6 rounded-2xl border border-ink-border shadow-card space-y-5">
+              <div className="bg-canvas-card p-6 border border-ink-border space-y-5">
                 <div className="flex items-center gap-2.5 pb-3 border-b border-ink-border">
                   <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center">
                     <UserPlus className="w-4 h-4" />
@@ -410,7 +406,7 @@ export default function AdminPage() {
                 </div>
 
                 {officerSuccess && (
-                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2">
+                  <div className="p-3 bg-emerald-50 border border-emerald-300 font-mono text-xs text-emerald-900 flex items-start gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <span>{officerSuccess}</span>
                   </div>
@@ -418,7 +414,7 @@ export default function AdminPage() {
 
 
                 {officerError && (
-                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-900 flex items-start gap-2">
+                  <div className="p-3 bg-rose-50 border border-rose-300 font-mono text-xs text-rose-900 flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                     <span>{officerError}</span>
                   </div>
@@ -433,7 +429,7 @@ export default function AdminPage() {
                         onClick={() => setOfficerRole(UserRole.DEPARTMENT_OFFICER)}
                         className={`p-2 rounded-lg border text-left font-semibold transition-all ${
                           officerRole === UserRole.DEPARTMENT_OFFICER
-                            ? 'border-civic-blue bg-civic-blueLight/40 text-civic-blueDark ring-1 ring-civic-blue'
+                            ? 'border-civic-terracotta bg-civic-blueLight/40 text-civic-terracottaDark ring-1 ring-civic-blue'
                             : 'border-ink-border bg-canvas-subtle text-ink-secondary hover:bg-white'
                         }`}
                       >
@@ -446,7 +442,7 @@ export default function AdminPage() {
                         onClick={() => setOfficerRole(UserRole.FIELD_OFFICER)}
                         className={`p-2 rounded-lg border text-left font-semibold transition-all ${
                           officerRole === UserRole.FIELD_OFFICER
-                            ? 'border-civic-blue bg-civic-blueLight/40 text-civic-blueDark ring-1 ring-civic-blue'
+                            ? 'border-civic-terracotta bg-civic-blueLight/40 text-civic-terracottaDark ring-1 ring-civic-blue'
                             : 'border-ink-border bg-canvas-subtle text-ink-secondary hover:bg-white'
                         }`}
                       >
@@ -464,7 +460,7 @@ export default function AdminPage() {
                       value={officerEmail}
                       onChange={(e) => setOfficerEmail(e.target.value)}
                       placeholder="officer@civicpulse.gov.in"
-                      className="w-full px-3 py-2 rounded-lg border border-ink-border bg-canvas-subtle focus:bg-white focus:outline-none focus:border-civic-blue text-ink-primary transition-colors"
+                      className="w-full px-3 py-2 rounded-lg border border-ink-border bg-canvas-subtle focus:bg-white focus:outline-none focus:border-civic-terracotta text-ink-primary transition-colors"
                     />
                   </div>
 
@@ -476,7 +472,7 @@ export default function AdminPage() {
                       value={officerName}
                       onChange={(e) => setOfficerName(e.target.value)}
                       placeholder="Er. Rajesh Kumar"
-                      className="w-full px-3 py-2 rounded-lg border border-ink-border bg-canvas-subtle focus:bg-white focus:outline-none focus:border-civic-blue text-ink-primary transition-colors"
+                      className="w-full px-3 py-2 rounded-lg border border-ink-border bg-canvas-subtle focus:bg-white focus:outline-none focus:border-civic-terracotta text-ink-primary transition-colors"
                     />
                   </div>
 
@@ -486,7 +482,7 @@ export default function AdminPage() {
                       <select
                         value={officerDept}
                         onChange={(e) => setOfficerDept(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg border border-ink-border bg-canvas-subtle focus:bg-white focus:outline-none focus:border-civic-blue text-ink-primary transition-colors"
+                        className="w-full px-3 py-2 rounded-lg border border-ink-border bg-canvas-subtle focus:bg-white focus:outline-none focus:border-civic-terracotta text-ink-primary transition-colors"
                       >
                         {departments.map((d) => (
                           <option key={d.id} value={d.id}>
@@ -503,7 +499,7 @@ export default function AdminPage() {
 
                   <div className="p-3 rounded-lg bg-canvas-subtle border border-ink-border text-[11px] text-ink-secondary space-y-1">
                     <div className="font-semibold text-ink-primary flex items-center gap-1.5">
-                      <Lock className="w-3.5 h-3.5 text-civic-blue" />
+                      <Lock className="w-3.5 h-3.5 text-civic-terracotta" />
                       <span>Password Privacy Protocol</span>
                     </div>
                     <p>
@@ -533,7 +529,7 @@ export default function AdminPage() {
 
         {/* TAB 2: USERS DIRECTORY */}
         {activeTab === 'users' && (
-          <div className="bg-white rounded-2xl border border-ink-border shadow-card p-6 space-y-4">
+          <div className="bg-canvas-card border border-ink-border p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-ink-border pb-4">
               <div>
                 <h3 className="text-sm font-bold text-ink-primary">Registered Users &amp; Identities</h3>
@@ -546,14 +542,14 @@ export default function AdminPage() {
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   placeholder="Search users by name, email..."
-                  className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-ink-border bg-canvas-subtle text-xs focus:bg-white focus:outline-none focus:border-civic-blue transition-colors"
+                  className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-ink-border bg-canvas-subtle text-xs focus:bg-white focus:outline-none focus:border-civic-terracotta transition-colors"
                 />
               </div>
             </div>
 
             {loadingData ? (
               <div className="py-12 text-center text-ink-secondary space-y-2">
-                <Loader2 className="w-6 h-6 animate-spin text-civic-blue mx-auto" />
+                <Loader2 className="w-6 h-6 animate-spin text-civic-terracotta mx-auto" />
                 <p className="text-xs">Querying authoritative user records...</p>
               </div>
             ) : filteredUsers.length === 0 ? (
@@ -621,7 +617,7 @@ export default function AdminPage() {
 
         {/* TAB 3: DEPARTMENTS REGISTRY */}
         {activeTab === 'departments' && (
-          <div className="bg-white rounded-2xl border border-ink-border shadow-card p-6 space-y-4">
+          <div className="bg-canvas-card border border-ink-border p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-ink-border pb-4">
               <div>
                 <h3 className="text-sm font-bold text-ink-primary">Registered Municipal Departments</h3>
@@ -637,7 +633,7 @@ export default function AdminPage() {
 
             {loadingData ? (
               <div className="py-12 text-center text-ink-secondary space-y-2">
-                <Loader2 className="w-6 h-6 animate-spin text-civic-blue mx-auto" />
+                <Loader2 className="w-6 h-6 animate-spin text-civic-terracotta mx-auto" />
                 <p className="text-xs">Loading department registry...</p>
               </div>
             ) : departments.length === 0 ? (
@@ -651,7 +647,7 @@ export default function AdminPage() {
                 {departments.map((d) => (
                   <div key={d.id} className="p-4 rounded-xl border border-ink-border bg-canvas-subtle space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-white border border-ink-border text-civic-blue">
+                      <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-white border border-ink-border text-civic-terracotta">
                         {d.id}
                       </span>
                       {d.short_name && (
@@ -719,7 +715,7 @@ export default function AdminPage() {
                     <span className="font-semibold text-ink-primary">
                       Server-Side PII Redaction Pipeline
                     </span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-civic-blueLight text-civic-blueDark">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-civic-blueLight text-civic-terracottaDark">
                       DPDP Act Compliance
                     </span>
                   </div>

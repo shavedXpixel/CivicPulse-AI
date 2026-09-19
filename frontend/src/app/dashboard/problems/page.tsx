@@ -5,31 +5,22 @@ import { useSearchParams } from 'next/navigation';
 import { GovernmentShell } from '../../../components/shells/GovernmentShell';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { ProblemList } from '../../../components/domain/ProblemList';
-import { DEMO_PROBLEMS } from '../../../lib/mockData';
 import { apiClient } from '../../../lib/api-client';
-import { useAuth } from '../../../context/AuthContext';
 import { ProblemCluster } from '@civicpulse/shared';
 import { RefreshCw, ShieldAlert } from 'lucide-react';
 
 function ProblemsContent() {
-  const { isDemoMode } = useAuth();
   const searchParams = useSearchParams();
   const initialDepartment = searchParams.get('department') || 'ALL';
   const initialStatus = searchParams.get('status') || 'ALL';
 
-  const [problems, setProblems] = useState<any[]>(isDemoMode ? DEMO_PROBLEMS : []);
+  const [problems, setProblems] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const loadProblems = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-
-    if (isDemoMode) {
-      setProblems(DEMO_PROBLEMS);
-      setIsLoading(false);
-      return;
-    }
 
     try {
       const res = await apiClient.get<{ data: ProblemCluster[] }>('/api/v1/problems');
@@ -100,13 +91,13 @@ function ProblemsContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [isDemoMode]);
+  }, []);
 
   useEffect(() => {
     loadProblems();
   }, [loadProblems]);
 
-  const authoritativeProblemCount = isDemoMode ? DEMO_PROBLEMS.length : problems.length;
+  const authoritativeProblemCount = problems.length;
 
   return (
     <GovernmentShell problemCount={authoritativeProblemCount}>
@@ -115,7 +106,7 @@ function ProblemsContent() {
           title="Problem Directory"
           description="Consolidated public incident clusters dynamically ranked by calculated public impact and deterministic SLA urgency."
           badge={
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-canvas-subtle border border-ink-border text-ink-secondary">
+            <span className="px-2.5 py-0.5 rounded-xs text-[10px] font-mono uppercase bg-canvas-subtle border border-ink-border text-ink-secondary">
               {problems.length} Incidents Available
             </span>
           }
@@ -127,7 +118,7 @@ function ProblemsContent() {
             <button
               onClick={() => loadProblems()}
               disabled={isLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-ink-border bg-white hover:bg-canvas-subtle text-ink-primary transition-colors disabled:opacity-50 shadow-subtle"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono uppercase border border-ink-border bg-canvas-card hover:bg-canvas-subtle text-ink-primary transition-colors disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
               <span>Refresh</span>
@@ -136,14 +127,14 @@ function ProblemsContent() {
         />
 
         {error && (
-          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-center justify-between">
+          <div className="p-4 border border-rose-300 bg-rose-50 text-rose-900 text-xs font-mono flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
               <span>{error}</span>
             </div>
             <button
               onClick={() => loadProblems()}
-              className="px-3 py-1 rounded bg-rose-600 text-white font-semibold hover:bg-rose-700 transition-colors"
+              className="px-3 py-1 bg-rose-700 text-white uppercase text-[10px] hover:bg-rose-800 transition-colors"
             >
               Retry
             </button>

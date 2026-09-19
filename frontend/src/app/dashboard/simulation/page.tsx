@@ -7,8 +7,7 @@ import { PageHeader } from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import {
   Sliders,
-  Building2,
-  UserCheck,
+  ShieldCheck,
   AlertTriangle,
   Lock,
   Sparkles,
@@ -18,7 +17,7 @@ import {
   Layers,
   ArrowRight,
 } from 'lucide-react';
-import { apiClient, setAuthToken, ApiError } from '../../../lib/api-client';
+import { apiClient, ApiError } from '../../../lib/api-client';
 import { useAuth } from '../../../context/AuthContext';
 import {
   InterventionType,
@@ -26,66 +25,11 @@ import {
   BudgetAllocationResult,
   SimulationScenarioInput,
   SIMULATION_CONSTANTS,
+  ProblemCluster,
 } from '@civicpulse/shared';
 
-interface Persona {
-  id: string;
-  label: string;
-  role: 'ADMIN' | 'DEPARTMENT_OFFICER' | 'FIELD_OFFICER' | 'CITIZEN';
-  name: string;
-  token: string;
-  department?: string;
-  scopeDesc: string;
-}
-
-const PERSONAS: Persona[] = [
-  {
-    id: 'admin',
-    label: 'Commissioner (Admin)',
-    role: 'ADMIN',
-    name: 'Municipal Commissioner',
-    token: 'demo-token-admin',
-    scopeDesc: 'Global Municipal Scope (All Departments & Citywide Simulation)',
-  },
-  {
-    id: 'dept_watco',
-    label: 'Er. Subrat (Dept Officer - WATCO)',
-    role: 'DEPARTMENT_OFFICER',
-    name: 'Er. Subrat Jena',
-    token: 'demo-token-dept-watco',
-    department: 'watco',
-    scopeDesc: 'Department Scope: Water Corporation of Odisha (WATCO)',
-  },
-  {
-    id: 'dept_drainage',
-    label: 'Dept Officer (Drainage)',
-    role: 'DEPARTMENT_OFFICER',
-    name: 'Drainage Superintending Eng',
-    token: 'demo-token-dept-drainage',
-    department: 'drainage',
-    scopeDesc: 'Department Scope: Drainage & Sewerage Division',
-  },
-  {
-    id: 'officer_rajesh',
-    label: 'Rajesh K. (Field Officer - WATCO)',
-    role: 'FIELD_OFFICER',
-    name: 'Rajesh K.',
-    token: 'demo-token-officer',
-    department: 'watco',
-    scopeDesc: 'Assigned Operational Scope: Ward 18 (WATCO)',
-  },
-  {
-    id: 'citizen',
-    label: 'Aarav (Citizen - Public View)',
-    role: 'CITIZEN',
-    name: 'Aarav Patnaik',
-    token: 'demo-token-citizen',
-    scopeDesc: 'Public Citizen Scope (Restricted from Simulation Workspace)',
-  },
-];
-
 export default function InterventionSimulatorPage() {
-  const { isDemoMode } = useAuth();
+  const { user, userProfile, getIdToken } = useAuth();
   const [queryProblemId, setQueryProblemId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -96,13 +40,12 @@ export default function InterventionSimulatorPage() {
     }
   }, []);
 
-  const [selectedPersonaId, setSelectedPersonaId] = useState<string>('admin');
   const [mode, setMode] = useState<'PROBLEM' | 'BUDGET'>('PROBLEM');
-  const [activeProblemId] = useState<string>('PRB-2026-0819');
-  const displayProblemId = queryProblemId || (isDemoMode ? 'PRB-2026-0819' : null);
+  const [problems, setProblems] = useState<ProblemCluster[]>([]);
+  const [selectedProblemId, setSelectedProblemId] = useState<string>('');
 
   // Single-Problem Simulation State
-  const [scenarioName, setScenarioName] = useState<string>('Scenario B: Accelerated Dual-Crew Repair & Mechanical Sleeve');
+  const [scenarioName, setScenarioName] = useState<string>('Accelerated Dual-Crew Repair & Mechanical Sleeve');
   const [interventionType, setInterventionType] = useState<InterventionType>(InterventionType.CAPACITY_BOOST);
   const [budgetInr, setBudgetInr] = useState<number>(420000);
   const [extraCrews, setExtraCrews] = useState<number>(2);
@@ -120,30 +63,39 @@ export default function InterventionSimulatorPage() {
   const [error, setError] = useState<string | null>(null);
   const [isCitizenForbidden, setIsCitizenForbidden] = useState<boolean>(false);
 
-  const activePersona = PERSONAS.find((p) => p.id === selectedPersonaId) || PERSONAS[0]!;
-
-  const handlePersonaChange = (newPersonaId: string) => {
-    setSelectedPersonaId(newPersonaId);
-    const p = PERSONAS.find((x) => x.id === newPersonaId) || PERSONAS[0]!;
-    setAuthToken(p.token);
-    setError(null);
-
-    if (p.role === 'CITIZEN') {
-      setIsCitizenForbidden(true);
-      setSimulationResult(null);
-      setBudgetResult(null);
-    } else {
-      setIsCitizenForbidden(false);
+  // Fetch available live problems on mount
+  useEffect(() => {
+    async function loadProblems() {
+      try {
+        const res = await apiClient.get<{ data: ProblemCluster[] }>('/api/v1/problems');
+        const list = res?.data || [];
+        setProblems(list);
+        if (list.length > 0) {
+          if (queryProblemId && list.some((p) => p.id === queryProblemId)) {
+            setSelectedProblemId(queryProblemId);
+          } else {
+            setSelectedProblemId(list[0]!.id);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load problems for simulation:', err);
+      }
     }
-  };
+    loadProblems();
+  }, [queryProblemId]);
 
   const runProblemSimulation = useCallback(async (
-    customParams?: Partial<SimulationScenarioInput>,
-    persona = activePersona
+    customParams?: Partial<SimulationScenarioInput>
   ) => {
-    if (persona.role === 'CITIZEN') {
+    if (userProfile?.role === 'CITIZEN') {
       setIsCitizenForbidden(true);
       setError('Simulation workspace is restricted to municipal administrators and department officers.');
+      return;
+    }
+
+    const targetProblemId = customParams?.problem_id || selectedProblemId;
+    if (!targetProblemId) {
+      setError('Please select an active problem cluster to simulate.');
       return;
     }
 
@@ -152,7 +104,7 @@ export default function InterventionSimulatorPage() {
     setIsCitizenForbidden(false);
 
     const payload: SimulationScenarioInput = {
-      problem_id: activeProblemId,
+      problem_id: targetProblemId,
       scenario_name: customParams?.scenario_name || scenarioName,
       intervention_type: customParams?.intervention_type || interventionType,
       additional_budget_inr: customParams?.additional_budget_inr !== undefined ? customParams.additional_budget_inr : budgetInr,
@@ -165,10 +117,13 @@ export default function InterventionSimulatorPage() {
     };
 
     try {
+      const token = await getIdToken();
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+
       const res = await apiClient.post<{ data: SimulationResult }>(
         '/api/v1/simulations/problem',
         payload,
-        { Authorization: `Bearer ${persona.token}` }
+        headers
       );
       setSimulationResult(res.data);
     } catch (err: any) {
@@ -182,10 +137,10 @@ export default function InterventionSimulatorPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeProblemId, scenarioName, interventionType, budgetInr, extraCrews, reliefRate, timeReduction, includeFacility, includeRenewal, activePersona]);
+  }, [selectedProblemId, scenarioName, interventionType, budgetInr, extraCrews, reliefRate, timeReduction, includeFacility, includeRenewal, userProfile?.role, getIdToken]);
 
-  const runBudgetAllocation = useCallback(async (persona = activePersona) => {
-    if (persona.role !== 'ADMIN') {
+  const runBudgetAllocation = useCallback(async () => {
+    if (userProfile?.role !== 'ADMIN') {
       setError('Citywide budget allocation optimization requires Municipal Administrator credentials.');
       return;
     }
@@ -194,10 +149,13 @@ export default function InterventionSimulatorPage() {
     setError(null);
 
     try {
+      const token = await getIdToken();
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+
       const res = await apiClient.post<{ data: BudgetAllocationResult }>(
         '/api/v1/simulations/budget-allocation',
         { total_budget_inr: cityBudgetInput },
-        { Authorization: `Bearer ${persona.token}` }
+        headers
       );
       setBudgetResult(res.data);
     } catch (err: any) {
@@ -205,19 +163,20 @@ export default function InterventionSimulatorPage() {
     } finally {
       setLoading(false);
     }
-  }, [cityBudgetInput, activePersona]);
+  }, [cityBudgetInput, userProfile?.role, getIdToken]);
 
-  // Initial simulation run on mount
+  // Initial simulation run when selected problem changes
   useEffect(() => {
-    setAuthToken(activePersona.token);
-    runProblemSimulation();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (selectedProblemId && userProfile && userProfile.role !== 'CITIZEN') {
+      runProblemSimulation();
+    }
+  }, [selectedProblemId, userProfile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Apply Preset Scenario helper
   const applyPreset = (presetLetter: 'A' | 'B' | 'C') => {
     if (presetLetter === 'A') {
       const p = {
-        scenario_name: 'Scenario A: Emergency Tanker Surge & Bottled Water',
+        scenario_name: 'Emergency Tanker Surge & Bottled Water Distribution',
         intervention_type: InterventionType.EMERGENCY_DISPATCH,
         additional_budget_inr: 150000,
         extra_crews: 2,
@@ -237,7 +196,7 @@ export default function InterventionSimulatorPage() {
       runProblemSimulation(p);
     } else if (presetLetter === 'B') {
       const p = {
-        scenario_name: 'Scenario B: Accelerated Dual-Crew Repair & Mechanical Sleeve',
+        scenario_name: 'Accelerated Dual-Crew Repair & Mechanical Sleeve',
         intervention_type: InterventionType.CAPACITY_BOOST,
         additional_budget_inr: 420000,
         extra_crews: 2,
@@ -257,7 +216,7 @@ export default function InterventionSimulatorPage() {
       runProblemSimulation(p);
     } else if (presetLetter === 'C') {
       const p = {
-        scenario_name: 'Scenario C: Resilient Culvert Bypass Loop & Renewal',
+        scenario_name: 'Resilient Culvert Bypass Loop & Permanent Renewal',
         intervention_type: InterventionType.INFRASTRUCTURE_REPAIR,
         additional_budget_inr: 850000,
         extra_crews: 3,
@@ -278,6 +237,8 @@ export default function InterventionSimulatorPage() {
     }
   };
 
+  const currentProblem = problems.find((p) => p.id === selectedProblemId);
+
   return (
     <GovernmentShell>
       <div className="space-y-6 max-w-7xl mx-auto pb-16">
@@ -290,7 +251,7 @@ export default function InterventionSimulatorPage() {
             { label: 'Intervention Simulator' },
           ]}
           badge={
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-semibold bg-civic-amberLight text-amber-900 border border-amber-300">
+            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-xs text-[10px] font-mono uppercase font-semibold bg-canvas-subtle text-ink-primary border border-ink-border">
               <Sliders className="w-3.5 h-3.5 text-amber-700" />
               <span>SIMULATION / ADVISORY</span>
             </div>
@@ -303,18 +264,18 @@ export default function InterventionSimulatorPage() {
               >
                 <span>Command Center</span>
               </Link>
-              {displayProblemId && (
+              {selectedProblemId && (
                 <Link
-                  href={`/dashboard/problems/${displayProblemId}`}
+                  href={`/dashboard/problems/${selectedProblemId}`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-ink-border bg-white hover:bg-canvas-subtle text-ink-primary transition-colors"
                 >
-                  <span>{isDemoMode && displayProblemId === 'PRB-2026-0819' ? 'Golden Demo Problem' : `Problem #${displayProblemId}`}</span>
+                  <span>Problem #{selectedProblemId}</span>
                   <ArrowRight className="w-3 h-3 text-ink-tertiary" />
                 </Link>
               )}
               <Link
-                href={`/dashboard/ai${displayProblemId ? `?problemId=${displayProblemId}` : ''}`}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-civic-blue text-white hover:bg-civic-blueDark transition-colors shadow-subtle"
+                href={`/dashboard/ai${selectedProblemId ? `?problemId=${selectedProblemId}` : ''}`}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-civic-terracotta text-white hover:bg-civic-terracottaDark transition-colors"
               >
                 <span>Governance AI</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -324,7 +285,7 @@ export default function InterventionSimulatorPage() {
         />
 
         {/* Advisory Policy Banner */}
-        <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 text-amber-950 flex items-start gap-3 text-xs leading-relaxed">
+        <div className="p-4 border border-amber-300 bg-amber-50/70 text-amber-950 flex items-start gap-3 text-xs leading-relaxed">
           <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <span className="font-bold uppercase tracking-wider font-mono">
@@ -336,65 +297,37 @@ export default function InterventionSimulatorPage() {
           </div>
         </div>
 
-        {/* Persona Switcher Bar */}
-        <div className="p-4 rounded-xl border border-ink-border bg-white shadow-card space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-ink-border/50 pb-2.5">
-            <div className="flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-civic-blue" />
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-ink-primary">
-                Active Simulator Identity & Authorization Context
-              </span>
+        {/* Authenticated Operator Scope Banner */}
+        <div className="p-4 border border-ink-border bg-canvas-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
             </div>
-            <div className="text-[11px] font-mono text-ink-tertiary">
-              Server-enforced RBAC from authenticated token
+            <div>
+              <div className="font-bold text-ink-primary flex items-center gap-2">
+                <span>{userProfile?.display_name || user?.email || 'Authenticated Officer'}</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-100 text-purple-800">
+                  {userProfile?.role || 'GOVERNMENT'}
+                </span>
+                {userProfile?.department_id && (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-blue-100 text-blue-800">
+                    Dept: {userProfile.department_id}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-ink-secondary font-mono">
+                {user?.email} • Live PostgreSQL session token authoritative
+              </p>
             </div>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
-            {PERSONAS.map((p) => {
-              const isSelected = p.id === selectedPersonaId;
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => handlePersonaChange(p.id)}
-                  className={`p-2.5 rounded-lg border text-left transition-all text-xs flex flex-col justify-between ${
-                    isSelected
-                      ? 'border-civic-blue bg-civic-blueLight/30 text-civic-blueDark shadow-sm ring-1 ring-civic-blue'
-                      : 'border-ink-border bg-canvas-subtle hover:bg-white text-ink-secondary hover:text-ink-primary'
-                  }`}
-                >
-                  <div className="font-semibold truncate">{p.label}</div>
-                  <div className="mt-1 flex items-center justify-between text-[10px] font-mono">
-                    <span
-                      className={`px-1.5 py-0.5 rounded ${
-                        p.role === 'ADMIN'
-                          ? 'bg-purple-100 text-purple-800'
-                          : p.role === 'DEPARTMENT_OFFICER'
-                          ? 'bg-blue-100 text-blue-800'
-                          : p.role === 'FIELD_OFFICER'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-rose-100 text-rose-800'
-                      }`}
-                    >
-                      {p.role}
-                    </span>
-                    {isSelected && <span className="text-civic-blue font-bold">ACTIVE</span>}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center gap-2 text-xs font-mono bg-canvas-subtle p-2 rounded border border-ink-border/60">
-            <Building2 className="w-3.5 h-3.5 text-ink-tertiary" />
-            <span className="text-ink-secondary">Current Scope:</span>
-            <span className="text-ink-primary font-medium">{activePersona.scopeDesc}</span>
+          <div className="text-[11px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md">
+            ✓ Authenticated Session Active
           </div>
         </div>
 
         {/* Citizen 403 Forbidden Screen */}
         {isCitizenForbidden && (
-          <div className="p-8 rounded-xl border border-rose-200 bg-rose-50/50 shadow-card space-y-4">
+          <div className="p-8 border border-rose-300 bg-rose-50/50 space-y-4">
             <div className="flex items-start gap-4">
               <div className="p-3 rounded-xl bg-rose-100 text-rose-700 border border-rose-200">
                 <Lock className="w-6 h-6" />
@@ -412,16 +345,13 @@ export default function InterventionSimulatorPage() {
                   The What-If Intervention Simulator is restricted to authorized municipal decision-makers and department engineering heads. Citizen accounts are barred from running hypothetical resource allocation models or accessing internal capacity estimates.
                 </p>
                 <div className="bg-white/80 p-3.5 rounded-lg border border-rose-200 text-xs text-ink-secondary space-y-1.5 font-mono">
-                  <div><strong>Current User:</strong> Aarav Patnaik (Citizen)</div>
-                  <div><strong>Authorization Check:</strong> <code>req.user.role === UserRole.CITIZEN</code> $\rightarrow$ Blocked</div>
+                  <div><strong>Current User:</strong> {userProfile?.display_name || user?.email} (Citizen)</div>
+                  <div><strong>Authorization Check:</strong> <code>role === UserRole.CITIZEN</code> $\rightarrow$ Blocked</div>
                 </div>
                 <div className="pt-2 flex flex-wrap items-center gap-3">
-                  <Button variant="primary" size="sm" onClick={() => handlePersonaChange('admin')}>
-                    Switch to Municipal Commissioner (Admin)
-                  </Button>
                   <Link
                     href="/dashboard"
-                    className="text-xs font-mono text-civic-blue hover:underline inline-flex items-center gap-1"
+                    className="text-xs font-mono text-civic-terracotta hover:underline inline-flex items-center gap-1"
                   >
                     <span>Return to Public Operations Dashboard</span>
                     <ExternalLink className="w-3.5 h-3.5" />
@@ -434,7 +364,7 @@ export default function InterventionSimulatorPage() {
 
         {/* General Error Banner */}
         {!isCitizenForbidden && error && (
-          <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 flex items-start gap-3 text-xs">
+          <div className="p-4 border border-amber-300 bg-amber-50 text-amber-900 flex items-start gap-3 text-xs">
             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <div className="space-y-1 flex-1">
               <div className="font-semibold">Simulation Notice</div>
@@ -446,8 +376,19 @@ export default function InterventionSimulatorPage() {
           </div>
         )}
 
-        {/* Main Simulator Workspace (Visible for authorized roles) */}
-        {!isCitizenForbidden && (
+        {/* Empty Problems State */}
+        {!isCitizenForbidden && problems.length === 0 && (
+          <div className="p-12 border border-ink-border bg-canvas-card text-center space-y-2">
+            <Sliders className="w-8 h-8 text-ink-muted mx-auto" />
+            <p className="text-sm font-serif font-bold text-ink-primary">No problem clusters available</p>
+            <p className="text-xs text-ink-secondary font-mono">
+              Intervention simulation requires at least one active problem cluster in the database.
+            </p>
+          </div>
+        )}
+
+        {/* Main Simulator Workspace */}
+        {!isCitizenForbidden && problems.length > 0 && (
           <div className="space-y-6">
             {/* Mode Switcher Tabs */}
             <div className="flex items-center justify-between border-b border-ink-border pb-3">
@@ -461,12 +402,12 @@ export default function InterventionSimulatorPage() {
                   }`}
                 >
                   <Sliders className="w-3.5 h-3.5" />
-                  <span>Targeted Problem Simulation (Ward 18)</span>
+                  <span>Targeted Problem Simulation</span>
                 </button>
                 <button
                   onClick={() => {
                     setMode('BUDGET');
-                    if (!budgetResult && activePersona.role === 'ADMIN') {
+                    if (!budgetResult && userProfile?.role === 'ADMIN') {
                       runBudgetAllocation();
                     }
                   }}
@@ -477,7 +418,7 @@ export default function InterventionSimulatorPage() {
                   }`}
                 >
                   <Layers className="w-3.5 h-3.5" />
-                  <span>Citywide Budget Optimizer (₹10 Lakh)</span>
+                  <span>Citywide Budget Optimizer</span>
                 </button>
               </div>
 
@@ -490,18 +431,30 @@ export default function InterventionSimulatorPage() {
             {mode === 'PROBLEM' && (
               <div className="space-y-6">
                 {/* Scenario Presets & Configuration Box */}
-                <div className="p-6 rounded-xl border border-ink-border bg-white shadow-card space-y-5">
+                <div className="p-6 border border-ink-border bg-canvas-card space-y-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-ink-border/50 pb-3">
-                    <div className="space-y-0.5">
-                      <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-ink-primary flex items-center gap-2">
-                        <span>Golden Demo Intervention Scenarios</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-blue-100 text-blue-800">
-                          PRB-2026-0819
-                        </span>
-                      </h3>
-                      <p className="text-xs text-ink-secondary">
-                        Target: Water Supply Disruption — Nayapalli Ward 18 (Impact 92/100, Pop 18,400)
-                      </p>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-mono font-bold uppercase tracking-wider text-ink-primary">
+                          Target Problem:
+                        </label>
+                        <select
+                          value={selectedProblemId}
+                          onChange={(e) => setSelectedProblemId(e.target.value)}
+                          className="px-2.5 py-1 text-xs font-mono bg-canvas-subtle border border-ink-border text-ink-primary rounded focus:outline-none"
+                        >
+                          {problems.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.id} — {p.title || 'Incident'}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {currentProblem && (
+                        <p className="text-xs text-ink-secondary">
+                          {currentProblem.title} • Ward {currentProblem.ward_id} • Impact {currentProblem.impact_score}/100
+                        </p>
+                      )}
                     </div>
 
                     {/* Preset Buttons */}
@@ -509,32 +462,32 @@ export default function InterventionSimulatorPage() {
                       <button
                         onClick={() => applyPreset('A')}
                         className={`px-3 py-1.5 rounded-lg border text-xs font-mono transition-all ${
-                          scenarioName.includes('Scenario A')
-                            ? 'bg-civic-blueLight border-civic-blue/40 text-civic-blueDark font-bold'
+                          scenarioName.includes('Emergency Tanker')
+                            ? 'bg-civic-blueLight border-civic-terracotta/40 text-civic-terracottaDark font-bold'
                             : 'bg-canvas-subtle border-ink-border text-ink-secondary hover:text-ink-primary hover:bg-white'
                         }`}
                       >
-                        Scenario A: Emergency Tanker Surge (₹1.5L)
+                        Emergency Relief (₹1.5L)
                       </button>
                       <button
                         onClick={() => applyPreset('B')}
                         className={`px-3 py-1.5 rounded-lg border text-xs font-mono transition-all ${
-                          scenarioName.includes('Scenario B')
-                            ? 'bg-civic-blueLight border-civic-blue/40 text-civic-blueDark font-bold'
+                          scenarioName.includes('Accelerated Dual-Crew')
+                            ? 'bg-civic-blueLight border-civic-terracotta/40 text-civic-terracottaDark font-bold'
                             : 'bg-canvas-subtle border-ink-border text-ink-secondary hover:text-ink-primary hover:bg-white'
                         }`}
                       >
-                        Scenario B: Accelerated Dual-Crew Repair (₹4.2L)
+                        Dual-Crew Repair (₹4.2L)
                       </button>
                       <button
                         onClick={() => applyPreset('C')}
                         className={`px-3 py-1.5 rounded-lg border text-xs font-mono transition-all ${
-                          scenarioName.includes('Scenario C')
-                            ? 'bg-civic-blueLight border-civic-blue/40 text-civic-blueDark font-bold'
+                          scenarioName.includes('Resilient Culvert')
+                            ? 'bg-civic-blueLight border-civic-terracotta/40 text-civic-terracottaDark font-bold'
                             : 'bg-canvas-subtle border-ink-border text-ink-secondary hover:text-ink-primary hover:bg-white'
                         }`}
                       >
-                        Scenario C: Resilient Culvert Bypass (₹8.5L)
+                        Permanent Renewal (₹8.5L)
                       </button>
                     </div>
                   </div>
@@ -545,7 +498,7 @@ export default function InterventionSimulatorPage() {
                     <div className="space-y-1.5 p-3 rounded-lg bg-canvas-subtle border border-ink-border/60">
                       <div className="flex justify-between font-mono text-[11px] text-ink-secondary font-semibold">
                         <span>ADDITIONAL BUDGET (INR)</span>
-                        <span className="text-civic-blue font-bold">₹{budgetInr.toLocaleString()}</span>
+                        <span className="text-civic-terracotta font-bold">₹{budgetInr.toLocaleString()}</span>
                       </div>
                       <input
                         type="number"
@@ -556,7 +509,7 @@ export default function InterventionSimulatorPage() {
                         className="w-full px-2.5 py-1.5 text-xs rounded border border-ink-border bg-white font-mono"
                       />
                       <div className="text-[10px] text-ink-tertiary font-mono">
-                        Synthetic benchmark rate
+                        Direct intervention expenditure
                       </div>
                     </div>
 
@@ -564,7 +517,7 @@ export default function InterventionSimulatorPage() {
                     <div className="space-y-1.5 p-3 rounded-lg bg-canvas-subtle border border-ink-border/60">
                       <div className="flex justify-between font-mono text-[11px] text-ink-secondary font-semibold">
                         <span>EXTRA CREWS (0-5)</span>
-                        <span className="text-civic-blue font-bold">{extraCrews} crews</span>
+                        <span className="text-civic-terracotta font-bold">{extraCrews} crews</span>
                       </div>
                       <input
                         type="range"
@@ -584,7 +537,7 @@ export default function InterventionSimulatorPage() {
                     <div className="space-y-1.5 p-3 rounded-lg bg-canvas-subtle border border-ink-border/60">
                       <div className="flex justify-between font-mono text-[11px] text-ink-secondary font-semibold">
                         <span>RELIEF COVERAGE RATE</span>
-                        <span className="text-civic-blue font-bold">{(reliefRate * 100).toFixed(0)}%</span>
+                        <span className="text-civic-terracotta font-bold">{(reliefRate * 100).toFixed(0)}%</span>
                       </div>
                       <input
                         type="range"
@@ -604,7 +557,7 @@ export default function InterventionSimulatorPage() {
                     <div className="space-y-1.5 p-3 rounded-lg bg-canvas-subtle border border-ink-border/60">
                       <div className="flex justify-between font-mono text-[11px] text-ink-secondary font-semibold">
                         <span>RESPONSE TIME REDUCTION</span>
-                        <span className="text-civic-blue font-bold">{timeReduction}h</span>
+                        <span className="text-civic-terracotta font-bold">{timeReduction}h</span>
                       </div>
                       <input
                         type="range"
@@ -629,18 +582,18 @@ export default function InterventionSimulatorPage() {
                           type="checkbox"
                           checked={includeFacility}
                           onChange={(e) => setIncludeFacility(e.target.checked)}
-                          className="rounded text-civic-blue"
+                          className="rounded text-civic-terracotta"
                         />
-                        <span>Protect DAV Public School (Dedicated Tanker/Feed)</span>
+                        <span>Facility Exposure Mitigation</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer font-medium text-ink-primary">
                         <input
                           type="checkbox"
                           checked={includeRenewal}
                           onChange={(e) => setIncludeRenewal(e.target.checked)}
-                          className="rounded text-civic-blue"
+                          className="rounded text-civic-terracotta"
                         />
-                        <span>Permanent Renewal (Modeled 90-Day Horizon)</span>
+                        <span>Permanent Renewal (90-Day Planning Horizon)</span>
                       </label>
                     </div>
 
@@ -648,7 +601,7 @@ export default function InterventionSimulatorPage() {
                       variant="primary"
                       size="md"
                       onClick={() => runProblemSimulation()}
-                      disabled={loading}
+                      disabled={loading || !selectedProblemId}
                       className="shrink-0"
                     >
                       {loading ? (
@@ -672,7 +625,7 @@ export default function InterventionSimulatorPage() {
                     {/* Side-by-Side Comparison: Baseline vs Projected */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {/* Left: Authoritative Baseline State */}
-                      <div className="p-6 rounded-xl border border-ink-border bg-white shadow-card space-y-4">
+                      <div className="p-6 border border-ink-border bg-canvas-card space-y-4">
                         <div className="flex items-center justify-between border-b border-ink-border/60 pb-3">
                           <div className="space-y-0.5">
                             <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-ink-tertiary">
@@ -696,7 +649,7 @@ export default function InterventionSimulatorPage() {
                             <div className="text-2xl font-bold text-civic-rose mt-1">
                               {simulationResult.baseline.impact_score} <span className="text-xs text-ink-tertiary font-normal">/ 100</span>
                             </div>
-                            <div className="text-[10px] text-rose-700 font-mono mt-0.5">CRITICAL PRIORITY</div>
+                            <div className="text-[10px] text-rose-700 font-mono mt-0.5">BASELINE PRIORITY</div>
                           </div>
 
                           <div className="p-3 rounded-lg bg-canvas-subtle border border-ink-border/50">
@@ -706,7 +659,7 @@ export default function InterventionSimulatorPage() {
                             <div className="text-2xl font-bold text-ink-primary mt-1">
                               {simulationResult.baseline.affected_population.toLocaleString()}
                             </div>
-                            <div className="text-[10px] text-ink-tertiary font-mono mt-0.5">Citizens in Ward 18</div>
+                            <div className="text-[10px] text-ink-tertiary font-mono mt-0.5">Citizens in Ward</div>
                           </div>
 
                           <div className="p-3 rounded-lg bg-canvas-subtle border border-ink-border/50">
@@ -716,7 +669,7 @@ export default function InterventionSimulatorPage() {
                             <div className="text-2xl font-bold text-ink-primary mt-1">
                               {simulationResult.baseline.elapsed_problem_hours}h
                             </div>
-                            <div className="text-[10px] text-ink-tertiary font-mono mt-0.5">3.0 days active</div>
+                            <div className="text-[10px] text-ink-tertiary font-mono mt-0.5">Incident lifetime</div>
                           </div>
                         </div>
 
@@ -724,10 +677,10 @@ export default function InterventionSimulatorPage() {
                         <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-950 space-y-1">
                           <div className="flex items-center gap-1.5 font-bold font-mono text-rose-900 uppercase tracking-wider text-[11px]">
                             <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                            <span>Current SLA Status: ALREADY BREACHED ({simulationResult.baseline.sla_utilization.toFixed(2)}x)</span>
+                            <span>Current SLA Utilization: {simulationResult.baseline.sla_utilization.toFixed(2)}x</span>
                           </div>
                           <p className="leading-relaxed text-[11px] text-rose-800">
-                            Problem duration ({simulationResult.baseline.elapsed_problem_hours}h) already exceeds the statutory 24-hour SLA deadline. This breach is already recorded in the audit trail.
+                            Problem duration ({simulationResult.baseline.elapsed_problem_hours}h) baseline against statutory SLA deadline.
                           </p>
                         </div>
                       </div>
@@ -801,9 +754,6 @@ export default function InterventionSimulatorPage() {
                             <span className="font-bold text-emerald-900">
                               PROJECTED SLA UTILIZATION: {simulationResult.projected.sla_utilization.toFixed(2)}x
                             </span>
-                            <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-bold text-[10px]">
-                              BREACHED (CRITICAL)
-                            </span>
                           </div>
                           <p className="text-[11px] text-ink-secondary leading-relaxed">
                             {simulationResult.projected.sla_explanation}
@@ -819,7 +769,7 @@ export default function InterventionSimulatorPage() {
                     </div>
 
                     {/* 7-Factor Component Breakdown Table */}
-                    <div className="p-6 rounded-xl border border-ink-border bg-white shadow-card space-y-4">
+                    <div className="p-6 border border-ink-border bg-canvas-card space-y-4">
                       <div className="flex items-center justify-between border-b border-ink-border/60 pb-3">
                         <div className="space-y-0.5">
                           <h4 className="text-sm font-mono font-bold uppercase tracking-wider text-ink-primary">
@@ -857,8 +807,8 @@ export default function InterventionSimulatorPage() {
                               </td>
                               <td className="py-2 px-3 font-sans text-ink-secondary text-[11px]">
                                 {simulationResult.projected.factors.severity < simulationResult.baseline.factors.severity
-                                  ? 'Physical leak isolated or drinking water quality safeguarded.'
-                                  : 'Acute contamination hazard remains.'}
+                                  ? 'Physical risk isolated or municipal service quality safeguarded.'
+                                  : 'Acute condition hazard remains.'}
                               </td>
                             </tr>
 
@@ -884,7 +834,7 @@ export default function InterventionSimulatorPage() {
                                 {simulationResult.projected.factors.duration - simulationResult.baseline.factors.duration}
                               </td>
                               <td className="py-2 px-3 font-sans text-ink-secondary text-[11px]">
-                                Total age {simulationResult.projected.projected_total_elapsed_hours}h ($\ge 3$ days bracket $\rightarrow$ score 14).
+                                Total age {simulationResult.projected.projected_total_elapsed_hours}h.
                               </td>
                             </tr>
 
@@ -911,8 +861,8 @@ export default function InterventionSimulatorPage() {
                               </td>
                               <td className="py-2 px-3 font-sans text-ink-secondary text-[11px]">
                                 {simulationResult.projected.factors.critical_facility < simulationResult.baseline.factors.critical_facility
-                                  ? 'DAV Public School provided dedicated tanker supply or restored line feed.'
-                                  : 'School pipeline remains unmitigated.'}
+                                  ? 'Protected facility mitigation deployed.'
+                                  : 'Facility exposure remains unmitigated.'}
                               </td>
                             </tr>
 
@@ -930,7 +880,7 @@ export default function InterventionSimulatorPage() {
                                     Assumed reduced to 1/10 for modeled 90-day planning horizon (simulation assumption).
                                   </span>
                                 ) : (
-                                  'Standard pipe patch; regional recurrence risk unchanged.'
+                                  'Standard intervention; regional recurrence risk unchanged.'
                                 )}
                               </td>
                             </tr>
@@ -942,7 +892,7 @@ export default function InterventionSimulatorPage() {
                               <td className="py-2 px-3 font-bold text-emerald-700">{simulationResult.projected.factors.evidence}</td>
                               <td className="py-2 px-3 font-bold text-slate-500">0</td>
                               <td className="py-2 px-3 font-sans text-ink-secondary text-[11px]">
-                                Verified baseline sensor records and field media remain auditable.
+                                Verified baseline records and field media remain auditable.
                               </td>
                             </tr>
 
@@ -963,13 +913,13 @@ export default function InterventionSimulatorPage() {
                       </div>
                     </div>
 
-                    {/* AI Strategic Decision Commentary (Constrained by exact numbers) */}
+                    {/* AI Strategic Decision Commentary */}
                     {simulationResult.ai_explanation && (
-                      <div className="p-6 rounded-xl border border-civic-blue/30 bg-civic-blueLight/10 shadow-card space-y-4">
-                        <div className="flex items-center justify-between border-b border-civic-blue/20 pb-3">
+                      <div className="p-6 rounded-xl border border-civic-terracotta/30 bg-civic-blueLight/10 shadow-card space-y-4">
+                        <div className="flex items-center justify-between border-b border-civic-terracotta/20 pb-3">
                           <div className="flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-civic-blue" />
-                            <h4 className="text-sm font-mono font-bold uppercase tracking-wider text-civic-blueDark">
+                            <Sparkles className="w-4 h-4 text-civic-terracotta" />
+                            <h4 className="text-sm font-mono font-bold uppercase tracking-wider text-civic-terracottaDark">
                               AI Strategic Decision Support Analysis
                             </h4>
                           </div>
@@ -1022,7 +972,7 @@ export default function InterventionSimulatorPage() {
                     {/* Assumptions & Limitations Drawer */}
                     <div className="p-4 rounded-xl border border-ink-border/60 bg-canvas-subtle text-[11px] font-mono text-ink-tertiary space-y-2">
                       <div className="flex items-center gap-1.5 font-bold text-ink-secondary">
-                        <Info className="w-3.5 h-3.5 text-civic-blue" />
+                        <Info className="w-3.5 h-3.5 text-civic-terracotta" />
                         <span>Documented Simulation Assumptions & Bound Constraints:</span>
                       </div>
                       <ul className="list-disc list-inside space-y-1 text-ink-secondary">
@@ -1039,10 +989,10 @@ export default function InterventionSimulatorPage() {
               </div>
             )}
 
-            {/* MODE 2: CITYWIDE BUDGET OPTIMIZER (FR-18 ₹10 Lakh) */}
+            {/* MODE 2: CITYWIDE BUDGET OPTIMIZER */}
             {mode === 'BUDGET' && (
               <div className="space-y-6">
-                <div className="p-6 rounded-xl border border-ink-border bg-white shadow-card space-y-5">
+                <div className="p-6 border border-ink-border bg-canvas-card space-y-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-ink-border/50 pb-3">
                     <div className="space-y-0.5">
                       <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-ink-primary flex items-center gap-2">
@@ -1052,7 +1002,7 @@ export default function InterventionSimulatorPage() {
                         </span>
                       </h3>
                       <p className="text-xs text-ink-secondary">
-                        Evaluates the 4 authoritative Phase 1-7 problems across departments using greedy marginal impact reduction per rupee.
+                        Evaluates live problems across departments using greedy marginal impact reduction per rupee.
                       </p>
                     </div>
 
@@ -1071,16 +1021,16 @@ export default function InterventionSimulatorPage() {
                         variant="primary"
                         size="md"
                         onClick={() => runBudgetAllocation()}
-                        disabled={loading || activePersona.role !== 'ADMIN'}
+                        disabled={loading || userProfile?.role !== 'ADMIN'}
                       >
                         {loading ? 'Optimizing...' : 'Optimize Allocation'}
                       </Button>
                     </div>
                   </div>
 
-                  {activePersona.role !== 'ADMIN' && (
+                  {userProfile?.role !== 'ADMIN' && (
                     <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 font-mono">
-                      Notice: Citywide multi-department budget optimization requires Municipal Commissioner (Admin) role. Switch persona above to test.
+                      Notice: Citywide multi-department budget optimization requires Municipal Administrator credentials.
                     </div>
                   )}
 
@@ -1140,7 +1090,7 @@ export default function InterventionSimulatorPage() {
                                 <td className="py-2.5 px-3 font-semibold text-ink-primary">
                                   <Link
                                     href={`/dashboard/problems/${item.problem_id}`}
-                                    className="text-civic-blue hover:underline flex items-center gap-1"
+                                    className="text-civic-terracotta hover:underline flex items-center gap-1"
                                   >
                                     <span>{item.problem_id}</span>
                                     <ExternalLink className="w-3 h-3" />

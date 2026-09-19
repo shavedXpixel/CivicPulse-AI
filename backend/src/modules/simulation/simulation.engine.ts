@@ -366,8 +366,15 @@ export class SimulationEngine {
     const sorted = [...problems].sort((a, b) => (b.impact_score || 0) - (a.impact_score || 0));
 
     for (const prob of sorted) {
-      const pkg = syntheticPackages[prob.id];
-      if (pkg && remainingBudget >= pkg.cost) {
+      const pkg = syntheticPackages[prob.id] || {
+        cost: Math.min(remainingBudget, 250000),
+        name: `Remediation Intervention for ${prob.title || prob.id}`,
+        type: InterventionType.CAPACITY_BOOST,
+        popRate: 0.85,
+        crews: 2,
+        permanent: false
+      };
+      if (pkg.cost > 0 && remainingBudget >= pkg.cost) {
         // Run single problem simulation
         const sim = this.simulateProblemScenario(prob, {
           problem_id: prob.id,

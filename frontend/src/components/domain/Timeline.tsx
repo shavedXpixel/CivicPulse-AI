@@ -16,22 +16,30 @@ export interface TimelineProps {
 }
 
 export function Timeline({ events }: TimelineProps) {
+  if (!events || events.length === 0) {
+    return (
+      <div className="p-4 rounded-sm border border-ink-border bg-canvas-subtle/50 text-center text-xs text-ink-secondary font-mono">
+        No operational actions or audit trail recorded yet.
+      </div>
+    );
+  }
+
   return (
     <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-ink-border">
       {events.map((event) => (
         <div key={event.id} className="relative group">
           {/* Node dot */}
           <div
-            className={`absolute -left-6 top-1 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+            className={`absolute -left-6 top-1 w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors ${
               event.isCurrent
-                ? 'border-civic-blue bg-white'
+                ? 'border-civic-terracotta bg-canvas-card'
                 : event.isCompleted
                 ? 'border-civic-emerald bg-civic-emerald text-white'
-                : 'border-ink-border bg-canvas'
+                : 'border-ink-border bg-canvas-subtle'
             }`}
           >
             {event.isCurrent && (
-              <span className="w-1.5 h-1.5 rounded-full bg-civic-blue animate-ping" />
+              <span className="w-1.5 h-1.5 rounded-sm bg-civic-terracotta" />
             )}
           </div>
 

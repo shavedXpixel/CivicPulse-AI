@@ -2,302 +2,163 @@ import React from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
-  CheckCircle2,
-  AlertTriangle,
-  MapPin,
+  ShieldCheck,
+  ExternalLink,
+  ArrowUpRight,
   Mic,
   Camera,
   FileText,
-  ShieldCheck,
-  Building2,
+  CheckCircle2,
+  AlertTriangle,
   Users,
   Clock,
-  ExternalLink,
-  Check,
+  MapPin,
+  Building2,
   RotateCcw,
+  Check,
 } from 'lucide-react';
 
 export default function HomePage() {
-  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
   return (
-    <div className="min-h-screen bg-canvas text-ink-primary selection:bg-civic-blueLight selection:text-civic-blueDark">
+    <div className="min-h-screen bg-canvas text-ink-primary selection:bg-civic-blueLight selection:text-civic-blueDark flex flex-col font-sans">
       {/* ------------------------------------------------------------- */}
-      {/* TOP NAVIGATION                                                */}
+      {/* TOP ARCHITECTURAL HEADER                                      */}
       {/* ------------------------------------------------------------- */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-ink-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center gap-3">
-              {/* Minimal geometric civic mark */}
-              <div className="w-8 h-8 rounded-lg bg-ink-primary flex items-center justify-center text-white font-bold text-sm tracking-wider">
+      <header className="sticky top-0 z-50 bg-canvas-card/95 backdrop-blur-sm border-b border-ink-border">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <Link href="/" className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-sm bg-ink-primary flex items-center justify-center text-canvas-card font-mono font-bold text-xs tracking-wider">
                 CP
               </div>
-              <div className="flex flex-col">
-                <span className="font-semibold text-base tracking-tight text-ink-primary">
-                  CivicPulse <span className="text-civic-blue font-mono text-xs uppercase px-1.5 py-0.5 rounded bg-civic-blueLight text-civic-blueDark ml-1">AI</span>
-                </span>
-              </div>
+              <span className="font-bold text-sm tracking-tight text-ink-primary">
+                CivicPulse
+              </span>
             </Link>
-            <div className="hidden md:block h-4 w-px bg-ink-border" />
-            <span className="hidden md:inline-block text-xs font-medium text-ink-secondary">
+            <div className="hidden sm:block h-3.5 w-px bg-ink-border" />
+            <span className="hidden md:inline-block text-[11px] font-mono uppercase tracking-wider text-ink-tertiary">
               Citizen Signals → Government Intelligence → Public Action
             </span>
           </div>
 
-          <nav className="hidden lg:flex items-center gap-8 text-sm font-medium text-ink-secondary">
-            <a href="#introduction" className="hover:text-ink-primary transition-colors">
-              Platform
-            </a>
-            <a href="#citizen-experience" className="hover:text-ink-primary transition-colors">
-              Citizen Signal
-            </a>
-            <a href="#problem-intelligence" className="hover:text-ink-primary transition-colors">
-              Clustering
-            </a>
-            <a href="#government-intelligence" className="hover:text-ink-primary transition-colors">
-              Command Center
-            </a>
-            <a href="#resolution-verification" className="hover:text-ink-primary transition-colors">
-              Verification
-            </a>
-            <a href="#governance-ai" className="hover:text-ink-primary transition-colors">
-              Governance AI
-            </a>
-          </nav>
-
           <div className="flex items-center gap-3">
-            {isDemoMode ? (
-              <div className="hidden sm:inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-canvas-subtle border border-ink-border text-ink-secondary">
-                <span className="w-1.5 h-1.5 rounded-full bg-civic-emerald" />
-                <span>DEMO_MODE</span>
-              </div>
-            ) : (
-              <div className="hidden sm:inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-emerald-50 border border-emerald-200 text-emerald-800">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                <span>LIVE PRODUCTION</span>
-              </div>
-            )}
-            <a
-              href="/api/v1/health"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-ink-secondary hover:text-ink-primary px-3 py-1.5 rounded-lg border border-ink-border hover:bg-canvas-subtle transition-all"
-            >
-              <span>System Health</span>
-              <ExternalLink className="w-3.5 h-3.5 text-ink-tertiary" />
-            </a>
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-[10px] font-mono font-medium bg-canvas-subtle border border-ink-border text-ink-secondary">
+              <span className="w-1.5 h-1.5 rounded-full bg-civic-emerald" />
+              <span>LIVE PRODUCTION</span>
+            </span>
+
             <Link
               href="/login"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-civic-blue hover:bg-civic-blueDark px-3.5 py-1.5 rounded-lg shadow-subtle transition-all"
+              className="inline-flex items-center gap-1 text-xs font-medium text-ink-secondary hover:text-ink-primary px-2.5 py-1.5 rounded-sm border border-ink-border hover:bg-canvas-subtle transition-colors"
             >
-              <span>{isDemoMode ? 'Launch Demo' : 'Sign In / Register'}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              Sign In
+            </Link>
+
+            <Link
+              href="/login?tab=register"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-white bg-civic-terracotta hover:bg-civic-terracottaDark px-3 py-1.5 rounded-sm transition-colors shadow-none"
+            >
+              <span>Register</span>
+              <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
         </div>
       </header>
 
       {/* ------------------------------------------------------------- */}
-      {/* 1. HERO SECTION                                               */}
+      {/* EDITORIAL HERO SECTION (12-COLUMN ARCHITECTURAL GRID)        */}
       {/* ------------------------------------------------------------- */}
-      <section className="relative pt-20 pb-24 md:pt-28 md:pb-32 overflow-hidden border-b border-ink-border bg-gradient-to-b from-white to-canvas">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md text-xs font-mono font-medium bg-canvas-subtle text-ink-secondary border border-ink-border mb-6">
-              <span>Digital Public Infrastructure (DPI)</span>
-              <span className="text-ink-tertiary">•</span>
-              <span className="text-civic-blue">Public Problem Intelligence Layer</span>
+      <section className="border-b border-ink-border bg-canvas">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 min-h-[540px]">
+
+          {/* Main Statement Column (Col 1-8) */}
+          <div className="lg:col-span-8 p-6 sm:p-10 lg:p-14 lg:border-r border-ink-border flex flex-col justify-between">
+            <div className="space-y-6 max-w-2xl">
+              <div className="inline-flex items-center gap-2 text-[11px] font-mono uppercase tracking-widest text-civic-terracotta">
+                <span>Digital Public Infrastructure</span>
+                <span>•</span>
+                <span>Civic Intelligence Layer</span>
+              </div>
+
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-ink-primary leading-[1.05] uppercase">
+                CITIZEN SIGNALS<br />
+                BECOME PUBLIC<br />
+                INTELLIGENCE.
+              </h1>
+
+              <p className="text-sm sm:text-base text-ink-secondary leading-relaxed font-normal pt-2">
+                CivicPulse turns real citizen signals into structured intelligence
+                that helps government identify, prioritize, assign and resolve
+                public problems.
+              </p>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-ink-primary leading-[1.1] mb-6">
-              Understand what citizens are experiencing.
-            </h1>
-
-            <p className="text-lg sm:text-xl text-ink-secondary font-normal leading-relaxed mb-8 max-w-2xl">
-              CivicPulse AI transforms fragmented public complaints into unified problem clusters,
-              calculates real-time public impact scores, and validates government resolution with multi-factor proof.
-            </p>
-
-            <div className="flex flex-wrap items-center gap-4 text-sm">
+            {/* Primary Action Buttons */}
+            <div className="pt-10 flex flex-wrap items-center gap-3">
+              <Link
+                href="/citizen/report"
+                className="inline-flex items-center gap-2 text-xs font-semibold text-white bg-civic-terracotta hover:bg-civic-terracottaDark px-4 py-2.5 rounded-sm transition-colors"
+              >
+                <span>Report an Issue</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
               <Link
                 href="/login"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-civic-blue hover:bg-civic-blueDark shadow-subtle transition-all"
+                className="inline-flex items-center gap-2 text-xs font-medium text-ink-primary bg-canvas-card hover:bg-canvas-subtle border border-ink-border px-4 py-2.5 rounded-sm transition-colors"
               >
-                <span>{isDemoMode ? 'Launch Demo Journey' : 'Get Started'}</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>Government Operations Portal</span>
+                <ArrowUpRight className="w-3.5 h-3.5 text-ink-tertiary" />
               </Link>
+            </div>
+          </div>
+
+          {/* Technical Metadata & Architecture Column (Col 9-12) */}
+          <div className="lg:col-span-4 p-6 sm:p-8 lg:p-10 flex flex-col justify-between bg-canvas-subtle/30 space-y-8">
+            <div className="space-y-6">
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-ink-tertiary block">
+                  SYSTEM STATUS
+                </span>
+                <div className="flex items-center gap-2 text-xs font-mono font-medium text-ink-primary">
+                  <span className="w-2 h-2 rounded-full bg-civic-emerald" />
+                  <span>AUTHORITATIVE PIPELINE ACTIVE</span>
+                </div>
+              </div>
+
+              <div className="space-y-1 border-t border-ink-border pt-4">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-ink-tertiary block">
+                  OPERATIONAL PRINCIPLE
+                </span>
+                <p className="text-xs text-ink-secondary leading-relaxed">
+                  Real data authority. Real municipal departments, live citizen reports,
+                  and objective 7-factor public impact calculations without synthetic demo inflation.
+                </p>
+              </div>
+
+              <div className="space-y-1 border-t border-ink-border pt-4">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-ink-tertiary block">
+                  LEGAL & PRIVACY FRAMEWORK
+                </span>
+                <div className="flex items-center gap-1.5 text-xs text-ink-primary font-medium">
+                  <ShieldCheck className="w-4 h-4 text-civic-terracotta shrink-0" />
+                  <span>DPDP Act 2023 Compliant</span>
+                </div>
+                <p className="text-[11px] text-ink-tertiary leading-normal pt-0.5">
+                  Citizen reports undergo automated PII redaction prior to municipal triage and aggregation.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-ink-border">
               <a
-                href="#citizen-experience"
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg font-medium text-ink-primary bg-white hover:bg-canvas-subtle border border-ink-border shadow-subtle transition-all"
+                href="/api/v1/health"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[11px] font-mono text-ink-secondary hover:text-ink-primary transition-colors"
               >
-                <span>Explore Citizen Signal</span>
+                <span>Backend Health Telemetry</span>
+                <ExternalLink className="w-3 h-3 text-ink-tertiary" />
               </a>
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg font-medium text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle transition-all"
-              >
-                <span>Command Center →</span>
-              </Link>
-            </div>
-          </div>
-
-          {/* Real Product UI Composition Preview */}
-          <div className="mt-16 relative">
-            <div className="bg-white rounded-xl border border-ink-border shadow-elevated p-6 md:p-8">
-              {/* Context Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-6 border-b border-ink-border gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="w-2 h-2 rounded-full bg-civic-rose" />
-                    <span className="text-xs font-mono uppercase tracking-wider font-semibold text-civic-rose">
-                      Active Priority Incident
-                    </span>
-                    <span className="text-xs text-ink-tertiary font-mono">#PRB-2026-0819</span>
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-bold text-ink-primary">
-                    Water Supply Disruption — Nayapalli Ward 18
-                  </h2>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <div className="text-xs text-ink-secondary font-medium">Public Impact Score</div>
-                    <div className="text-2xl font-bold text-civic-rose">92<span className="text-xs font-normal text-ink-secondary">/100</span></div>
-                  </div>
-                  <div className="h-10 w-px bg-ink-border" />
-                  <div className="text-right">
-                    <div className="text-xs text-ink-secondary font-medium">Signals Clustered</div>
-                    <div className="text-2xl font-bold text-ink-primary">327</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Three-Column Operational Composition */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Column 1: Citizen Signal Intake */}
-                <div className="rounded-lg bg-canvas p-5 border border-ink-border">
-                  <div className="text-xs font-mono text-ink-secondary uppercase tracking-wider mb-3 flex items-center justify-between">
-                    <span>Citizen Signals</span>
-                    <span className="text-civic-blue font-semibold">Live Feed</span>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="bg-white p-3.5 rounded-md border border-ink-border text-xs space-y-2 shadow-subtle">
-                      <div className="flex items-center justify-between text-ink-tertiary">
-                        <span className="font-mono">Signal #SIG-8821</span>
-                        <span>4 mins ago</span>
-                      </div>
-                      <p className="text-ink-primary font-medium">
-                        &ldquo;High pressure water pipe burst near 4th Cross. Flooding basement parking and road impassable.&rdquo;
-                      </p>
-                      <div className="flex items-center gap-2 pt-1">
-                        <span className="px-2 py-0.5 rounded bg-canvas-subtle text-ink-secondary font-mono">Audio (Odia)</span>
-                        <span className="px-2 py-0.5 rounded bg-civic-blueLight text-civic-blueDark font-mono">Auto-Translated</span>
-                      </div>
-                    </div>
-
-                    <div className="bg-white p-3.5 rounded-md border border-ink-border text-xs space-y-2 shadow-subtle">
-                      <div className="flex items-center justify-between text-ink-tertiary">
-                        <span className="font-mono">Signal #SIG-8819</span>
-                        <span>12 mins ago</span>
-                      </div>
-                      <p className="text-ink-primary font-medium">
-                        &ldquo;No water in taps across blocks C and D since 6 AM. Road submerged outside gate.&rdquo;
-                      </p>
-                      <div className="flex items-center gap-2 pt-1">
-                        <span className="px-2 py-0.5 rounded bg-civic-roseLight text-civic-rose font-mono">Photo Verified</span>
-                        <span className="px-2 py-0.5 rounded bg-canvas-subtle text-ink-secondary font-mono">Ward 18</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Column 2: Systemic Problem Clustering */}
-                <div className="rounded-lg bg-canvas p-5 border border-ink-border">
-                  <div className="text-xs font-mono text-ink-secondary uppercase tracking-wider mb-3 flex items-center justify-between">
-                    <span>Problem Intelligence</span>
-                    <span className="text-civic-emerald font-semibold">Semantic Cluster</span>
-                  </div>
-                  <div className="space-y-3 text-xs">
-                    <div className="bg-white p-3.5 rounded-md border border-ink-border space-y-2 shadow-subtle">
-                      <div className="text-ink-secondary font-medium">Affected Population & Reach</div>
-                      <div className="flex items-baseline justify-between">
-                        <span className="text-xl font-bold text-ink-primary">18,400</span>
-                        <span className="text-ink-secondary">Residents in 1.4 km²</span>
-                      </div>
-                      <div className="w-full bg-canvas-muted rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-civic-rose h-full rounded-full w-[88%]" />
-                      </div>
-                    </div>
-
-                    <div className="bg-white p-3.5 rounded-md border border-ink-border space-y-2 shadow-subtle">
-                      <div className="text-ink-secondary font-medium">Critical Infrastructure at Risk</div>
-                      <div className="flex items-center gap-2 text-ink-primary font-medium">
-                        <Building2 className="w-4 h-4 text-civic-rose shrink-0" />
-                        <span>DAV Public School (adjacent to corridor)</span>
-                      </div>
-                      <div className="text-ink-tertiary">Backup water reserves depleted in 4 hours</div>
-                    </div>
-
-                    <div className="bg-white p-3.5 rounded-md border border-ink-border space-y-2 shadow-subtle">
-                      <div className="text-ink-secondary font-medium">Authoritative 7-Factor Model</div>
-                      <div className="grid grid-cols-4 gap-1.5 text-[10px] text-center">
-                        <div className="p-1 bg-canvas rounded">Sev: 25%</div>
-                        <div className="p-1 bg-canvas rounded">Pop: 20%</div>
-                        <div className="p-1 bg-canvas rounded">Dur: 15%</div>
-                        <div className="p-1 bg-canvas rounded">Conc: 15%</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Column 3: Verified Municipal Action */}
-                <div className="rounded-lg bg-canvas p-5 border border-ink-border">
-                  <div className="text-xs font-mono text-ink-secondary uppercase tracking-wider mb-3 flex items-center justify-between">
-                    <span>Government Action</span>
-                    <span className="text-civic-blue font-semibold">PWD Dispatched</span>
-                  </div>
-                  <div className="space-y-3 text-xs">
-                    <div className="bg-white p-3.5 rounded-md border border-ink-border space-y-2 shadow-subtle">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-ink-primary">Emergency Work Order #WO-402</span>
-                        <span className="px-2 py-0.5 rounded bg-civic-amberLight text-civic-amber font-mono font-medium">In Progress</span>
-                      </div>
-                      <p className="text-ink-secondary">
-                        Valve 4B isolated. Excavation unit on-site. Valve replacement underway.
-                      </p>
-                      <div className="flex items-center gap-2 text-ink-tertiary font-mono pt-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>Est. completion: 2h 40m</span>
-                      </div>
-                    </div>
-
-                    <div className="bg-white p-3.5 rounded-md border border-ink-border space-y-2 shadow-subtle">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-ink-primary">Resolution Verification</span>
-                        <span className="px-2 py-0.5 rounded bg-canvas-subtle text-ink-secondary font-mono">Pending Evidence</span>
-                      </div>
-                      <p className="text-ink-secondary">
-                        Requires post-repair photo match, telemetry pressure restoration, and citizen re-confirmation.
-                      </p>
-                      <div className="text-civic-blue flex items-center gap-1 font-medium pt-1">
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        <span>Tamper-proof audit trail active</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------------- */}
-      {/* 2. PRODUCT INTRODUCTION (THE CIVIC LAYER)                     */}
-      {/* ------------------------------------------------------------- */}
-      <section id="introduction" className="py-24 border-b border-ink-border bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-            <div className="lg:col-span-5 space-y-4">
               <div className="text-xs font-mono uppercase tracking-wider font-semibold text-civic-blue">
                 The Architectural Role
               </div>
@@ -845,13 +706,13 @@ export default function HomePage() {
                 <div className="text-xs font-mono text-ink-tertiary">Verified Citations:</div>
                 <div className="flex flex-wrap gap-2 text-xs font-mono">
                   <span className="px-2.5 py-1 rounded bg-canvas border border-ink-border text-ink-secondary hover:border-civic-blue transition-colors cursor-pointer">
-                    [1] Problem #PRB-2026-0819 (Impact: 92)
+                    [1] Verified Municipal Problem Dossier
                   </span>
                   <span className="px-2.5 py-1 rounded bg-canvas border border-ink-border text-ink-secondary hover:border-civic-blue transition-colors cursor-pointer">
-                    [2] Signal Cluster Batch #W18-994 (327 Signals)
+                    [2] Correlated Signal Cluster Records
                   </span>
                   <span className="px-2.5 py-1 rounded bg-canvas border border-ink-border text-ink-secondary hover:border-civic-blue transition-colors cursor-pointer">
-                    [3] WATCO Work Order #WO-402
+                    [3] Official Department Work Order
                   </span>
                 </div>
               </div>

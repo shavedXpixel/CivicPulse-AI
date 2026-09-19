@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 
 import { useAuth } from '../../context/AuthContext';
-import { DEMO_PROBLEMS } from '../../lib/mockData';
 import { apiClient } from '../../lib/api-client';
 
 export interface GovernmentShellProps {
@@ -31,13 +30,13 @@ export interface GovernmentShellProps {
 export function GovernmentShell({ children, problemCount }: GovernmentShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, userProfile, isDemoMode, signOut } = useAuth();
+  const { user, userProfile, signOut } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [resolvedCount, setResolvedCount] = useState<number | null>(null);
 
   React.useEffect(() => {
     let active = true;
-    if (problemCount === undefined && !isDemoMode) {
+    if (problemCount === undefined) {
       apiClient
         .get<{ data: any[] }>('/api/v1/problems')
         .then((res) => {
@@ -50,15 +49,13 @@ export function GovernmentShell({ children, problemCount }: GovernmentShellProps
     return () => {
       active = false;
     };
-  }, [problemCount, isDemoMode]);
+  }, [problemCount]);
 
   const effectiveProblemCount =
     problemCount !== undefined
       ? problemCount
       : resolvedCount !== null
       ? resolvedCount
-      : isDemoMode
-      ? DEMO_PROBLEMS.length
       : 0;
 
   const navigation = [
@@ -79,18 +76,18 @@ export function GovernmentShell({ children, problemCount }: GovernmentShellProps
   return (
     <div className="min-h-screen bg-canvas text-ink-primary flex">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:flex-col w-64 border-r border-ink-border bg-white shrink-0 sticky top-0 h-screen">
+      <aside className="hidden lg:flex lg:flex-col w-64 border-r border-ink-border bg-canvas-card shrink-0 sticky top-0 h-screen">
         {/* Brand */}
-        <div className="h-16 px-6 border-b border-ink-border flex items-center justify-between">
+        <div className="h-14 px-6 border-b border-ink-border flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-ink-primary flex items-center justify-center text-white font-bold text-xs">
+            <div className="w-7 h-7 rounded-sm bg-ink-primary flex items-center justify-center text-canvas-card font-mono font-bold text-xs">
               CP
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-sm text-ink-primary">
-                CivicPulse <span className="text-civic-blue font-mono text-xs">GOV</span>
+              <span className="font-bold text-sm tracking-tight text-ink-primary">
+                CivicPulse <span className="text-civic-terracotta font-mono text-xs">GOV</span>
               </span>
-              <span className="text-[10px] text-ink-tertiary">Operations Command</span>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-ink-tertiary">Operations Command</span>
             </div>
           </Link>
           <span className="w-2 h-2 rounded-full bg-civic-emerald" title="Live Connection" />
@@ -98,7 +95,7 @@ export function GovernmentShell({ children, problemCount }: GovernmentShellProps
 
         {/* Navigation items */}
         <div className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          <div className="px-3 pb-2 text-[10px] uppercase tracking-wider font-semibold text-ink-tertiary">
+          <div className="px-3 pb-2 text-[10px] uppercase tracking-widest font-mono font-semibold text-ink-tertiary">
             Intelligence Layer
           </div>
           {navigation.map((item) => {
@@ -109,23 +106,23 @@ export function GovernmentShell({ children, problemCount }: GovernmentShellProps
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                className={`flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors ${
                   isActive
-                    ? 'bg-civic-blueLight text-civic-blueDark font-semibold'
+                    ? 'bg-civic-blueLight text-civic-blueDark font-semibold border-l-2 border-civic-terracotta'
                     : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-civic-blue' : 'text-ink-tertiary'}`} />
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-civic-terracotta' : 'text-ink-tertiary'}`} />
                   <span>{item.name}</span>
                 </div>
                 {item.badge && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-civic-roseLight text-civic-rose">
+                  <span className="px-1.5 py-0.2 rounded-sm text-[10px] font-mono font-bold bg-canvas-subtle border border-ink-border text-ink-primary">
                     {item.badge}
                   </span>
                 )}
                 {item.isAI && (
-                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-civic-blue/10 text-civic-blue">
+                  <span className="px-1.5 py-0.2 rounded-sm text-[9px] font-mono font-bold bg-civic-blueLight text-civic-blueDark">
                     ANALYTICS
                   </span>
                 )}
@@ -139,17 +136,15 @@ export function GovernmentShell({ children, problemCount }: GovernmentShellProps
           <div className="flex items-center justify-between text-xs">
             <div className="min-w-0 pr-2">
               <div className="font-semibold text-ink-primary truncate">
-                {userProfile?.display_name || user?.displayName || user?.email || (isDemoMode ? 'Municipal Commissioner' : 'Operations Officer')}
+                {userProfile?.display_name || user?.displayName || user?.email || 'Operations Officer'}
               </div>
-              <div className="text-[10px] text-ink-tertiary truncate flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-civic-blue shrink-0" />
+              <div className="text-[10px] font-mono text-ink-tertiary truncate flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3 text-civic-terracotta shrink-0" />
                 <span>
                   {userProfile?.role === 'ADMIN'
                     ? 'Citywide Admin • Bhubaneswar'
                     : userProfile?.role === 'DEPARTMENT_OFFICER'
                     ? `${userProfile.department_id || 'WATCO'} Supervisor • Bhubaneswar`
-                    : isDemoMode
-                    ? 'BMC Central Zone • Bhubaneswar'
                     : user?.email || 'Operations Command'}
                 </span>
               </div>
@@ -160,7 +155,7 @@ export function GovernmentShell({ children, problemCount }: GovernmentShellProps
                 router.push('/login');
               }}
               className="text-ink-tertiary hover:text-ink-primary p-1 rounded hover:bg-canvas transition-colors shrink-0"
-              title={isDemoMode ? 'Switch Role' : 'Sign Out'}
+              title="Sign Out"
             >
               <LogOut className="w-3.5 h-3.5" />
             </button>
@@ -171,7 +166,7 @@ export function GovernmentShell({ children, problemCount }: GovernmentShellProps
       {/* Main Layout Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header Bar */}
-        <header className="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-sm border-b border-ink-border px-4 sm:px-6 flex items-center justify-between gap-4">
+        <header className="sticky top-0 z-30 h-14 bg-canvas-card/95 backdrop-blur-sm border-b border-ink-border px-4 sm:px-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
@@ -194,8 +189,8 @@ export function GovernmentShell({ children, problemCount }: GovernmentShellProps
 
           <div className="flex items-center gap-3">
             <div className="hidden sm:inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-mono bg-canvas-subtle border border-ink-border text-ink-secondary">
-              <span className={`w-2 h-2 rounded-full ${isDemoMode ? 'bg-civic-emerald' : 'bg-civic-blue'}`} />
-              <span>{isDemoMode ? 'DEMO_MODE: Bhubaneswar Ward 18 Scenario' : 'REAL_MODE: Live Operations Command'}</span>
+              <span className="w-2 h-2 rounded-full bg-civic-blue" />
+              <span>REAL_MODE: Live Operations Command</span>
             </div>
 
             <button
@@ -258,10 +253,10 @@ export function GovernmentShell({ children, problemCount }: GovernmentShellProps
               <div className="p-4 border-t border-ink-border flex items-center justify-between text-xs">
                 <div className="min-w-0 pr-2">
                   <div className="font-semibold text-ink-primary truncate">
-                    {userProfile?.display_name || user?.displayName || user?.email || (isDemoMode ? 'Municipal Commissioner' : 'Officer')}
+                    {userProfile?.display_name || user?.displayName || user?.email || 'Officer'}
                   </div>
                   <div className="text-[10px] text-ink-tertiary truncate">
-                    {userProfile?.role || (isDemoMode ? 'BMC Central Zone' : 'Government')}
+                    {userProfile?.role || 'Government'}
                   </div>
                 </div>
                 <button

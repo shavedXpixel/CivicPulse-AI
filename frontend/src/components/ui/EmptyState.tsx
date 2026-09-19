@@ -9,19 +9,19 @@ export interface EmptyStateProps {
 }
 
 export function EmptyState({
-  icon = <Inbox className="w-8 h-8 text-ink-tertiary" />,
+  icon = <Inbox className="w-5 h-5 text-ink-tertiary" />,
   title,
   description,
   action,
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center p-8 text-center rounded-xl border border-dashed border-ink-border bg-canvas/50 space-y-3">
-      <div className="p-3 rounded-full bg-canvas-subtle border border-ink-border">{icon}</div>
+    <div className="flex flex-col items-center justify-center p-8 text-center border border-ink-border bg-canvas-card rounded-md space-y-3">
+      <div className="p-2 rounded-sm bg-canvas-subtle border border-ink-border">{icon}</div>
       <div className="space-y-1 max-w-sm">
-        <h4 className="text-sm font-semibold text-ink-primary">{title}</h4>
+        <h4 className="text-sm font-semibold text-ink-primary tracking-tight">{title}</h4>
         <p className="text-xs text-ink-secondary leading-relaxed">{description}</p>
       </div>
-      {action && <div className="pt-2">{action}</div>}
+      {action && <div className="pt-1">{action}</div>}
     </div>
   );
 }

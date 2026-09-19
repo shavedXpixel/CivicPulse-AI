@@ -84,6 +84,8 @@ export class SignalService {
       ward_name: resolvedWardName,
       geography_provenance: resolvedProvenance,
       location: input.location || undefined,
+      location_source: input.location_source || undefined,
+      location_accuracy_m: typeof input.location_accuracy_m === 'number' ? input.location_accuracy_m : undefined,
       location_reference: input.location_reference || undefined,
       severity: SignalSeverity.UNKNOWN,
       status: SignalStatus.ACTIVE,

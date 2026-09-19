@@ -98,19 +98,19 @@ describe('Frontend Navigation & Role Journey UX Verification', () => {
       expect(html).not.toContain('Intervention Simulator');
     });
 
-    it('displays Demo Role Switcher in DEMO_MODE, and authenticated user controls in REAL_MODE', () => {
-      // In DEMO_MODE: shows Switch Role
-      mockAuthState.isDemoMode = true;
+    it('strictly does NOT display Switch Role; displays Sign In when unauthenticated and Sign Out when authenticated', () => {
+      // When unauthenticated: shows Sign In, never Switch Role
+      mockAuthState.user = null;
       let html = renderToStaticMarkup(
         <CitizenShell>
           <div>Content</div>
         </CitizenShell>
       );
-      expect(html).toContain('Switch Role');
+      expect(html).not.toContain('Switch Role');
+      expect(html).toContain('Sign In');
       expect(html).toContain('href="/login"');
 
-      // In REAL_MODE with authenticated citizen: shows email and Sign Out
-      mockAuthState.isDemoMode = false;
+      // When authenticated citizen: shows email and Sign Out
       mockAuthState.user = { email: 'citizen@bhubaneswar.gov.in', uid: 'c_123' };
       html = renderToStaticMarkup(
         <CitizenShell>
@@ -128,7 +128,7 @@ describe('Frontend Navigation & Role Journey UX Verification', () => {
       currentPathname = '/dashboard';
       const html = renderToStaticMarkup(
         <GovernmentShell>
-          <div>Gov Content</div>
+          <div>Dashboard Content</div>
         </GovernmentShell>
       );
 
@@ -149,31 +149,27 @@ describe('Frontend Navigation & Role Journey UX Verification', () => {
     });
 
     it('highlights Command Center when on /dashboard and preserves Problems active on subroutes', () => {
-      // On Command Center
       currentPathname = '/dashboard';
       let html = renderToStaticMarkup(
         <GovernmentShell>
-          <div>Gov Content</div>
+          <div>Dashboard Content</div>
         </GovernmentShell>
       );
-      // Command Center link has active background class
       expect(html).toMatch(/href="\/dashboard"[^>]*class="[^"]*bg-civic-blueLight/);
 
-      // On Subroute /dashboard/problems/PRB-2026-0819
+      // Problems subroute check
       currentPathname = '/dashboard/problems/PRB-2026-0819';
       html = renderToStaticMarkup(
         <GovernmentShell>
-          <div>Gov Content</div>
+          <div>Detail Content</div>
         </GovernmentShell>
       );
-      // Problems link maintains active background class on subroutes
       expect(html).toMatch(/href="\/dashboard\/problems"[^>]*class="[^"]*bg-civic-blueLight/);
     });
   });
 
   describe('3. OfficerShell Navigation & Role Corrections', () => {
-    it('in DEMO_MODE: renders My Work, Assigned Problems (with Golden Demo link), and Priority Problems', () => {
-      mockAuthState.isDemoMode = true;
+    it('in production runtime: renders My Work, Assigned Problems (pointing to /officer), and Priority Problems without Golden Demo', () => {
       currentPathname = '/officer';
       const html = renderToStaticMarkup(
         <OfficerShell>
@@ -184,8 +180,8 @@ describe('Frontend Navigation & Role Journey UX Verification', () => {
       expect(html).toContain('My Work / Officer Queue');
       expect(html).toContain('href="/officer"');
       expect(html).toContain('Assigned Problems');
-      expect(html).toContain('href="/dashboard/problems/PRB-2026-0819"');
-      expect(html).toContain('Golden Demo');
+      expect(html).not.toContain('href="/dashboard/problems/PRB-2026-0819"');
+      expect(html).not.toContain('Golden Demo');
       expect(html).toContain('Priority Problems');
       expect(html).toContain('href="/dashboard/problems"');
     });
@@ -316,7 +312,7 @@ describe('Frontend Navigation & Role Journey UX Verification', () => {
 
       // REAL_MODE with live problem
       const isReal = false;
-      const realProblemId = 'PRB-2026-6985';
+      const realProblemId: string = 'PRB-2026-6985';
       const realRail = (
         <div>
           <a href="/dashboard/problems">All Problems</a>

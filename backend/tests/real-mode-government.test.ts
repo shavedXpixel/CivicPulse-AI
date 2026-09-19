@@ -8,7 +8,7 @@ import { createApp } from '../src/app';
 import { Express } from 'express';
 import { getFirebaseAuth, getFirestoreDb } from '../src/infrastructure/firebase/firebase-admin';
 import { UserRole } from '@civicpulse/shared';
-import { ProviderContainer, FirestoreDatabaseProvider } from '../src/providers';
+import { ProviderContainer, FirestoreDatabaseProvider, FirebaseAuthProvider } from '../src/providers';
 import { env } from '../src/config/env';
 
 describe('Phase 13: Real Government Experience & Operations Workflows', () => {
@@ -47,7 +47,10 @@ describe('Phase 13: Real Government Experience & Operations Workflows', () => {
   beforeAll(async () => {
     (env as any).DEMO_MODE = false;
     (env as any).PROVIDER_MODE = 'cloud';
+    (env as any).AUTH_PROVIDER = 'firebase';
+    (env as any).DATABASE_PROVIDER = 'firestore';
     ProviderContainer.setDatabaseProvider(new FirestoreDatabaseProvider());
+    ProviderContainer.setAuthProvider(new FirebaseAuthProvider());
 
     app = createApp();
     try {

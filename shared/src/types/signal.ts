@@ -69,6 +69,8 @@ export interface Signal {
   ward_name?: string;
   geography_provenance?: import('./problem').ProvenanceSource;
   location?: GeoCoordinates;
+  location_source?: LocationSource;
+  location_accuracy_m?: number;
   location_reference?: string;
   critical_facility?: string;
   status: SignalStatus;
@@ -84,11 +86,14 @@ export interface Signal {
   ai_analysis?: SignalAIAnalysis;
 }
 
+export type LocationSource = 'GPS' | 'MANUAL';
 
 export interface CreateSignalInput {
   original_text: string;
   category?: string | null;
   location?: GeoCoordinates | null;
+  location_source?: LocationSource | null;
+  location_accuracy_m?: number | null;
   ward_id?: string | null;
   location_reference?: string | null;
   media_ids?: string[];

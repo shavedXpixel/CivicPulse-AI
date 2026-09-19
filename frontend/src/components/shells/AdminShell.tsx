@@ -49,28 +49,28 @@ export function AdminShell({ children }: AdminShellProps) {
   return (
     <div className="min-h-screen bg-canvas text-ink-primary flex">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:flex-col w-64 border-r border-ink-border bg-white shrink-0 sticky top-0 h-screen">
+      <aside className="hidden lg:flex lg:flex-col w-64 border-r border-ink-border bg-canvas-card shrink-0 sticky top-0 h-screen">
         {/* Brand */}
-        <div className="h-16 px-6 border-b border-ink-border flex items-center justify-between">
+        <div className="h-14 px-6 border-b border-ink-border flex items-center justify-between">
           <Link href="/admin" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-ink-primary flex items-center justify-center text-white font-bold text-xs">
+            <div className="w-7 h-7 rounded-sm bg-ink-primary flex items-center justify-center text-canvas-card font-mono font-bold text-xs">
               AD
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-sm text-ink-primary">
-                CivicPulse <span className="text-purple-600 font-mono text-xs">ADMIN</span>
+              <span className="font-bold text-sm tracking-tight text-ink-primary">
+                CivicPulse <span className="text-civic-terracotta font-mono text-xs">ADMIN</span>
               </span>
-              <span className="text-[10px] text-ink-tertiary">Platform Controls</span>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-ink-tertiary">Platform Controls</span>
             </div>
           </Link>
-          <span className="w-2 h-2 rounded-full bg-purple-500" title="Superadmin Mode" />
+          <span className="w-2 h-2 rounded-full bg-civic-emerald" title="Superadmin Mode" />
         </div>
 
         {/* Navigation items */}
         <div className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
           {/* Main Section */}
           <div className="space-y-1">
-            <div className="px-3 pb-2 text-[10px] uppercase tracking-wider font-semibold text-ink-tertiary">
+            <div className="px-3 pb-2 text-[10px] uppercase tracking-widest font-mono font-semibold text-ink-tertiary">
               Operational Workspace
             </div>
             {mainNav.map((item) => {
@@ -80,13 +80,13 @@ export function AdminShell({ children }: AdminShellProps) {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
                     isActive
-                      ? 'bg-civic-blueLight text-civic-blueDark font-semibold'
+                      ? 'bg-civic-blueLight text-civic-blueDark font-semibold border-l-2 border-civic-terracotta'
                       : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
                   }`}
                 >
-                  <Icon className="w-4 h-4 text-ink-tertiary" />
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-civic-terracotta' : 'text-ink-tertiary'}`} />
                   <span>{item.name}</span>
                 </Link>
               );
@@ -94,8 +94,8 @@ export function AdminShell({ children }: AdminShellProps) {
           </div>
 
           {/* Admin Dedicated Section */}
-          <div className="space-y-1 pt-2 border-t border-ink-border/60">
-            <div className="px-3 pb-2 text-[10px] uppercase tracking-wider text-purple-700 font-semibold">
+          <div className="space-y-1 pt-2 border-t border-ink-border">
+            <div className="px-3 pb-2 text-[10px] uppercase tracking-widest font-mono text-ink-secondary font-semibold">
               Administration & DPI
             </div>
             {adminNav.map((item) => {
@@ -105,13 +105,13 @@ export function AdminShell({ children }: AdminShellProps) {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
                     isActive
-                      ? 'bg-purple-50 text-purple-900 font-semibold'
+                      ? 'bg-canvas-subtle text-ink-primary font-semibold border border-ink-border'
                       : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
                   }`}
                 >
-                  <Icon className="w-4 h-4 text-purple-600" />
+                  <Icon className="w-4 h-4 text-ink-tertiary" />
                   <span>{item.name}</span>
                 </Link>
               );

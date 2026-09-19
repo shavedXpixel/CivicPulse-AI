@@ -24,7 +24,7 @@ describe('Phase 15B.1 — Foundation & Non-Google Architecture Verification', ()
       expect(fs.existsSync(migrationsDir)).toBe(true);
 
       const files = fs.readdirSync(migrationsDir).sort();
-      expect(files).toEqual([
+      expect(files.slice(0, 6)).toEqual([
         '0001_extensions.sql',
         '0002_types.sql',
         '0003_tables.sql',
@@ -32,6 +32,7 @@ describe('Phase 15B.1 — Foundation & Non-Google Architecture Verification', ()
         '0005_rls.sql',
         '0006_grants.sql'
       ]);
+      expect(files).toContain('0007_location_metadata.sql');
     });
 
     it('0001_extensions.sql enables uuid-ossp, pgcrypto, and vector', () => {

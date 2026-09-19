@@ -42,18 +42,17 @@ export interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
+  const isDemoMode = false;
   const useSupabase = isSupabaseConfigured();
 
   const [user, setUser] = useState<any | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState<boolean>(!isDemoMode);
+  const [loading, setLoading] = useState<boolean>(true);
   const [isConfigured, setIsConfigured] = useState<boolean>(
     useSupabase ? isSupabaseConfigured() : isFirebaseConfigured()
   );
 
   const fetchProfile = useCallback(async (): Promise<UserProfile | null> => {
-    if (isDemoMode) return null;
     try {
       const res = await apiClient.get<{ data: { user: UserProfile } }>('/api/v1/auth/me');
       if (res?.data?.user) {
@@ -64,14 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.warn('Could not fetch authoritative user profile:', err);
     }
     return null;
-  }, [isDemoMode]);
+  }, []);
 
   useEffect(() => {
-    if (isDemoMode) {
-      setLoading(false);
-      return;
-    }
-
     const configured = useSupabase ? isSupabaseConfigured() : isFirebaseConfigured();
     setIsConfigured(configured);
 
@@ -108,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       return () => unsubscribe();
     }
-  }, [isDemoMode, useSupabase, fetchProfile]);
+  }, [useSupabase, fetchProfile]);
 
   const handleSignIn = async (email: string, pass: string): Promise<{ user: any; profile: UserProfile | null }> => {
     if (useSupabase) {
@@ -216,12 +210,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (!context) {
-    const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
     return {
       user: null,
       userProfile: null,
       loading: false,
-      isDemoMode: isDemo,
+      isDemoMode: false,
       isConfigured: false,
       signIn: async () => { throw new Error('AuthProvider not mounted'); },
       signUp: async () => { throw new Error('AuthProvider not mounted'); },

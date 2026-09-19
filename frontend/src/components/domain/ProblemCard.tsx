@@ -22,28 +22,28 @@ export function ProblemCard({ problem, rank, compact = false }: ProblemCardProps
   const sla = problem.sla_state;
 
   return (
-    <div className="p-5 rounded-xl border border-ink-border bg-white shadow-card hover:border-ink-secondary/40 transition-all space-y-4">
+    <div className="p-5 rounded-sm border border-ink-border bg-canvas-card shadow-none hover:border-ink-secondary transition-colors space-y-4">
       <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             {rank !== undefined && (
-              <span className="text-xs font-mono font-bold text-ink-tertiary">
+              <span className="text-[11px] font-mono font-bold text-ink-tertiary">
                 #{String(rank).padStart(2, '0')}
               </span>
             )}
-            <span className="text-xs uppercase tracking-wider font-semibold text-ink-secondary">
+            <span className="text-[10px] font-mono uppercase tracking-widest font-semibold text-civic-terracotta">
               {(problem.category || 'CIVIC').replace(/_/g, ' ')}
             </span>
-            <span className="text-ink-tertiary">•</span>
-            <span className="text-xs font-mono text-ink-tertiary">{problem.id}</span>
+            <span className="text-ink-border">•</span>
+            <span className="text-[11px] font-mono text-ink-tertiary">{problem.id}</span>
             {isDemo && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+              <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-bold bg-amber-50 text-amber-900 border border-amber-200">
                 SYNTHETIC DEMO
               </span>
             )}
             {sla && (
               <span
-                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold flex items-center gap-1 ${
+                className={`px-2 py-0.5 rounded-sm text-[10px] font-mono font-bold flex items-center gap-1 ${
                   sla.status === 'BREACHED'
                     ? 'bg-rose-100 text-rose-800'
                     : sla.status === 'AT_RISK'
@@ -64,10 +64,10 @@ export function ProblemCard({ problem, rank, compact = false }: ProblemCardProps
 
           <Link
             href={`/dashboard/problems/${problem.id}`}
-            className="group inline-flex items-center gap-1.5 text-base font-bold text-ink-primary hover:text-civic-blue transition-colors"
+            className="group inline-flex items-center gap-1.5 text-base font-bold text-ink-primary hover:text-civic-terracotta transition-colors"
           >
             <span>{problem.title}</span>
-            <ArrowUpRight className="w-4 h-4 text-ink-tertiary group-hover:text-civic-blue transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            <ArrowUpRight className="w-4 h-4 text-ink-tertiary group-hover:text-civic-terracotta transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </Link>
         </div>
 
@@ -77,35 +77,35 @@ export function ProblemCard({ problem, rank, compact = false }: ProblemCardProps
       <div className="flex flex-wrap items-center gap-4 text-xs text-ink-secondary">
         <div className="flex items-center gap-1.5">
           <MapPin className="w-3.5 h-3.5 text-ink-tertiary" />
-          <span>{wardDisplay}</span>
+          <span className="font-medium">{wardDisplay}</span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 font-mono text-[11px]">
           <Users className="w-3.5 h-3.5 text-ink-tertiary" />
-          <span className="font-semibold text-ink-primary">{signalCount}</span>
-          <span>reports</span>
+          <span className="font-bold text-ink-primary">{signalCount}</span>
+          <span className="text-ink-secondary">reports</span>
           {isDemo && (
             <span className="text-[10px] text-amber-700 italic">(synthetic aggregate)</span>
           )}
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-ink-tertiary font-medium">Dept:</span>
-          <span className="font-semibold text-ink-primary">{deptDisplay}</span>
+          <span className="text-ink-tertiary text-[11px] font-mono uppercase tracking-wider">Dept:</span>
+          <span className="font-semibold text-ink-primary text-xs">{deptDisplay}</span>
         </div>
       </div>
 
       {!compact && summary && (
-        <p className="text-xs text-ink-secondary leading-relaxed bg-canvas-subtle/50 p-3 rounded-lg border border-ink-border/50">
+        <p className="text-xs text-ink-secondary leading-relaxed bg-canvas-subtle/50 p-3 rounded-sm border border-ink-border">
           {summary}
         </p>
       )}
 
-      <div className="pt-2 border-t border-ink-border/60 flex items-center justify-between">
+      <div className="pt-2 border-t border-ink-border flex items-center justify-between">
         <div className="w-40">
           <ImpactScore score={impactScore} size="sm" showBar={true} />
         </div>
         <Link
           href={`/dashboard/problems/${problem.id}`}
-          className="text-xs font-semibold text-civic-blue hover:text-civic-blueDark transition-colors"
+          className="text-xs font-mono font-semibold text-civic-terracotta hover:text-civic-terracottaDark transition-colors"
         >
           View Details →
         </Link>

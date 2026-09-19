@@ -54,7 +54,6 @@ vi.mock('../src/lib/api-client', () => ({
 import GovernmentDashboardPage from '../src/app/dashboard/page';
 import ProblemsPage from '../src/app/dashboard/problems/page';
 import { GovernmentShell } from '../src/components/shells/GovernmentShell';
-import { DEMO_PROBLEMS, DEMO_DEPARTMENTS, DEMO_KPIS } from '../src/lib/mockData';
 
 describe('Phase 11 Regression: Dashboard Data Consistency & Authoritative Counts', () => {
   beforeEach(() => {
@@ -70,48 +69,45 @@ describe('Phase 11 Regression: Dashboard Data Consistency & Authoritative Counts
     };
   });
 
-  describe('1. In DEMO_MODE: Coherent Golden Demo Dataset', () => {
-    it('ensures Problems badge, All Problems, Departments, KPIs, and Brief all match Golden Demo dataset', () => {
-      mockAuthState.isDemoMode = true;
+  describe('1. Production Runtime: Zero Fallback to Golden Demo Dataset', () => {
+    it('ensures Problems badge, All Problems, Departments, KPIs, and Brief never fall back to Golden Demo dataset', () => {
+      mockAuthState.isDemoMode = false;
 
       const html = renderToStaticMarkup(<GovernmentDashboardPage />);
 
-      // 1. Sidebar badge must equal demo problem count (5), never hardcoded 14
+      // 1. Sidebar badge must be 0, never hardcoded 14 or 5
       expect(html).toContain('Problems');
-      expect(html).toContain(`>${DEMO_PROBLEMS.length}<`);
+      expect(html).toContain('>0<');
       expect(html).not.toMatch(/>14</);
+      expect(html).not.toMatch(/>5</);
 
-      // 2. Quick navigation All Problems count must equal demo problem count (5)
-      expect(html).toContain(`All Problems (${DEMO_PROBLEMS.length})`);
+      // 2. Quick navigation All Problems count must be 0
+      expect(html).toContain('All Problems (0)');
 
-      // 3. Quick navigation Departments count must equal demo department count (5)
-      expect(html).toContain(`Departments (${DEMO_DEPARTMENTS.length})`);
+      // 3. Quick navigation Departments count must be 0
+      expect(html).toContain('Departments (0)');
 
-      // 4. KPI Citizen Signals must NOT be 0 or arbitrary 12,842; must match demo signals
-      const expectedSignals = DEMO_PROBLEMS.reduce((s, p) => s + (p.signalCount || 0), 0);
-      expect(html).toContain(expectedSignals.toLocaleString());
+      // 4. KPI Citizen Signals must be 0
+      expect(html).toContain('Citizen Signals');
 
-      // 5. KPI Active Problems must NOT be 0; must match demo active problems
-      const expectedActive = DEMO_PROBLEMS.filter(p => p.status !== 'RESOLVED' && p.status !== 'CLOSED').length;
-      expect(html).toContain(`>${expectedActive}<`);
-
-      // 6. Intelligence Brief must be grounded on PRB-2026-0819 with 327 verified citizen signals
-      expect(html).toContain('Grounded on 327 verified citizen signals');
-      expect(html).toContain('Nayapalli');
-      expect(html).toContain('18,400');
+      // 5. Intelligence Brief must NOT claim grounding on 327 verified signals or Golden Demo specifics
+      expect(html).not.toContain('Grounded on 327 verified citizen signals');
+      expect(html).not.toContain('Nayapalli corridor');
+      expect(html).not.toContain('18,400 residents');
     });
 
-    it('ensures GovernmentShell alone defaults to demo problem count in DEMO_MODE', () => {
-      mockAuthState.isDemoMode = true;
+    it('ensures GovernmentShell alone defaults to 0 problem count in production', () => {
+      mockAuthState.isDemoMode = false;
       const html = renderToStaticMarkup(
         <GovernmentShell>
           <div>Shell Content</div>
         </GovernmentShell>
       );
 
-      // Badge must be String(DEMO_PROBLEMS.length), strictly not '14'
-      expect(html).toContain(`>${DEMO_PROBLEMS.length}<`);
+      // Badge must be 0, strictly not '14' or '5'
+      expect(html).toContain('>0<');
       expect(html).not.toMatch(/>14</);
+      expect(html).not.toMatch(/>5</);
     });
   });
 
@@ -184,18 +180,17 @@ describe('Phase 11 Regression: Dashboard Data Consistency & Authoritative Counts
       expect(htmlWith2).not.toMatch(/>14</);
     });
 
-    it('ensures ProblemsPage passes Golden Demo count to GovernmentShell in DEMO_MODE', () => {
-      mockAuthState.isDemoMode = true;
+    it('ensures ProblemsPage passes authoritative count to GovernmentShell in production', () => {
+      mockAuthState.isDemoMode = false;
       const html = renderToStaticMarkup(<ProblemsPage />);
 
-      // Sidebar Problems badge matches Golden Demo count
+      // Sidebar Problems badge matches authoritative count (0 on initial load)
       expect(html).toContain('Problems');
-      expect(html).toContain(`>${DEMO_PROBLEMS.length}<`);
-      expect(html).not.toMatch(/>0</);
+      expect(html).toContain('>0<');
       expect(html).not.toMatch(/>14</);
 
-      // Page header badge matches Golden Demo count
-      expect(html).toContain(`${DEMO_PROBLEMS.length} Incidents Available`);
+      // Page header badge matches authoritative count
+      expect(html).toContain('0 Incidents Available');
     });
   });
 });

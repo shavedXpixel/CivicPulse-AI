@@ -9,14 +9,7 @@ import { AIBrief } from '../../components/domain/AIBrief';
 import { ProblemCard } from '../../components/domain/ProblemCard';
 import { MapContainer } from '../../components/domain/MapContainer';
 import { FilterBar } from '../../components/domain/FilterBar';
-import {
-  DEMO_PROBLEMS,
-  DEMO_KPIS,
-  DEMO_DEPARTMENTS,
-  DEMO_AI_BRIEF,
-} from '../../lib/mockData';
 import { apiClient } from '../../lib/api-client';
-import { useAuth } from '../../context/AuthContext';
 import {
   ArrowRight,
   Activity,
@@ -31,7 +24,6 @@ import {
 } from 'lucide-react';
 
 export default function GovernmentDashboardPage() {
-  const { isDemoMode } = useAuth();
   const [ward, setWard] = useState('ALL');
   const [category, setCategory] = useState('ALL');
   const [severity, setSeverity] = useState('ALL');
@@ -85,57 +77,38 @@ export default function GovernmentDashboardPage() {
         setLiveMap(mapRes.data);
       }
     } catch (err: any) {
-      console.warn('Dashboard live API fetch fallback:', err);
-      if (!isDemoMode) {
-        setError(err.message || 'Failed to connect to operations backend. Click retry to reconnect.');
-      }
+      console.warn('Dashboard live API fetch error:', err);
+      setError(err.message || 'Failed to connect to operations backend. Click retry to reconnect.');
     } finally {
       setLoading(false);
     }
-  }, [isDemoMode]);
+  }, []);
 
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
 
-  // Single Authoritative Dataset Resolution:
-  // In DEMO_MODE:
-  // Use liveProblems if available and non-empty, otherwise use DEMO_PROBLEMS.
-  // In REAL_MODE:
-  // Strictly use liveProblems (truthful empty [] if none in database).
-  const rawProblems = isDemoMode
-    ? (liveProblems.length > 0 ? liveProblems : DEMO_PROBLEMS)
-    : liveProblems;
+  // Live Authoritative Datasets & Counts
+  const rawProblems = liveProblems;
+  const displayDepartments = liveDepartments;
 
-  // Effective departments list:
-  // In DEMO_MODE:
-  // Use liveDepartments if available and non-empty, otherwise use DEMO_DEPARTMENTS.
-  // In REAL_MODE:
-  // Strictly use liveDepartments (truthful empty [] if none in database).
-  const displayDepartments = isDemoMode
-    ? (liveDepartments.length > 0 ? liveDepartments : DEMO_DEPARTMENTS)
-    : liveDepartments;
-
-  // Single Authoritative Counts (Invariant: problem count, badge, quick nav, and KPIs derived from same dataset):
   const authoritativeProblemCount = rawProblems.length;
   const authoritativeDepartmentCount = displayDepartments.length;
 
-  const authoritativeActiveCount = isDemoMode && liveProblems.length === 0
-    ? DEMO_KPIS.activeProblems
-    : (liveSummary?.active_problems ?? rawProblems.filter((p) => p.status !== 'RESOLVED' && p.status !== 'CLOSED').length);
+  const authoritativeActiveCount =
+    liveSummary?.active_problems ??
+    rawProblems.filter((p) => p.status !== 'RESOLVED' && p.status !== 'CLOSED').length;
 
-  const authoritativeCriticalCount = isDemoMode && liveProblems.length === 0
-    ? DEMO_KPIS.highImpact
-    : (liveSummary?.critical_problems ?? rawProblems.filter((p) => {
-        const sev = p.impact_level || p.severity;
-        return sev === 'CRITICAL' || sev === 'HIGH';
-      }).length);
+  const authoritativeCriticalCount =
+    liveSummary?.critical_problems ??
+    rawProblems.filter((p) => {
+      const sev = p.impact_level || p.severity;
+      return sev === 'CRITICAL' || sev === 'HIGH';
+    }).length;
 
-  const authoritativeSignalCount = isDemoMode
-    ? (liveSummary && liveProblems.length > 0 && liveSummary.total_signals > 0
-        ? liveSummary.total_signals
-        : rawProblems.reduce((sum, p) => sum + (p.signalCount ?? p.signal_count ?? 0), 0))
-    : (liveSummary?.total_signals ?? rawProblems.reduce((sum, p) => sum + (p.signal_count ?? p.signalCount ?? 0), 0));
+  const authoritativeSignalCount =
+    liveSummary?.total_signals ??
+    rawProblems.reduce((sum, p) => sum + (p.signal_count ?? p.signalCount ?? 0), 0);
 
   // Determine highest impact problem for primary contextual navigation
   const highestProblem = rawProblems.slice().sort((a, b) => {
@@ -143,7 +116,7 @@ export default function GovernmentDashboardPage() {
     const scoreB = b.impact_score ?? b.impactScore ?? 0;
     return scoreB - scoreA;
   })[0];
-  const primaryProblemId = highestProblem?.id || (isDemoMode ? 'PRB-2026-0819' : null);
+  const primaryProblemId = highestProblem?.id || null;
 
   const filteredProblems = rawProblems.filter((p) => {
     const pWard = p.ward_id || p.wardId;
@@ -157,13 +130,12 @@ export default function GovernmentDashboardPage() {
   });
 
   // Effective SLA risk list:
-  const slaRiskList = liveSlaRisk.length > 0
-    ? liveSlaRisk
-    : (isDemoMode
-        ? DEMO_PROBLEMS.filter((p) => p.severity === 'CRITICAL')
-        : rawProblems.filter((p) => p.sla_state?.status === 'AT_RISK' || p.sla_state?.status === 'BREACHED'));
+  const slaRiskList =
+    liveSlaRisk.length > 0
+      ? liveSlaRisk
+      : rawProblems.filter((p) => p.sla_state?.status === 'AT_RISK' || p.sla_state?.status === 'BREACHED');
 
-  // Authoritative Intelligence Brief Data
+  // Authoritative Intelligence Brief Data (derived strictly from backend data)
   let briefData: {
     headline: string;
     summary: string;
@@ -173,40 +145,27 @@ export default function GovernmentDashboardPage() {
     problemLink: string;
   };
 
-  if (isDemoMode) {
-    const demoSourcesCount = highestProblem?.signalCount ?? highestProblem?.signal_count ?? 327;
+  if (authoritativeProblemCount === 0 || authoritativeSignalCount === 0) {
     briefData = {
-      headline: DEMO_AI_BRIEF.headline,
-      summary: DEMO_AI_BRIEF.summary,
-      recommendedAction: DEMO_AI_BRIEF.recommendedAction,
-      confidence: DEMO_AI_BRIEF.confidence,
-      sourcesCount: demoSourcesCount,
-      problemLink: primaryProblemId ? `/dashboard/problems/${primaryProblemId}` : '/dashboard/problems',
+      headline: 'District Operational Calm — No Incident Signals',
+      summary: 'No citizen signals or correlated problem clusters currently require executive remediation in the municipal database.',
+      recommendedAction: 'Continue monitoring automated DPI ingestion and IoT telemetry streams.',
+      confidence: '100%',
+      sourcesCount: 0,
+      problemLink: '/dashboard/problems',
     };
   } else {
-    // In REAL_MODE: Never render hardcoded Golden Demo intelligence
-    if (authoritativeProblemCount === 0 || authoritativeSignalCount === 0) {
-      briefData = {
-        headline: 'District Operational Calm — No Incident Signals',
-        summary: 'No citizen signals or correlated problem clusters currently require executive remediation in the municipal database.',
-        recommendedAction: 'Continue monitoring automated DPI ingestion and IoT telemetry streams.',
-        confidence: '100%',
-        sourcesCount: 0,
-        problemLink: '/dashboard/problems',
-      };
-    } else {
-      const topSigCount = highestProblem?.signal_count ?? highestProblem?.signalCount ?? 1;
-      const topImpact = highestProblem?.impact_score ?? highestProblem?.impactScore ?? 0;
-      const topWard = highestProblem?.ward_id ?? highestProblem?.wardId ?? 'Ward 18';
-      briefData = {
-        headline: `Priority Incident Cluster: #${highestProblem?.id} (${highestProblem?.title})`,
-        summary: highestProblem?.impact_explanation || highestProblem?.description || `High-impact municipal incident localized in ${topWard}. Auditable impact score: ${topImpact}/100.`,
-        recommendedAction: `Coordinate with ${highestProblem?.department_id || highestProblem?.department || 'assigned department'} to dispatch field verification team and track SLA countdown.`,
-        confidence: `${Math.round((highestProblem?.confidence || 0.92) * 100)}%`,
-        sourcesCount: topSigCount,
-        problemLink: `/dashboard/problems/${highestProblem?.id}`,
-      };
-    }
+    const topSigCount = highestProblem?.signal_count ?? highestProblem?.signalCount ?? 1;
+    const topImpact = highestProblem?.impact_score ?? highestProblem?.impactScore ?? 0;
+    const topWard = highestProblem?.ward_id ?? highestProblem?.wardId ?? 'Ward 18';
+    briefData = {
+      headline: `Priority Incident Cluster: #${highestProblem?.id} (${highestProblem?.title})`,
+      summary: highestProblem?.impact_explanation || highestProblem?.description || `High-impact municipal incident localized in ${topWard}. Auditable impact score: ${topImpact}/100.`,
+      recommendedAction: `Coordinate with ${highestProblem?.department_id || highestProblem?.department || 'assigned department'} to dispatch field verification team and track SLA countdown.`,
+      confidence: `${Math.round((highestProblem?.confidence || 0.92) * 100)}%`,
+      sourcesCount: topSigCount,
+      problemLink: `/dashboard/problems/${highestProblem?.id}`,
+    };
   }
 
   return (
@@ -221,28 +180,28 @@ export default function GovernmentDashboardPage() {
           }
           badge={
             <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-civic-emeraldLight text-emerald-800">
-              {isDemoMode ? 'Demo Feed Active' : 'Live Municipal Console'}
+              Live Municipal Console
             </span>
           }
           actions={
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 font-mono">
               <button
                 onClick={() => loadDashboard()}
                 disabled={loading}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-ink-border bg-white hover:bg-canvas-subtle text-ink-primary transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-sm text-xs font-medium border border-ink-border bg-canvas-card hover:bg-canvas-subtle text-ink-primary transition-colors disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">Refresh</span>
               </button>
               <Link
                 href="/dashboard/problems"
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-ink-border bg-white hover:bg-canvas-subtle text-ink-primary transition-colors"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-sm text-xs font-medium border border-ink-border bg-canvas-card hover:bg-canvas-subtle text-ink-primary transition-colors"
               >
                 <span>Problems Queue</span>
               </Link>
               <Link
                 href="/dashboard/ai"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-civic-blue text-white hover:bg-civic-blueDark transition-colors shadow-subtle"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-sm text-xs font-semibold bg-civic-terracotta text-white hover:bg-civic-terracottaDark transition-colors shadow-none"
               >
                 <span>Ask Governance AI</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -268,47 +227,43 @@ export default function GovernmentDashboardPage() {
         )}
 
         {/* Quick Operational Actions / Journey Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-white border border-ink-border shadow-subtle text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-sm bg-canvas-card border border-ink-border shadow-none text-xs font-mono">
           <div className="flex items-center gap-2 text-ink-secondary">
-            <span className="font-semibold text-ink-primary">Quick Navigation:</span>
-            <span>Jump across intelligence layers</span>
+            <span className="font-semibold text-ink-primary uppercase tracking-wider text-[11px]">Quick Navigation:</span>
+            <span className="text-[11px] text-ink-tertiary">Intelligence layers</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/dashboard/problems"
-              className="px-3 py-1.5 rounded-lg border border-ink-border bg-canvas-subtle hover:bg-white text-ink-primary font-medium transition-colors"
+              className="px-3 py-1.5 rounded-sm border border-ink-border bg-canvas-subtle hover:bg-canvas-card text-ink-primary font-medium transition-colors text-[11px]"
             >
               All Problems ({authoritativeProblemCount})
             </Link>
             {primaryProblemId && (
               <Link
                 href={`/dashboard/problems/${primaryProblemId}`}
-                className="px-3 py-1.5 rounded-lg border border-civic-rose/30 bg-rose-50 text-rose-800 hover:bg-rose-100 font-semibold transition-colors flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-sm border border-civic-terracotta/40 bg-civic-blueLight text-civic-terracottaDark hover:bg-civic-terracotta hover:text-white font-semibold transition-colors flex items-center gap-1.5 text-[11px]"
               >
-                <span className="w-2 h-2 rounded-full bg-civic-rose animate-pulse" />
-                <span>
-                  {isDemoMode && primaryProblemId === 'PRB-2026-0819'
-                    ? 'Golden Demo: PRB-2026-0819 (Impact 92)'
-                    : `Priority: #${primaryProblemId}`}
-                </span>
+                <span className="w-2 h-2 rounded-full bg-civic-terracotta animate-pulse" />
+                <span>Priority: #{primaryProblemId}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             )}
             <Link
               href={`/dashboard/ai${primaryProblemId ? `?problemId=${primaryProblemId}` : ''}`}
-              className="px-3 py-1.5 rounded-lg border border-civic-blue/30 bg-civic-blueLight/50 text-civic-blueDark hover:bg-civic-blueLight font-medium transition-colors"
+              className="px-3 py-1.5 rounded-sm border border-ink-border bg-canvas-subtle text-ink-primary hover:bg-canvas-card font-medium transition-colors text-[11px]"
             >
               Governance AI
             </Link>
             <Link
               href={`/dashboard/simulation${primaryProblemId ? `?problemId=${primaryProblemId}` : ''}`}
-              className="px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 font-medium transition-colors"
+              className="px-3 py-1.5 rounded-sm border border-ink-border bg-canvas-subtle text-ink-primary hover:bg-canvas-card font-medium transition-colors text-[11px]"
             >
               Intervention Simulator
             </Link>
             <Link
               href="/dashboard/departments"
-              className="px-3 py-1.5 rounded-lg border border-ink-border bg-canvas-subtle hover:bg-white text-ink-primary font-medium transition-colors"
+              className="px-3 py-1.5 rounded-sm border border-ink-border bg-canvas-subtle hover:bg-canvas-card text-ink-primary font-medium transition-colors text-[11px]"
             >
               Departments ({authoritativeDepartmentCount})
             </Link>
@@ -338,9 +293,9 @@ export default function GovernmentDashboardPage() {
           <KPIStat
             label="Citizen Signals"
             value={authoritativeSignalCount.toLocaleString()}
-            comparison={isDemoMode ? '+384 today' : 'Correlated signals'}
+            comparison="Correlated signals"
             trend="up"
-            trendValue={isDemoMode ? '+12%' : ''}
+            trendValue=""
             isPositive={false}
             icon={<Activity className="w-4 h-4" />}
           />
@@ -349,7 +304,7 @@ export default function GovernmentDashboardPage() {
             value={authoritativeActiveCount.toLocaleString()}
             comparison="Clustered from signals"
             trend="down"
-            trendValue={isDemoMode ? '-4%' : ''}
+            trendValue=""
             isPositive={true}
             icon={<AlertOctagon className="w-4 h-4" />}
           />
@@ -367,8 +322,6 @@ export default function GovernmentDashboardPage() {
             value={
               liveSummary
                 ? `${liveSummary.sla_compliance_rate}%`
-                : isDemoMode
-                ? DEMO_KPIS.resolutionRate
                 : '100%'
             }
             comparison={
@@ -386,8 +339,6 @@ export default function GovernmentDashboardPage() {
             value={
               liveSummary
                 ? `${liveSummary.sla_at_risk_count} At Risk`
-                : isDemoMode
-                ? '3 At Risk'
                 : '0 At Risk'
             }
             comparison={
@@ -405,8 +356,6 @@ export default function GovernmentDashboardPage() {
             value={
               liveSummary?.median_resolution_time_hours != null
                 ? `${liveSummary.median_resolution_time_hours}h`
-                : isDemoMode
-                ? DEMO_KPIS.medianResponse
                 : 'N/A'
             }
             comparison="Resolved cases"
@@ -554,23 +503,23 @@ export default function GovernmentDashboardPage() {
               Open Fullscreen GIS →
             </Link>
           </div>
-          <div className="rounded-xl overflow-hidden border border-ink-border shadow-card">
+          <div className="rounded-sm overflow-hidden border border-ink-border shadow-none">
             <MapContainer problems={(liveMap.length > 0 ? liveMap : filteredProblems) as any} height="420px" />
           </div>
         </div>
 
         {/* Department Workload Summary Strip */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between border-b border-ink-border pb-2">
             <div>
-              <h2 className="text-base font-bold text-ink-primary">Department Workload Distribution</h2>
+              <h2 className="text-sm font-mono font-bold text-ink-primary uppercase tracking-wider">Department Workload Distribution</h2>
               <p className="text-xs text-ink-secondary">
                 Active problem queues and SLA adherence by municipal agency
               </p>
             </div>
             <Link
               href="/dashboard/departments"
-              className="text-xs font-semibold text-civic-blue hover:underline"
+              className="text-xs font-mono font-medium text-civic-terracotta hover:underline"
             >
               All Departments ({authoritativeDepartmentCount}) →
             </Link>
@@ -589,12 +538,12 @@ export default function GovernmentDashboardPage() {
                 return (
                   <div
                     key={deptId}
-                    className="p-5 rounded-xl border border-ink-border bg-white shadow-card space-y-3 hover:border-civic-blue/40 transition-colors"
+                    className="p-5 rounded-sm border border-ink-border bg-canvas-card shadow-none space-y-3 hover:border-ink-secondary transition-colors"
                   >
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center gap-1.5">
-                          <Building2 className="w-4 h-4 text-civic-blue shrink-0" />
+                          <Building2 className="w-4 h-4 text-civic-terracotta shrink-0" />
                           <h3 className="text-sm font-bold text-ink-primary">{deptName}</h3>
                         </div>
                         <span className="text-xs text-ink-secondary font-mono">
@@ -602,20 +551,20 @@ export default function GovernmentDashboardPage() {
                         </span>
                       </div>
                       {slaRiskCount > 0 && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-civic-amberLight text-amber-900">
+                        <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-bold bg-amber-50 text-amber-900 border border-amber-200">
                           {slaRiskCount} SLA At Risk
                         </span>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="p-2 rounded bg-canvas-subtle border border-ink-border">
+                    <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                      <div className="p-2 rounded-sm bg-canvas-subtle border border-ink-border">
                         <span className="text-ink-tertiary block text-[10px] uppercase font-semibold">
                           High Impact
                         </span>
                         <span className="font-bold text-civic-rose">{highImpactCount}</span>
                       </div>
-                      <div className="p-2 rounded bg-canvas-subtle border border-ink-border">
+                      <div className="p-2 rounded-sm bg-canvas-subtle border border-ink-border">
                         <span className="text-ink-tertiary block text-[10px] uppercase font-semibold">
                           Median Res.
                         </span>
@@ -623,10 +572,10 @@ export default function GovernmentDashboardPage() {
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-ink-border/60 flex items-center justify-end">
+                    <div className="pt-2 border-t border-ink-border flex items-center justify-end">
                       <Link
                         href={`/dashboard/problems?department=${dept.id || dept.name}`}
-                        className="text-xs font-semibold text-civic-blue hover:underline flex items-center gap-1"
+                        className="text-xs font-mono font-semibold text-civic-terracotta hover:underline flex items-center gap-1"
                       >
                         <span>View Department Queue</span>
                         <ArrowRight className="w-3 h-3" />
@@ -637,7 +586,7 @@ export default function GovernmentDashboardPage() {
               })}
             </div>
           ) : (
-            <div className="p-8 rounded-xl border border-ink-border bg-white text-center space-y-2">
+            <div className="p-8 rounded-sm border border-ink-border bg-canvas-card text-center space-y-2">
               <Building2 className="w-8 h-8 text-ink-tertiary mx-auto" />
               <p className="text-sm font-semibold text-ink-primary">No department records available</p>
               <p className="text-xs text-ink-secondary">

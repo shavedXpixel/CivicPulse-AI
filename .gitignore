@@ -13,6 +13,7 @@ frontend/out/
 # Production build outputs
 dist/
 build/
+*.tsbuildinfo
 
 # Environment files
 .env

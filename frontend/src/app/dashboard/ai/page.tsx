@@ -15,72 +15,14 @@ import {
   Lock,
   Sparkles,
   ExternalLink,
-  Building2,
-  UserCheck,
   CheckCircle2,
   RefreshCw,
   Info,
   ArrowRight,
 } from 'lucide-react';
-import { apiClient, setAuthToken, ApiError } from '../../../lib/api-client';
+import { apiClient, ApiError } from '../../../lib/api-client';
 import { useAuth } from '../../../context/AuthContext';
 import type { GovernanceQueryResponse } from '@civicpulse/shared';
-
-interface Persona {
-  id: string;
-  label: string;
-  role: 'ADMIN' | 'DEPARTMENT_OFFICER' | 'FIELD_OFFICER' | 'CITIZEN';
-  name: string;
-  token: string;
-  department?: string;
-  scopeDesc: string;
-}
-
-const PERSONAS: Persona[] = [
-  {
-    id: 'admin',
-    label: 'Commissioner (Admin)',
-    role: 'ADMIN',
-    name: 'Municipal Commissioner',
-    token: 'demo-token-admin',
-    scopeDesc: 'Global Municipal Scope (All Departments & Wards)',
-  },
-  {
-    id: 'dept_watco',
-    label: 'Er. Subrat (Dept Officer - WATCO)',
-    role: 'DEPARTMENT_OFFICER',
-    name: 'Er. Subrat Jena',
-    token: 'demo-token-dept-watco',
-    department: 'watco',
-    scopeDesc: 'Department Scope: Water Corporation of Odisha (WATCO)',
-  },
-  {
-    id: 'dept_drainage',
-    label: 'Dept Officer (Drainage)',
-    role: 'DEPARTMENT_OFFICER',
-    name: 'Drainage Superintending Eng',
-    token: 'demo-token-dept-drainage',
-    department: 'drainage',
-    scopeDesc: 'Department Scope: Drainage & Sewerage Division',
-  },
-  {
-    id: 'officer_rajesh',
-    label: 'Rajesh K. (Field Officer - WATCO)',
-    role: 'FIELD_OFFICER',
-    name: 'Rajesh K.',
-    token: 'demo-token-officer',
-    department: 'watco',
-    scopeDesc: 'Assigned Operational Scope: Ward 18 (WATCO)',
-  },
-  {
-    id: 'citizen',
-    label: 'Aarav (Citizen - Public View)',
-    role: 'CITIZEN',
-    name: 'Aarav Patnaik',
-    token: 'demo-token-citizen',
-    scopeDesc: 'Public Citizen Scope (Restricted from Internal Governance AI)',
-  },
-];
 
 interface SuggestedQuery {
   category: string;
@@ -98,9 +40,9 @@ const SUGGESTED_QUERIES: SuggestedQuery[] = [
   },
   {
     category: 'Ranking & Impact',
-    label: 'Why Water Ranked Highest',
-    query: 'Why is the Ward 18 water supply disruption ranked highest?',
-    description: 'Explains the 7-factor mathematical impact score calculation for PRB-2026-0819.',
+    label: 'Why Problem Ranked Highest',
+    query: 'Why is the highest-ranked public problem prioritized?',
+    description: 'Explains the 7-factor mathematical impact score calculation for top-ranked incidents.',
   },
   {
     category: 'Operations & SLA',
@@ -111,20 +53,20 @@ const SUGGESTED_QUERIES: SuggestedQuery[] = [
   {
     category: 'Operational Status',
     label: 'Water Problem Status',
-    query: 'What is the current status of the Ward 18 water supply disruption?',
+    query: 'What is the current status of the active water supply problems?',
     description: 'Fetches authoritative workflow status, assigned officer, and recent actions.',
   },
   {
     category: 'Verification & Audit',
     label: 'Resolution Evidence',
-    query: 'What resolution evidence has been submitted for problem PRB-2026-0819?',
-    description: 'Inspects Phase 6 work logs, before/after telemetry, and AI verification findings.',
+    query: 'What resolution evidence has been submitted for recent problems?',
+    description: 'Inspects work logs, before/after telemetry, and AI verification findings.',
   },
   {
     category: 'RBAC Scoping',
     label: 'Cross-Dept Test (Drainage)',
     query: 'Show all problems in Drainage and Sewerage',
-    description: 'Tests department boundary enforcement under the active persona.',
+    description: 'Tests department boundary enforcement under the active user account.',
   },
   {
     category: 'Security & Guardrails',
@@ -135,7 +77,7 @@ const SUGGESTED_QUERIES: SuggestedQuery[] = [
 ];
 
 export default function GovernanceAIPage() {
-  const { user, userProfile, isDemoMode, getIdToken } = useAuth();
+  const { user, userProfile, getIdToken } = useAuth();
   const [problemId, setProblemId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -146,45 +88,19 @@ export default function GovernanceAIPage() {
     }
   }, []);
 
-  const activeProblemId = problemId || (isDemoMode ? 'PRB-2026-0819' : null);
+  const activeProblemId = problemId;
 
-  const [selectedPersonaId, setSelectedPersonaId] = useState<string>('admin');
   const [query, setQuery] = useState<string>('What are the top public problems in Ward 18?');
   const [response, setResponse] = useState<GovernanceQueryResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isCitizenForbidden, setIsCitizenForbidden] = useState<boolean>(false);
 
-  const activePersona = PERSONAS.find((p) => p.id === selectedPersonaId) || PERSONAS[0]!;
-
-  const handlePersonaChange = (newPersonaId: string) => {
-    setSelectedPersonaId(newPersonaId);
-    const p = PERSONAS.find((x) => x.id === newPersonaId) || PERSONAS[0]!;
-    setAuthToken(p.token);
-    setError(null);
-
-    if (p.role === 'CITIZEN') {
-      setIsCitizenForbidden(true);
-      setResponse(null);
-    } else {
-      setIsCitizenForbidden(false);
-      // Auto-trigger query under new persona
-      executeQuery(query, p);
-    }
-  };
-
-  const executeQuery = useCallback(async (questionText: string, persona = activePersona) => {
+  const executeQuery = useCallback(async (questionText: string) => {
     const trimmed = questionText.trim();
     if (!trimmed) return;
 
-    if (isDemoMode && persona.role === 'CITIZEN') {
-      setIsCitizenForbidden(true);
-      setResponse(null);
-      setError('Governance AI analysis is restricted to authorized municipal officers and administrators (HTTP 403 Forbidden).');
-      return;
-    }
-
-    if (!isDemoMode && userProfile?.role === 'CITIZEN') {
+    if (userProfile?.role === 'CITIZEN') {
       setIsCitizenForbidden(true);
       setResponse(null);
       setError('Governance AI analysis is restricted to authorized municipal officers and administrators (HTTP 403 Forbidden).');
@@ -197,13 +113,9 @@ export default function GovernanceAIPage() {
 
     try {
       let headers: Record<string, string> | undefined = undefined;
-      if (isDemoMode) {
-        headers = { Authorization: `Bearer ${persona.token}` };
-      } else {
-        const token = await getIdToken();
-        if (token) {
-          headers = { Authorization: `Bearer ${token}` };
-        }
+      const token = await getIdToken();
+      if (token) {
+        headers = { Authorization: `Bearer ${token}` };
       }
 
       const res = await apiClient.post<{ data: GovernanceQueryResponse }>(
@@ -223,17 +135,14 @@ export default function GovernanceAIPage() {
     } finally {
       setLoading(false);
     }
-  }, [activePersona, isDemoMode, userProfile?.role, getIdToken]);
+  }, [userProfile?.role, getIdToken]);
 
-  // Initial query on mount
+  // Initial query on mount for authorized roles
   useEffect(() => {
-    if (isDemoMode) {
-      setAuthToken(activePersona.token);
-      executeQuery('What are the top public problems in Ward 18?', activePersona);
-    } else if (userProfile && userProfile.role !== 'CITIZEN') {
+    if (userProfile && userProfile.role !== 'CITIZEN') {
       executeQuery('What are the top public problems in Ward 18?');
     }
-  }, [isDemoMode, userProfile]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userProfile, executeQuery]);
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,7 +155,7 @@ export default function GovernanceAIPage() {
         {/* Page Header */}
         <PageHeader
           title="Governance AI — Grounded Municipal Intelligence"
-          description="Read-only analytical intelligence layer synthesizing authoritative operational database records, mathematical impact scores, SLA compliance metrics, and Phase 6 resolution evidence."
+          description="Read-only analytical intelligence layer synthesizing authoritative operational database records, mathematical impact scores, SLA compliance metrics, and resolution evidence."
           breadcrumbs={[
             { label: 'Operations', href: '/dashboard' },
             { label: 'Governance AI' },
@@ -270,7 +179,7 @@ export default function GovernanceAIPage() {
                   href={`/dashboard/problems/${activeProblemId}`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-ink-border bg-white hover:bg-canvas-subtle text-ink-primary transition-colors"
                 >
-                  <span>{isDemoMode && activeProblemId === 'PRB-2026-0819' ? 'Golden Demo Problem' : `Problem #${activeProblemId}`}</span>
+                  <span>Problem #{activeProblemId}</span>
                   <ArrowRight className="w-3 h-3 text-ink-tertiary" />
                 </Link>
               )}
@@ -285,93 +194,36 @@ export default function GovernanceAIPage() {
           }
         />
 
-        {/* Persona Switcher Bar (DEMO_MODE) OR Authenticated Operator Scope Banner (REAL_MODE) */}
-        {isDemoMode ? (
-          <div className="p-4 rounded-xl border border-ink-border bg-white shadow-card space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-ink-border/50 pb-2.5">
-              <div className="flex items-center gap-2">
-                <UserCheck className="w-4 h-4 text-civic-blue" />
-                <span className="text-xs font-mono font-bold uppercase tracking-wider text-ink-primary">
-                  Demo Evaluation Identity Switcher
+        {/* Authenticated Operator Scope Banner */}
+        <div className="p-4 border border-ink-border bg-canvas-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div>
+              <div className="font-bold text-ink-primary flex items-center gap-2">
+                <span>{userProfile?.display_name || user?.email || 'Authenticated Officer'}</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-100 text-purple-800">
+                  {userProfile?.role || 'GOVERNMENT'}
                 </span>
-              </div>
-              <div className="text-[11px] font-mono text-ink-tertiary">
-                Demonstration RBAC emulation mode
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
-              {PERSONAS.map((p) => {
-                const isSelected = p.id === selectedPersonaId;
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => handlePersonaChange(p.id)}
-                    className={`p-2.5 rounded-lg border text-left transition-all text-xs flex flex-col justify-between ${
-                      isSelected
-                        ? 'border-civic-blue bg-civic-blueLight/30 text-civic-blueDark shadow-sm ring-1 ring-civic-blue'
-                        : 'border-ink-border bg-canvas-subtle hover:bg-white text-ink-secondary hover:text-ink-primary'
-                    }`}
-                  >
-                    <div className="font-semibold truncate">{p.label}</div>
-                    <div className="mt-1 flex items-center justify-between text-[10px] font-mono">
-                      <span
-                        className={`px-1.5 py-0.5 rounded ${
-                          p.role === 'ADMIN'
-                            ? 'bg-purple-100 text-purple-800'
-                            : p.role === 'DEPARTMENT_OFFICER'
-                            ? 'bg-blue-100 text-blue-800'
-                            : p.role === 'FIELD_OFFICER'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-rose-100 text-rose-800'
-                        }`}
-                      >
-                        {p.role}
-                      </span>
-                      {isSelected && <span className="text-civic-blue font-bold">ACTIVE</span>}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex items-center gap-2 text-xs font-mono bg-canvas-subtle p-2 rounded border border-ink-border/60">
-              <Building2 className="w-3.5 h-3.5 text-ink-tertiary" />
-              <span className="text-ink-secondary">Current Scope:</span>
-              <span className="text-ink-primary font-medium">{activePersona.scopeDesc}</span>
-            </div>
-          </div>
-        ) : (
-          <div className="p-4 rounded-xl border border-ink-border bg-white shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
-                <ShieldCheck className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <div className="font-bold text-ink-primary flex items-center gap-2">
-                  <span>{userProfile?.display_name || user?.email || 'Authenticated Officer'}</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-100 text-purple-800">
-                    {userProfile?.role || 'GOVERNMENT'}
+                {userProfile?.department_id && (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-blue-100 text-blue-800">
+                    Dept: {userProfile.department_id}
                   </span>
-                  {userProfile?.department_id && (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-blue-100 text-blue-800">
-                      Dept: {userProfile.department_id}
-                    </span>
-                  )}
-                </div>
-                <p className="text-[11px] text-ink-secondary font-mono">
-                  {user?.email} • Live PostgreSQL session token authoritative
-                </p>
+                )}
               </div>
-            </div>
-            <div className="text-[11px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md">
-              ✓ Authenticated Session Active
+              <p className="text-[11px] text-ink-secondary font-mono">
+                {user?.email} • Live PostgreSQL session token authoritative
+              </p>
             </div>
           </div>
-        )}
+          <div className="text-[11px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md">
+            ✓ Authenticated Session Active
+          </div>
+        </div>
 
         {/* Natural Language Query Bar */}
-        <div className="p-6 rounded-xl border border-ink-border bg-white shadow-card space-y-4">
+        <div className="p-6 border border-ink-border bg-canvas-card space-y-4">
           <form onSubmit={handleFormSubmit} className="space-y-3">
             <div className="flex items-center justify-between">
               <label htmlFor="gov-query-input" className="text-xs font-mono uppercase tracking-wider font-semibold text-ink-secondary">
@@ -388,7 +240,7 @@ export default function GovernanceAIPage() {
                   id="gov-query-input"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  prefixIcon={<Search className="w-4 h-4 text-civic-blue" />}
+                  prefixIcon={<Search className="w-4 h-4 text-civic-terracotta" />}
                   placeholder="Ask about Ward 18 problems, SLA velocities, resolution evidence, or impact rankings..."
                   disabled={loading}
                 />
@@ -415,11 +267,11 @@ export default function GovernanceAIPage() {
             </div>
           </form>
 
-          {/* Suggested Golden Demo Questions */}
+          {/* Suggested Analytical Questions */}
           <div className="space-y-2 pt-2 border-t border-ink-border/40">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-ink-tertiary">
-                Authoritative Demo Scenarios & Test Inquiries:
+                Authoritative Analytical Inquiries:
               </span>
               <span className="text-[10px] font-mono text-ink-tertiary">Click to analyze</span>
             </div>
@@ -436,7 +288,7 @@ export default function GovernanceAIPage() {
                     title={sq.description}
                     className={`text-xs text-left px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 ${
                       isSelected
-                        ? 'bg-civic-blueLight border-civic-blue/40 text-civic-blueDark font-medium'
+                        ? 'bg-civic-blueLight border-civic-terracotta/40 text-civic-terracottaDark font-medium'
                         : 'bg-canvas-subtle border-ink-border text-ink-secondary hover:text-ink-primary hover:bg-white'
                     }`}
                   >
@@ -451,7 +303,7 @@ export default function GovernanceAIPage() {
 
         {/* Citizen 403 Forbidden Restriction Guard Card */}
         {isCitizenForbidden && (
-          <div className="p-8 rounded-xl border border-rose-200 bg-rose-50/50 shadow-card space-y-4">
+          <div className="p-8 border border-rose-300 bg-rose-50/50 space-y-4">
             <div className="flex items-start gap-4">
               <div className="p-3 rounded-xl bg-rose-100 text-rose-700 border border-rose-200">
                 <Lock className="w-6 h-6" />
@@ -470,21 +322,14 @@ export default function GovernanceAIPage() {
                   decision-makers, department heads, and operational field engineers.
                 </p>
                 <div className="bg-white/80 p-3.5 rounded-lg border border-rose-200 text-xs text-ink-secondary space-y-1.5 font-mono">
-                  <div><strong>Authenticated Identity:</strong> Aarav Patnaik (Citizen)</div>
-                  <div><strong>Authorization Check:</strong> <code>req.user.role === UserRole.CITIZEN</code> $\rightarrow$ Blocked</div>
+                  <div><strong>Authenticated Identity:</strong> {userProfile?.display_name || user?.email} (Citizen)</div>
+                  <div><strong>Authorization Check:</strong> <code>role === UserRole.CITIZEN</code> $\rightarrow$ Blocked</div>
                   <div><strong>Enforcement Policy:</strong> Citizen users cannot access internal operational intelligence, department SLA velocity assessments, or administrative verification logs.</div>
                 </div>
                 <div className="pt-2 flex flex-wrap items-center gap-3">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => handlePersonaChange('admin')}
-                  >
-                    Switch to Municipal Commissioner (Admin)
-                  </Button>
                   <Link
                     href="/dashboard"
-                    className="text-xs font-mono text-civic-blue hover:underline inline-flex items-center gap-1"
+                    className="text-xs font-mono text-civic-terracotta hover:underline inline-flex items-center gap-1"
                   >
                     <span>Browse Public Operations Dashboard</span>
                     <ExternalLink className="w-3.5 h-3.5" />
@@ -497,7 +342,7 @@ export default function GovernanceAIPage() {
 
         {/* General Error Alert */}
         {!isCitizenForbidden && error && (
-          <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 flex items-start gap-3 text-xs">
+          <div className="p-4 border border-amber-300 bg-amber-50 text-amber-900 flex items-start gap-3 text-xs">
             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <div className="space-y-1 flex-1">
               <div className="font-semibold">Query Processing Notice</div>
@@ -511,7 +356,7 @@ export default function GovernanceAIPage() {
 
         {/* Loading Skeleton */}
         {loading && (
-          <div className="p-8 rounded-xl border border-ink-border bg-white shadow-card space-y-6 animate-pulse">
+          <div className="p-8 border border-ink-border bg-canvas-card space-y-6 animate-pulse">
             <div className="flex items-center justify-between border-b border-ink-border/40 pb-4">
               <div className="h-5 bg-ink-border/30 rounded w-64" />
               <div className="h-6 bg-emerald-100 rounded w-36" />
@@ -534,7 +379,7 @@ export default function GovernanceAIPage() {
 
         {/* Grounded Intelligence Response Workspace */}
         {!loading && !isCitizenForbidden && response && (
-          <div className="p-6 sm:p-8 rounded-xl border border-ink-border bg-white shadow-card space-y-7">
+          <div className="p-6 sm:p-8 border border-ink-border bg-canvas-card space-y-7">
             {/* Header: Grounding Status & Meta */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-ink-border/60 pb-5">
               <div className="space-y-1">
@@ -549,7 +394,7 @@ export default function GovernanceAIPage() {
                 </div>
               </div>
 
-              {/* Evidence Badges (Strictly Evidence-backed + verified count, NO fabricated percentages) */}
+              {/* Evidence Badges */}
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-civic-emeraldLight text-emerald-800 border border-emerald-200 text-xs font-mono font-bold">
                   <ShieldCheck className="w-4 h-4 text-civic-emerald" />
@@ -562,7 +407,7 @@ export default function GovernanceAIPage() {
               </div>
             </div>
 
-            {/* Safe Tool & Evidence Badges (Audited server-side tools) */}
+            {/* Safe Tool & Evidence Badges */}
             {response.evidence_labels && response.evidence_labels.length > 0 && (
               <div className="space-y-2">
                 <div className="text-[11px] font-mono uppercase tracking-wider font-semibold text-ink-tertiary">
@@ -582,9 +427,9 @@ export default function GovernanceAIPage() {
             )}
 
             {/* 1. Natural Language Answer */}
-            <div className="space-y-3 bg-canvas-subtle/50 p-5 sm:p-6 rounded-xl border border-ink-border/60">
+            <div className="space-y-3 bg-canvas-subtle p-5 sm:p-6 border border-ink-border">
               <div className="text-xs font-mono uppercase tracking-wider font-semibold text-ink-secondary flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-civic-blue" />
+                <FileText className="w-3.5 h-3.5 text-civic-terracotta" />
                 <span>Grounded Executive Summary</span>
               </div>
               <div className="text-sm text-ink-primary leading-relaxed whitespace-pre-line">
@@ -592,7 +437,7 @@ export default function GovernanceAIPage() {
               </div>
             </div>
 
-            {/* 2. Calculated Quantitative Metrics (Authoritative grounded numbers) */}
+            {/* 2. Calculated Quantitative Metrics */}
             {response.metrics && response.metrics.length > 0 && (
               <div className="space-y-2.5">
                 <div className="text-xs uppercase tracking-wider font-semibold text-ink-secondary">
@@ -600,7 +445,7 @@ export default function GovernanceAIPage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                   {response.metrics.map((m, idx) => (
-                    <div key={idx} className="p-4 rounded-lg bg-white border border-ink-border shadow-xs space-y-1">
+                    <div key={idx} className="p-4 bg-canvas-subtle border border-ink-border space-y-1 font-mono">
                       <div className="text-ink-tertiary uppercase tracking-wider text-[10px] font-mono font-semibold truncate">
                         {m.label}
                       </div>
@@ -614,7 +459,7 @@ export default function GovernanceAIPage() {
               </div>
             )}
 
-            {/* 3. Authoritative Factual Statements Grounded in DB */}
+            {/* 3. Authoritative Factual Statements */}
             {response.facts && response.facts.length > 0 && (
               <div className="space-y-2.5">
                 <div className="text-xs uppercase tracking-wider font-semibold text-ink-secondary">
@@ -641,9 +486,9 @@ export default function GovernanceAIPage() {
 
             {/* 4. Actionable Municipal Recommendations */}
             {response.recommendations && response.recommendations.length > 0 && (
-              <div className="p-4 rounded-xl bg-civic-blueLight/20 border border-civic-blue/30 space-y-2">
-                <div className="text-xs font-mono uppercase tracking-wider font-bold text-civic-blueDark flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-civic-blue" />
+              <div className="p-4 rounded-xl bg-civic-blueLight/20 border border-civic-terracotta/30 space-y-2">
+                <div className="text-xs font-mono uppercase tracking-wider font-bold text-civic-terracottaDark flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-civic-terracotta" />
                   <span>Actionable Municipal Guidance</span>
                 </div>
                 <ul className="space-y-1.5 text-xs text-ink-primary leading-relaxed list-disc list-inside">
@@ -670,15 +515,15 @@ export default function GovernanceAIPage() {
                     <Link
                       key={idx}
                       href={s.url || `/dashboard/problems/${s.entity_id}`}
-                      className="p-3 rounded-lg bg-canvas-subtle border border-ink-border hover:border-civic-blue hover:bg-white text-ink-primary transition-all flex items-center justify-between gap-2 group"
+                      className="p-3 rounded-lg bg-canvas-subtle border border-ink-border hover:border-civic-terracotta hover:bg-white text-ink-primary transition-all flex items-center justify-between gap-2 group"
                     >
                       <div className="space-y-0.5 min-w-0">
-                        <div className="text-xs font-mono font-semibold text-civic-blue group-hover:underline truncate">
+                        <div className="text-xs font-mono font-semibold text-civic-terracotta group-hover:underline truncate">
                           {s.entity_id}
                         </div>
                         <div className="text-[11px] text-ink-secondary truncate">{s.label}</div>
                       </div>
-                      <ExternalLink className="w-3.5 h-3.5 text-ink-tertiary group-hover:text-civic-blue shrink-0" />
+                      <ExternalLink className="w-3.5 h-3.5 text-ink-tertiary group-hover:text-civic-terracotta shrink-0" />
                     </Link>
                   ))}
                 </div>
@@ -688,7 +533,7 @@ export default function GovernanceAIPage() {
             {/* 6. Grounding Limitations & Model Transparency */}
             <div className="p-3.5 rounded-lg bg-canvas-subtle border border-ink-border/50 text-[11px] font-mono text-ink-tertiary space-y-1.5">
               <div className="flex items-center gap-1.5 font-semibold text-ink-secondary">
-                <Info className="w-3.5 h-3.5 text-civic-blue" />
+                <Info className="w-3.5 h-3.5 text-civic-terracotta" />
                 <span>Model Safety & Transparency Metadata</span>
               </div>
               <div>
