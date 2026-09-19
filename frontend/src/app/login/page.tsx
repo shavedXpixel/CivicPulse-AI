@@ -293,9 +293,19 @@ function LoginContent() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block text-[10px] font-mono uppercase tracking-widest font-semibold text-ink-secondary">
-                    Password
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[10px] font-mono uppercase tracking-widest font-semibold text-ink-secondary">
+                      Password
+                    </label>
+                    {!isRegistering && (
+                      <Link
+                        href="/forgot-password"
+                        className="text-[11px] font-medium text-civic-terracotta hover:text-civic-terracottaDark transition-colors font-mono"
+                      >
+                        Forgot password?
+                      </Link>
+                    )}
+                  </div>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-ink-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
                     <input

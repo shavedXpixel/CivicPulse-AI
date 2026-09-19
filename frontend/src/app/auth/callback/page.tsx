@@ -75,6 +75,17 @@ function CallbackContent() {
         }
 
         const session = sessionData.session;
+
+        // Check if this callback was triggered by a password recovery flow
+        const type = searchParams.get('type');
+        const next = searchParams.get('next');
+        if (type === 'recovery' || next === '/update-password') {
+          if (isMounted) {
+            router.push('/update-password');
+          }
+          return;
+        }
+
         if (isMounted) {
           setStatus('provisioning');
         }

@@ -130,3 +130,39 @@ export async function getCurrentSessionToken(): Promise<string | null> {
   const { data: { session } } = await client.auth.getSession();
   return session?.access_token || null;
 }
+
+export async function resetPasswordForEmail(email: string, redirectTo?: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error('Supabase Auth is not configured on this client. Please check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.');
+  }
+
+  const targetRedirect =
+    redirectTo ||
+    (typeof window !== 'undefined'
+      ? `${window.location.origin}/update-password`
+      : undefined);
+
+  const { error } = await client.auth.resetPasswordForEmail(email, {
+    redirectTo: targetRedirect
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function updateUserPassword(newPassword: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error('Supabase Auth is not configured on this client. Please check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.');
+  }
+
+  const { error } = await client.auth.updateUser({
+    password: newPassword
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
