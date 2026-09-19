@@ -41,6 +41,7 @@ export interface Department {
   contact_phone?: string;
   contact_email?: string;
   jurisdiction_wards?: number[];
+  status?: 'ACTIVE' | 'INACTIVE';
 }
 
 export interface DepartmentWorkload {

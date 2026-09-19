@@ -3,7 +3,18 @@ import request from 'supertest';
 import { createApp } from '../src/app';
 import { env } from '../src/config/env';
 import { ProviderContainer, MockDatabaseProvider, getDatabaseProvider } from '../src/providers';
-import { ProblemStatus, AssignmentPriority, ActionType, SignalStatus, EvidenceType, BeforeOrAfter } from '@civicpulse/shared';
+import {
+  ProblemStatus,
+  AssignmentPriority,
+  ActionType,
+  SignalStatus,
+  SignalSeverity,
+  SignalSourceType,
+  SignalProcessingStatus,
+  EvidenceType,
+  EvidenceStatus,
+  BeforeOrAfter
+} from '@civicpulse/shared';
 import * as firebaseAdminModule from '../src/infrastructure/firebase/firebase-admin';
 
 describe('Phase 14 Concurrency & Idempotency Hardening', () => {
@@ -151,11 +162,12 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
         id: `sig_atomic_test_${Date.now()}`,
         citizen_id: 'usr_citizen_01',
         original_text: 'Atomic clustering test signal',
-        source_type: 'MOBILE_APP' as any,
-        processing_status: 'PENDING' as any,
+        source_type: SignalSourceType.CITIZEN,
+        status: SignalStatus.ACTIVE,
+        severity: SignalSeverity.MEDIUM,
+        processing_status: SignalProcessingStatus.PENDING,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        is_demo: false
+        updated_at: new Date().toISOString()
       });
 
       const clusterId = `PRB-2026-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -212,6 +224,8 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
         file_size_bytes: 5000,
         sha256_hash: 'hash123',
         submitted_by: 'usr_officer_01',
+        submitted_at: new Date().toISOString(),
+        status: EvidenceStatus.SUBMITTED,
         before_or_after: BeforeOrAfter.AFTER,
         created_at: new Date().toISOString()
       });

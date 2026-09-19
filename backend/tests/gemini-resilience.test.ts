@@ -12,6 +12,7 @@ import { SignalAIService } from '../src/modules/signals/signal-ai.service';
 import { env } from '../src/config/env';
 import {
   SignalStatus,
+  SignalSeverity,
   SignalProcessingStatus,
   SignalSourceType,
   UserRole,
@@ -339,7 +340,7 @@ describe('Gemini 503 Resilience, Bounded Exponential Backoff & Model Fallback', 
       });
       ProviderContainer.setAIProvider(geminiProvider);
 
-      const signalRepo = new SignalRepository(mockDb);
+      const signalRepo = new SignalRepository();
       const testSignal = await signalRepo.create({
         id: `sig_audit_test_${Date.now()}`,
         source_type: SignalSourceType.CITIZEN,
@@ -347,6 +348,7 @@ describe('Gemini 503 Resilience, Bounded Exponential Backoff & Model Fallback', 
         original_text: 'Flooded street near Patia market',
         location: { lat: 20.355, lng: 85.815 },
         status: SignalStatus.ACTIVE,
+        severity: SignalSeverity.MEDIUM,
         processing_status: SignalProcessingStatus.PENDING,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -524,7 +526,7 @@ describe('Gemini 503 Resilience, Bounded Exponential Backoff & Model Fallback', 
     });
 
     it('rejects direct clustering on unanalyzed signal with 400 SIGNAL_AI_INCOMPLETE', async () => {
-      const signalRepo = new SignalRepository(mockDb);
+      const signalRepo = new SignalRepository();
       const pendingSignal = await signalRepo.create({
         id: `sig_pending_${Date.now()}`,
         source_type: SignalSourceType.CITIZEN,
@@ -532,6 +534,7 @@ describe('Gemini 503 Resilience, Bounded Exponential Backoff & Model Fallback', 
         original_text: 'Raw unanalyzed signal',
         location: { lat: 20.2961, lng: 85.8245 },
         status: SignalStatus.ACTIVE,
+        severity: SignalSeverity.LOW,
         processing_status: SignalProcessingStatus.PENDING,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()

@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '../../context/AuthContext';
+import { UserRole } from '@civicpulse/shared';
 import { GovernmentShell } from '../../components/shells/GovernmentShell';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { KPIStat } from '../../components/domain/KPIStat';
@@ -24,6 +27,9 @@ import {
 } from 'lucide-react';
 
 export default function GovernmentDashboardPage() {
+  const router = useRouter();
+  const { user, userProfile, loading: authLoading } = useAuth();
+
   const [ward, setWard] = useState('ALL');
   const [category, setCategory] = useState('ALL');
   const [severity, setSeverity] = useState('ALL');
@@ -31,6 +37,27 @@ export default function GovernmentDashboardPage() {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Explicit Dashboard Access Control (ADMIN / SYSTEM_ADMIN only for global /dashboard)
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+    if (userProfile?.role === UserRole.DEPARTMENT_OFFICER) {
+      router.replace('/department-officer');
+      return;
+    }
+    if (userProfile?.role === UserRole.FIELD_OFFICER) {
+      router.replace('/field-officer');
+      return;
+    }
+    if (userProfile?.role === UserRole.CITIZEN) {
+      router.replace('/citizen');
+      return;
+    }
+  }, [user, userProfile, authLoading, router]);
 
   const [liveSummary, setLiveSummary] = useState<any>(null);
   const [liveProblems, setLiveProblems] = useState<any[]>([]);

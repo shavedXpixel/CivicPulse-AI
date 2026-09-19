@@ -265,14 +265,15 @@ export class GovernanceTools {
    */
   public static async getTrend(
     user: UserProfile,
-    params: { category?: string; ward_id?: string } = {}
+    params: { category?: string; ward_id?: string; department_id?: string } = {}
   ): Promise<{ trend: any; evidence_label: string }> {
-    this.enforceDepartmentScope(user);
+    const scopedDept = this.enforceDepartmentScope(user, params.department_id);
     const db = getDatabaseProvider();
 
     const { data: problems } = await db.listProblemClusters({
       category: params.category,
       ward_id: params.ward_id,
+      department_id: scopedDept,
       limit: 100
     });
 

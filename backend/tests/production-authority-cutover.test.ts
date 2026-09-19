@@ -198,7 +198,7 @@ describe('Phase 15B.5.3.8 — Production Authority & Access Control Test Suite',
       impact_level: 'HIGH' as any,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
-    });
+    } as any);
 
     ProviderContainer.setDatabaseProvider(mockDb);
 
@@ -612,7 +612,7 @@ describe('Phase 15B.5.3.8 — Production Authority & Access Control Test Suite',
       impact_level: 'HIGH' as any,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
-    });
+    } as any);
 
     const token = await createTestToken({
       sub: DEPT_OFFICER_AUTH_ID,

@@ -17,10 +17,13 @@ import {
   LogOut,
   Sliders,
   ShieldCheck,
+  Settings,
+  Users,
 } from 'lucide-react';
 
 import { useAuth } from '../../context/AuthContext';
 import { apiClient } from '../../lib/api-client';
+import { UserRole } from '@civicpulse/shared';
 
 export interface GovernmentShellProps {
   children: ReactNode;
@@ -58,20 +61,42 @@ export function GovernmentShell({ children, problemCount }: GovernmentShellProps
       ? resolvedCount
       : 0;
 
-  const navigation = [
-    { name: 'Command Center', href: '/dashboard', icon: LayoutDashboard },
-    {
-      name: 'Problems',
-      href: '/dashboard/problems',
-      icon: AlertOctagon,
-      badge: String(effectiveProblemCount),
-    },
-    { name: 'Map Workspace', href: '/dashboard/map', icon: Map },
-    { name: 'Departments', href: '/dashboard/departments', icon: Building2 },
-    { name: 'Trends & Velocity', href: '/dashboard/trends', icon: TrendingUp },
-    { name: 'Governance AI', href: '/dashboard/ai', icon: Brain, isAI: true },
-    { name: 'Intervention Simulator', href: '/dashboard/simulation', icon: Sliders, badge: 'Advisory' },
-  ];
+  const isDeptOfficer = userProfile?.role === UserRole.DEPARTMENT_OFFICER;
+  const isFieldOfficer = userProfile?.role === UserRole.FIELD_OFFICER;
+
+  const navigation = isDeptOfficer
+    ? [
+        { name: 'Department Workspace', href: '/department-officer', icon: Building2 },
+        {
+          name: 'Department Problems',
+          href: '/dashboard/problems',
+          icon: AlertOctagon,
+          badge: String(effectiveProblemCount),
+        },
+        { name: 'Department Map', href: '/dashboard/map', icon: Map },
+      ]
+    : isFieldOfficer
+    ? [
+        { name: 'Field Workspace', href: '/field-officer', icon: LayoutDashboard },
+        { name: 'Field Map', href: '/dashboard/map', icon: Map },
+      ]
+    : [
+        { name: 'Command Center', href: '/dashboard', icon: LayoutDashboard },
+        {
+          name: 'Problems',
+          href: '/dashboard/problems',
+          icon: AlertOctagon,
+          badge: String(effectiveProblemCount),
+        },
+        { name: 'Map Workspace', href: '/dashboard/map', icon: Map },
+        { name: 'Departments', href: '/dashboard/departments', icon: Building2 },
+        { name: 'Department Registry', href: '/admin/departments', icon: Building2 },
+        { name: 'Users Directory', href: '/admin/users', icon: Users },
+        { name: 'System Admin', href: '/admin', icon: Settings },
+        { name: 'Trends & Velocity', href: '/dashboard/trends', icon: TrendingUp },
+        { name: 'Governance AI', href: '/dashboard/ai', icon: Brain, isAI: true },
+        { name: 'Intervention Simulator', href: '/dashboard/simulation', icon: Sliders, badge: 'Advisory' },
+      ];
 
   return (
     <div className="min-h-screen bg-canvas text-ink-primary flex">

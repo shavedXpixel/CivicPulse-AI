@@ -5,7 +5,7 @@ import { PostgresDatabaseProvider } from '../src/providers/database/postgres.pro
 import { R2StorageProvider } from '../src/providers/storage/r2.storage';
 import { OpenAIProvider } from '../src/providers/ai/openai.provider';
 import { SnapshotImporter } from '../src/migration/importer';
-import { MAX_MEDIA_FILE_SIZE_BYTES } from '@civicpulse/shared';
+import { MAX_MEDIA_FILE_SIZE_BYTES, ProblemStatus, ActionType } from '@civicpulse/shared';
 
 vi.mock('@aws-sdk/s3-request-presigner', () => ({
   getSignedUrl: vi.fn().mockImplementation(async (_client: any, command: any) => {
@@ -142,16 +142,16 @@ describe('Phase 15B.3 — Target Non-Google Providers & Importer', () => {
 
       const res = await provider.atomicTransitionStatus(
         'PRB-001',
-        'NEW',
-        'IN_PROGRESS',
+        ProblemStatus.NEW,
+        ProblemStatus.IN_PROGRESS,
         {
           id: 'act_001',
           problem_id: 'PRB-001',
           actor_id: 'user_1',
           actor_role: 'DEPARTMENT_OFFICER',
-          action_type: 'STATUS_CHANGE',
-          previous_state: 'NEW',
-          new_state: 'IN_PROGRESS',
+          action_type: ActionType.STARTED_WORK,
+          previous_state: ProblemStatus.NEW,
+          new_state: ProblemStatus.IN_PROGRESS,
           created_at: new Date().toISOString()
         }
       );
@@ -405,6 +405,7 @@ describe('Phase 15B.3 — Target Non-Google Providers & Importer', () => {
       };
 
       const result = await openaiProvider.verifyResolutionEvidence({
+        problem_id: 'PRB-001',
         problem_title: 'Drain blocked',
         problem_category: 'WATER',
         problem_description: 'Severe blockage in stormwater drain',

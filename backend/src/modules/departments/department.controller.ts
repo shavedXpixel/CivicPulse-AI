@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getDatabaseProvider } from '../../providers';
 import { AppError } from '../../middleware/error.middleware';
-import { ERROR_CODES } from '@civicpulse/shared';
+import { ERROR_CODES, UserRole } from '@civicpulse/shared';
 
 export class DepartmentController {
   /**
@@ -51,8 +51,29 @@ export class DepartmentController {
    */
   public static async getWorkload(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const db = getDatabaseProvider();
+      if (req.user?.role === UserRole.CITIZEN) {
+        return next(
+          new AppError({
+            statusCode: 403,
+            code: ERROR_CODES.FORBIDDEN,
+            message: 'Citizens are not authorized to view department workload.'
+          })
+        );
+      }
+
       const deptId = Array.isArray(req.params.id) ? req.params.id[0]! : req.params.id!;
+
+      if (req.user?.role === UserRole.DEPARTMENT_OFFICER && req.user.department_id && req.user.department_id !== deptId) {
+        return next(
+          new AppError({
+            statusCode: 403,
+            code: ERROR_CODES.FORBIDDEN,
+            message: `Department officer cannot view workload for department ${deptId}. Authorized only for ${req.user.department_id}.`
+          })
+        );
+      }
+
+      const db = getDatabaseProvider();
       const workload = await db.getDepartmentWorkload(deptId);
       res.status(200).json({
         data: workload
@@ -68,8 +89,29 @@ export class DepartmentController {
    */
   public static async getDepartmentOfficers(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const db = getDatabaseProvider();
+      if (req.user?.role === UserRole.CITIZEN) {
+        return next(
+          new AppError({
+            statusCode: 403,
+            code: ERROR_CODES.FORBIDDEN,
+            message: 'Citizens are not authorized to view department officers.'
+          })
+        );
+      }
+
       const deptId = Array.isArray(req.params.id) ? req.params.id[0]! : req.params.id!;
+
+      if (req.user?.role === UserRole.DEPARTMENT_OFFICER && req.user.department_id && req.user.department_id !== deptId) {
+        return next(
+          new AppError({
+            statusCode: 403,
+            code: ERROR_CODES.FORBIDDEN,
+            message: `Department officer cannot view officers for department ${deptId}. Authorized only for ${req.user.department_id}.`
+          })
+        );
+      }
+
+      const db = getDatabaseProvider();
       const officers = await db.listDepartmentOfficers(deptId);
       res.status(200).json({
         data: officers

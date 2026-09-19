@@ -18,6 +18,7 @@ import {
   AppError,
   ERROR_CODES,
   UserRole,
+  UserStatus,
   AdminAuditRecord
 } from '@civicpulse/shared';
 import {
@@ -389,7 +390,7 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     }));
   }
 
-  async listUsers(filter?: { role?: UserRole; department_id?: string }): Promise<UserProfile[]> {
+  async listUsers(filter?: { role?: UserRole; department_id?: string; status?: UserStatus }): Promise<UserProfile[]> {
     let sql = `SELECT * FROM users`;
     const conditions: string[] = [];
     const params: any[] = [];
@@ -401,6 +402,10 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     if (filter?.department_id) {
       params.push(filter.department_id);
       conditions.push(`department_id = $${params.length}`);
+    }
+    if (filter?.status) {
+      params.push(filter.status);
+      conditions.push(`status = $${params.length}`);
     }
 
     if (conditions.length > 0) {
@@ -790,6 +795,10 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       conditions.push(`impact_level = $${pIdx++}`);
       params.push(filter.impact_level);
     }
+    if (filter.assigned_to) {
+      conditions.push(`assigned_to = $${pIdx++}`);
+      params.push(filter.assigned_to);
+    }
     if (filter.cursor) {
       conditions.push(`created_at < $${pIdx++}`);
       params.push(filter.cursor);
@@ -1096,7 +1105,12 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       id: r.id,
       name: r.name,
       short_name: r.short_name,
-      description: r.description || ''
+      description: r.description || '',
+      lead_officer: r.lead_officer || undefined,
+      contact_phone: r.contact_phone || undefined,
+      contact_email: r.contact_email || undefined,
+      jurisdiction_wards: r.jurisdiction_wards || undefined,
+      status: (r.status as any) || 'ACTIVE'
     }));
   }
 
@@ -1108,29 +1122,65 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       id: r.id,
       name: r.name,
       short_name: r.short_name,
-      description: r.description || ''
+      description: r.description || '',
+      lead_officer: r.lead_officer || undefined,
+      contact_phone: r.contact_phone || undefined,
+      contact_email: r.contact_email || undefined,
+      jurisdiction_wards: r.jurisdiction_wards || undefined,
+      status: (r.status as any) || 'ACTIVE'
     };
   }
 
   async createDepartment(department: Department): Promise<Department> {
     const now = new Date().toISOString();
-    const sql = `
-      INSERT INTO departments (id, name, short_name, description, lead_officer, contact_phone, contact_email, jurisdiction_wards, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      RETURNING *;
-    `;
-    const rows = await this.query(sql, [
-      department.id,
-      department.name,
-      department.short_name || department.id,
-      department.description || '',
-      department.lead_officer || null,
-      department.contact_phone || null,
-      department.contact_email || null,
-      department.jurisdiction_wards || null,
-      now,
-      now
-    ]);
+    const colCheck = await this.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'departments' AND column_name = 'status';`
+    );
+    const hasStatus = colCheck.length > 0;
+
+    let sql: string;
+    let params: any[];
+
+    if (hasStatus) {
+      sql = `
+        INSERT INTO departments (id, name, short_name, description, lead_officer, contact_phone, contact_email, jurisdiction_wards, status, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING *;
+      `;
+      params = [
+        department.id,
+        department.name,
+        department.short_name || department.id,
+        department.description || '',
+        department.lead_officer || null,
+        department.contact_phone || null,
+        department.contact_email || null,
+        department.jurisdiction_wards || null,
+        department.status || 'ACTIVE',
+        now,
+        now
+      ];
+    } else {
+      sql = `
+        INSERT INTO departments (id, name, short_name, description, lead_officer, contact_phone, contact_email, jurisdiction_wards, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *;
+      `;
+      params = [
+        department.id,
+        department.name,
+        department.short_name || department.id,
+        department.description || '',
+        department.lead_officer || null,
+        department.contact_phone || null,
+        department.contact_email || null,
+        department.jurisdiction_wards || null,
+        now,
+        now
+      ];
+    }
+
+    const rows = await this.query(sql, params);
     const r = rows[0];
     return {
       id: r.id,
@@ -1140,7 +1190,76 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       lead_officer: r.lead_officer || undefined,
       contact_phone: r.contact_phone || undefined,
       contact_email: r.contact_email || undefined,
-      jurisdiction_wards: r.jurisdiction_wards || undefined
+      jurisdiction_wards: r.jurisdiction_wards || undefined,
+      status: (r.status as any) || department.status || 'ACTIVE'
+    };
+  }
+
+  async updateDepartment(id: string, updates: Partial<Department>): Promise<Department> {
+    const existing = await this.getDepartment(id);
+    if (!existing) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: `Department ${id} not found.`
+      });
+    }
+
+    const setClauses: string[] = ['updated_at = NOW()'];
+    const params: any[] = [id];
+
+    if (updates.name !== undefined) {
+      params.push(updates.name);
+      setClauses.push(`name = $${params.length}`);
+    }
+    if (updates.short_name !== undefined) {
+      params.push(updates.short_name);
+      setClauses.push(`short_name = $${params.length}`);
+    }
+    if (updates.description !== undefined) {
+      params.push(updates.description);
+      setClauses.push(`description = $${params.length}`);
+    }
+    if (updates.contact_phone !== undefined) {
+      params.push(updates.contact_phone);
+      setClauses.push(`contact_phone = $${params.length}`);
+    }
+    if (updates.contact_email !== undefined) {
+      params.push(updates.contact_email);
+      setClauses.push(`contact_email = $${params.length}`);
+    }
+    if (updates.lead_officer !== undefined) {
+      params.push(updates.lead_officer);
+      setClauses.push(`lead_officer = $${params.length}`);
+    }
+    if (updates.jurisdiction_wards !== undefined) {
+      params.push(updates.jurisdiction_wards);
+      setClauses.push(`jurisdiction_wards = $${params.length}`);
+    }
+
+    if (updates.status !== undefined) {
+      const colCheck = await this.query(
+        `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'departments' AND column_name = 'status';`
+      );
+      if (colCheck.length > 0) {
+        params.push(updates.status);
+        setClauses.push(`status = $${params.length}`);
+      }
+    }
+
+    const sql = `UPDATE departments SET ${setClauses.join(', ')} WHERE id = $1 RETURNING *;`;
+    const rows = await this.query(sql, params);
+    const r = rows[0];
+    return {
+      id: r.id,
+      name: r.name,
+      short_name: r.short_name,
+      description: r.description || '',
+      lead_officer: r.lead_officer || undefined,
+      contact_phone: r.contact_phone || undefined,
+      contact_email: r.contact_email || undefined,
+      jurisdiction_wards: r.jurisdiction_wards || undefined,
+      status: (r.status as any) || updates.status || existing.status || 'ACTIVE'
     };
   }
 

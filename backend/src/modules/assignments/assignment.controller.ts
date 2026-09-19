@@ -38,9 +38,27 @@ export class AssignmentController {
 
       // 2. Server-side scoping
       if (user.role === UserRole.FIELD_OFFICER) {
+        if (req.query.assigned_to && req.query.assigned_to !== 'me' && req.query.assigned_to !== user.id) {
+          return next(
+            new AppError({
+              statusCode: 403,
+              code: ERROR_CODES.FORBIDDEN,
+              message: "Field officer cannot retrieve another officer's assignments."
+            })
+          );
+        }
         // Field officer only ever sees assignments explicitly assigned to them
         filter.assigned_to = user.id;
       } else if (user.role === UserRole.DEPARTMENT_OFFICER) {
+        if (req.query.department_id && req.query.department_id !== user.department_id) {
+          return next(
+            new AppError({
+              statusCode: 403,
+              code: ERROR_CODES.FORBIDDEN,
+              message: "Department officer cannot retrieve another department's assignments."
+            })
+          );
+        }
         // Department officer scoped to their department
         filter.department_id = user.department_id;
         if (req.query.assigned_to && req.query.assigned_to !== 'me') {

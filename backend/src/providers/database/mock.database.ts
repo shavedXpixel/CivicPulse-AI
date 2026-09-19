@@ -691,13 +691,16 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     return list;
   }
 
-  async listUsers(filter?: { role?: UserRole; department_id?: string }): Promise<UserProfile[]> {
+  async listUsers(filter?: { role?: UserRole; department_id?: string; status?: UserStatus }): Promise<UserProfile[]> {
     let list = Array.from(this.users.values()).map((u) => ({ ...u }));
     if (filter?.role) {
       list = list.filter((u) => u.role === filter.role);
     }
     if (filter?.department_id) {
       list = list.filter((u) => u.department_id === filter.department_id);
+    }
+    if (filter?.status) {
+      list = list.filter((u) => u.status === filter.status);
     }
     return list;
   }
@@ -854,6 +857,9 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     if (filter.ward_id) {
       result = result.filter((p) => p.ward_id === filter.ward_id);
     }
+    if (filter.assigned_to) {
+      result = result.filter((p) => p.assigned_to === filter.assigned_to);
+    }
     if (filter.min_impact !== undefined) {
       result = result.filter((p) => p.impact_score >= filter.min_impact!);
     }
@@ -977,6 +983,24 @@ export class MockDatabaseProvider implements IDatabaseProvider {
   async createDepartment(department: Department): Promise<Department> {
     this.departments.set(department.id, { ...department });
     return { ...department };
+  }
+
+  async updateDepartment(id: string, updates: Partial<Department>): Promise<Department> {
+    const existing = this.departments.get(id);
+    if (!existing) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: `Department ${id} not found.`
+      });
+    }
+    const updated = {
+      ...existing,
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
+    this.departments.set(id, updated);
+    return { ...updated };
   }
 
   async getDepartmentWorkload(id: string): Promise<DepartmentWorkload> {

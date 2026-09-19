@@ -96,6 +96,7 @@ export interface ProblemFilterQuery {
   category?: string;
   department_id?: string;
   ward_id?: string;
+  assigned_to?: string;
   sort?: 'impact_desc' | 'impact_asc' | 'updated_desc' | 'created_desc';
   search?: string;
 }

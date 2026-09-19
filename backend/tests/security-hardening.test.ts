@@ -95,6 +95,8 @@ describe('Phase 14 Security Hardening & RBAC Integrity', () => {
         file_size_bytes: 1000,
         sha256_hash: 'abc',
         submitted_by: 'usr_other_officer',
+        submitted_at: new Date().toISOString(),
+        status: EvidenceStatus.SUBMITTED,
         before_or_after: BeforeOrAfter.AFTER,
         created_at: new Date().toISOString()
       });
@@ -132,6 +134,8 @@ describe('Phase 14 Security Hardening & RBAC Integrity', () => {
         file_size_bytes: 1000,
         sha256_hash: 'def',
         submitted_by: 'usr_dept_watco',
+        submitted_at: new Date().toISOString(),
+        status: EvidenceStatus.SUBMITTED,
         before_or_after: BeforeOrAfter.AFTER,
         created_at: new Date().toISOString()
       });
@@ -375,6 +379,7 @@ describe('Phase 14 Security Hardening & RBAC Integrity', () => {
         file_size_bytes: validBuffer.length,
         sha256_hash: 'hash_test',
         submitted_by: 'usr_officer_01',
+        submitted_at: new Date().toISOString(),
         before_or_after: BeforeOrAfter.AFTER,
         status: EvidenceStatus.SUBMITTED,
         created_at: new Date().toISOString()
@@ -416,6 +421,7 @@ describe('Phase 14 Security Hardening & RBAC Integrity', () => {
         file_size_bytes: validBuffer.length,
         sha256_hash: 'hash_test_2',
         submitted_by: 'usr_officer_01',
+        submitted_at: new Date().toISOString(),
         before_or_after: BeforeOrAfter.AFTER,
         status: EvidenceStatus.SUBMITTED,
         created_at: new Date().toISOString()
@@ -456,6 +462,7 @@ describe('Phase 14 Security Hardening & RBAC Integrity', () => {
         file_size_bytes: validBuffer.length,
         sha256_hash: 'hash_test_3',
         submitted_by: 'usr_dept_watco',
+        submitted_at: new Date().toISOString(),
         before_or_after: BeforeOrAfter.AFTER,
         status: EvidenceStatus.SUBMITTED,
         created_at: new Date().toISOString()

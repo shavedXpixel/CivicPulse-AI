@@ -71,7 +71,7 @@ export class AdminController {
    */
   public static async createDepartment(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { code, id, name, description, short_name, jurisdiction_wards, contact_email, contact_phone } = req.body;
+      const { code, id, name, description, short_name, jurisdiction_wards, contact_email, contact_phone, status } = req.body;
 
       if (!name || typeof name !== 'string' || !name.trim()) {
         return next(
@@ -108,6 +108,8 @@ export class AdminController {
         );
       }
 
+      const deptStatus: 'ACTIVE' | 'INACTIVE' = status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE';
+
       const newDept: Department = {
         id: deptId,
         name: name.trim(),
@@ -115,7 +117,8 @@ export class AdminController {
         description: (description || '').trim(),
         jurisdiction_wards: Array.isArray(jurisdiction_wards) ? jurisdiction_wards : undefined,
         contact_email: contact_email?.trim() || undefined,
-        contact_phone: contact_phone?.trim() || undefined
+        contact_phone: contact_phone?.trim() || undefined,
+        status: deptStatus
       };
 
       let created: Department = newDept;
@@ -127,6 +130,62 @@ export class AdminController {
         data: {
           department: created,
           message: `Department '${deptId}' created successfully.`
+        }
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * PATCH /api/v1/admin/departments/:id
+   * ADMIN-only: Update department details (status, name, description, contact details).
+   */
+  public static async updateDepartment(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const db = getDatabaseProvider();
+      const existing = await db.getDepartment(id);
+      if (!existing) {
+        return next(
+          new AppError({
+            statusCode: 404,
+            code: ERROR_CODES.NOT_FOUND,
+            message: `Department '${id}' not found.`
+          })
+        );
+      }
+
+      const { name, short_name, description, contact_email, contact_phone, jurisdiction_wards, status } = req.body;
+
+      if (status && status !== 'ACTIVE' && status !== 'INACTIVE') {
+        return next(
+          new AppError({
+            statusCode: 400,
+            code: ERROR_CODES.VALIDATION_ERROR,
+            message: "Status must be either 'ACTIVE' or 'INACTIVE'."
+          })
+        );
+      }
+
+      const updates: Partial<Department> = {};
+      if (name !== undefined) updates.name = String(name).trim();
+      if (short_name !== undefined) updates.short_name = String(short_name).trim();
+      if (description !== undefined) updates.description = String(description).trim();
+      if (contact_email !== undefined) updates.contact_email = String(contact_email).trim() || undefined;
+      if (contact_phone !== undefined) updates.contact_phone = String(contact_phone).trim() || undefined;
+      if (jurisdiction_wards !== undefined && Array.isArray(jurisdiction_wards)) updates.jurisdiction_wards = jurisdiction_wards;
+      if (status !== undefined) updates.status = status;
+
+      let updated: Department = { ...existing, ...updates };
+      if (typeof db.updateDepartment === 'function') {
+        updated = await db.updateDepartment(id, updates);
+      }
+
+      res.status(200).json({
+        data: {
+          department: updated,
+          message: `Department '${id}' updated successfully.`
         }
       });
     } catch (err) {
@@ -200,6 +259,16 @@ export class AdminController {
             statusCode: 404,
             code: ERROR_CODES.NOT_FOUND,
             message: `Department '${department_id}' does not exist.`
+          })
+        );
+      }
+
+      if (department.status === 'INACTIVE') {
+        return next(
+          new AppError({
+            statusCode: 400,
+            code: ERROR_CODES.VALIDATION_ERROR,
+            message: `Cannot assign staff to inactive department '${department_id}'.`
           })
         );
       }
@@ -348,7 +417,6 @@ export class AdminController {
         );
       }
 
-      // Check lifecycle status
       if (user.status === UserStatus.ACTIVE) {
         return next(
           new AppError({
@@ -365,6 +433,16 @@ export class AdminController {
             statusCode: 400,
             code: ERROR_CODES.VALIDATION_ERROR,
             message: `Account for '${user.email}' is currently ${user.status.toLowerCase()}. Please re-enable the account first.`
+          })
+        );
+      }
+
+      if (user.status !== UserStatus.INVITED) {
+        return next(
+          new AppError({
+            statusCode: 400,
+            code: ERROR_CODES.VALIDATION_ERROR,
+            message: `Invitations can only be resent for users in INVITED status. Current status: ${user.status}.`
           })
         );
       }
@@ -496,6 +574,16 @@ export class AdminController {
         );
       }
 
+      if (user.role !== UserRole.DEPARTMENT_OFFICER && user.role !== UserRole.FIELD_OFFICER) {
+        return next(
+          new AppError({
+            statusCode: 400,
+            code: ERROR_CODES.VALIDATION_ERROR,
+            message: 'Disable action is only available for government staff (DEPARTMENT_OFFICER or FIELD_OFFICER).'
+          })
+        );
+      }
+
       let updated = user;
       if (typeof db.updateUser === 'function') {
         updated = await db.updateUser(user.id, { status: UserStatus.INACTIVE });
@@ -559,6 +647,16 @@ export class AdminController {
         );
       }
 
+      if (user.role !== UserRole.DEPARTMENT_OFFICER && user.role !== UserRole.FIELD_OFFICER) {
+        return next(
+          new AppError({
+            statusCode: 400,
+            code: ERROR_CODES.VALIDATION_ERROR,
+            message: 'Enable action is only available for government staff (DEPARTMENT_OFFICER or FIELD_OFFICER).'
+          })
+        );
+      }
+
       let updated = user;
       if (typeof db.updateUser === 'function') {
         updated = await db.updateUser(user.id, { status: UserStatus.ACTIVE });
@@ -614,7 +712,8 @@ export class AdminController {
       if (typeof db.listUsers === 'function') {
         const role = req.query.role as UserRole | undefined;
         const department_id = req.query.department_id as string | undefined;
-        users = await db.listUsers({ role, department_id });
+        const status = req.query.status as UserStatus | undefined;
+        users = await db.listUsers({ role, department_id, status });
       }
       res.status(200).json({
         data: {

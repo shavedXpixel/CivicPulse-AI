@@ -37,19 +37,27 @@ function LoginContent() {
 
   const determineDestination = (role?: string): string => {
     if (explicitRedirect) {
-      if (role === UserRole.CITIZEN && (explicitRedirect.startsWith('/dashboard') || explicitRedirect.startsWith('/officer'))) {
+      if (
+        role === UserRole.CITIZEN &&
+        (explicitRedirect.startsWith('/dashboard') ||
+          explicitRedirect.startsWith('/officer') ||
+          explicitRedirect.startsWith('/field-officer') ||
+          explicitRedirect.startsWith('/department-officer') ||
+          explicitRedirect.startsWith('/admin'))
+      ) {
         return '/citizen';
       }
       return explicitRedirect;
     }
 
     switch (role) {
-      case UserRole.FIELD_OFFICER:
-        return '/officer';
-      case UserRole.DEPARTMENT_OFFICER:
       case UserRole.ADMIN:
       case UserRole.SYSTEM_ADMIN:
-        return '/dashboard';
+        return '/admin';
+      case UserRole.DEPARTMENT_OFFICER:
+        return '/department-officer';
+      case UserRole.FIELD_OFFICER:
+        return '/field-officer';
       case UserRole.CITIZEN:
       default:
         return '/citizen';
@@ -131,9 +139,11 @@ function LoginContent() {
   const activeDestination = determineDestination(effectiveRole);
   const destinationLabel =
     effectiveRole === UserRole.FIELD_OFFICER
-      ? 'Go to Field Operations Queue'
-      : effectiveRole === UserRole.DEPARTMENT_OFFICER || effectiveRole === UserRole.ADMIN || effectiveRole === UserRole.SYSTEM_ADMIN
-      ? 'Go to Operations Command Center'
+      ? 'Go to Field Operations Workspace'
+      : effectiveRole === UserRole.DEPARTMENT_OFFICER
+      ? 'Go to Department Operations Workspace'
+      : effectiveRole === UserRole.ADMIN || effectiveRole === UserRole.SYSTEM_ADMIN
+      ? 'Go to System Administration'
       : 'Go to Citizen Portal';
 
   return (

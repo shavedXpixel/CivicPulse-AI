@@ -216,7 +216,7 @@ describe('Phase 15B.4 — Supabase Authentication & Security Negative Suite', ()
       impact_level: 'HIGH' as any,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
-    });
+    } as any);
 
     ProviderContainer.setDatabaseProvider(mockDb);
 

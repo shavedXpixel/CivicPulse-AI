@@ -12,6 +12,7 @@ import {
   DepartmentWorkload,
   ProblemStatus,
   UserRole,
+  UserStatus,
   AdminAuditRecord
 } from '@civicpulse/shared';
 
@@ -35,6 +36,7 @@ export interface ProblemFilterCriteria {
   category?: string;
   department_id?: string;
   ward_id?: string;
+  assigned_to?: string;
   sort?: string;
   search?: string;
 }
@@ -45,7 +47,7 @@ export interface IDatabaseProvider {
   getUserByAuthId?(authUserId: string): Promise<UserProfile | null>;
   createUser(user: UserProfile): Promise<UserProfile>;
   updateUser?(id: string, updates: Partial<UserProfile>): Promise<UserProfile>;
-  listUsers?(filter?: { role?: UserRole; department_id?: string }): Promise<UserProfile[]>;
+  listUsers?(filter?: { role?: UserRole; department_id?: string; status?: UserStatus }): Promise<UserProfile[]>;
   getCitizenProfile(userId: string): Promise<CitizenProfile | null>;
   createCitizenProfile(profile: CitizenProfile): Promise<CitizenProfile>;
 
@@ -91,6 +93,7 @@ export interface IDatabaseProvider {
   listDepartments(): Promise<Department[]>;
   getDepartment(id: string): Promise<Department | null>;
   createDepartment?(department: Department): Promise<Department>;
+  updateDepartment?(id: string, updates: Partial<Department>): Promise<Department>;
   getDepartmentWorkload(id: string): Promise<DepartmentWorkload>;
   listDepartmentOfficers(departmentId: string): Promise<UserProfile[]>;
 

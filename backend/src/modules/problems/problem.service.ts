@@ -29,7 +29,16 @@ export class ProblemService {
     _user: UserProfile,
     query: ProblemFilterQuery
   ): Promise<{ data: ProblemCluster[]; nextCursor?: string }> {
-    return this.problemRepo.list(query);
+    const effectiveQuery = { ...query };
+    if (_user.role === UserRole.DEPARTMENT_OFFICER) {
+      if (!_user.department_id) {
+        return { data: [] };
+      }
+      effectiveQuery.department_id = _user.department_id;
+    } else if (_user.role === UserRole.FIELD_OFFICER && effectiveQuery.assigned_to) {
+      effectiveQuery.assigned_to = _user.id;
+    }
+    return this.problemRepo.list(effectiveQuery);
   }
 
   async getProblem(_user: UserProfile, id: string): Promise<ProblemCluster> {
@@ -41,6 +50,17 @@ export class ProblemService {
         message: `Problem cluster not found: ${id}`
       });
     }
+
+    if (_user.role === UserRole.DEPARTMENT_OFFICER) {
+      if (problem.department_id && _user.department_id && problem.department_id !== _user.department_id) {
+        throw new AppError({
+          statusCode: 403,
+          code: ERROR_CODES.FORBIDDEN,
+          message: `Department officer from ${_user.department_id} cannot view problem belonging to ${problem.department_id}.`
+        });
+      }
+    }
+
     return problem;
   }
 

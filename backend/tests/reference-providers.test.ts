@@ -225,6 +225,7 @@ describe('Phase 10 Step 2: Reference Data Providers & Provenance', () => {
     const mockUser: UserProfile = {
       id: 'usr_real_01',
       email: 'citizen@example.com',
+      display_name: 'Citizen Real',
       role: UserRole.CITIZEN,
       status: UserStatus.ACTIVE,
       created_at: new Date().toISOString(),

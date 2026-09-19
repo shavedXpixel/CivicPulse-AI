@@ -17,6 +17,9 @@ if (env.DEMO_MODE) {
 // POST /api/v1/admin/departments
 router.post('/departments', authMiddleware, requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN), AdminController.createDepartment);
 
+// PATCH /api/v1/admin/departments/:id
+router.patch('/departments/:id', authMiddleware, requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN), AdminController.updateDepartment);
+
 // POST /api/v1/admin/users/government
 router.post('/users/government', authMiddleware, requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN), AdminController.createGovernmentUser);
 

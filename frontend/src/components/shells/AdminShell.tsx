@@ -10,10 +10,10 @@ import {
   Building2,
   TrendingUp,
   Brain,
-  ShieldAlert,
   Settings,
   Users,
   Database,
+  ShieldAlert,
   Sliders,
   Menu,
   X,
@@ -41,9 +41,11 @@ export function AdminShell({ children }: AdminShellProps) {
 
   const adminNav = [
     { name: 'System Administration', href: '/admin', icon: Settings },
-    { name: 'DPI Connectors & APIs', href: '#dpi', icon: Database },
-    { name: 'User & Role Access', href: '#users', icon: Users },
-    { name: 'Audit & Compliance Logs', href: '#audit', icon: ShieldAlert },
+    { name: 'Department Registry', href: '/admin/departments', icon: Building2 },
+    { name: 'Users Directory', href: '/admin/users', icon: Users },
+    { name: 'DPI Connectors & APIs', href: '/admin', icon: Database },
+    { name: 'User & Role Access', href: '/admin/users', icon: Users },
+    { name: 'Audit & Compliance Logs', href: '/admin', icon: ShieldAlert },
   ];
 
   return (
