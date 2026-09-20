@@ -193,7 +193,7 @@ export default function HomePage() {
                   Semantic Clustering
                 </h3>
                 <p className="text-sm text-ink-secondary leading-relaxed">
-                  Consolidates hundreds of individual complaints into single systemic incidents using Google text-embedding-004 and spatiotemporal clustering.
+                  Consolidates hundreds of individual complaints into single systemic incidents using Google gemini-embedding-001 and spatiotemporal clustering.
                 </p>
               </div>
 

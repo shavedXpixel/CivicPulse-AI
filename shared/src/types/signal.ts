@@ -57,6 +57,7 @@ export interface Signal {
   source_type: SignalSourceType;
   source_reference?: string;
   citizen_id?: string;
+  citizen_legacy_uid?: string;
   original_text?: string;
   normalized_text?: string;
   language?: string;

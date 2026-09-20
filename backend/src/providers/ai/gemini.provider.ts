@@ -11,6 +11,7 @@ export interface GeminiAIProviderConfig {
   apiKey?: string;
   primaryModel?: string;
   fallbackModel?: string;
+  embeddingModel?: string;
   maxRetries?: number;
   baseDelayMs?: number;
   maxDelayMs?: number;
@@ -86,6 +87,7 @@ export class GeminiAIProvider implements IAIProvider {
   private apiKey: string;
   private primaryModel: string;
   private fallbackModel: string;
+  private embeddingModel: string;
   private lastUsedModel?: string;
   private maxRetries: number;
   private baseDelayMs: number;
@@ -103,6 +105,11 @@ export class GeminiAIProvider implements IAIProvider {
       config?.fallbackModel ??
       env.GEMINI_FALLBACK_MODEL ??
       'gemini-3.5-flash';
+    this.embeddingModel =
+      config?.embeddingModel ??
+      env.AI_EMBEDDING_MODEL ??
+      env.AI_MODEL_EMBEDDING ??
+      'gemini-embedding-001';
     this.maxRetries = config?.maxRetries ?? 3;
     this.baseDelayMs =
       config?.baseDelayMs ?? (process.env.NODE_ENV === 'test' ? 10 : 500);
@@ -279,7 +286,7 @@ export class GeminiAIProvider implements IAIProvider {
       });
     }
 
-    const embeddingModel = env.AI_EMBEDDING_MODEL || 'text-embedding-004';
+    const embeddingModel = this.embeddingModel;
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${embeddingModel}:embedContent?key=${this.apiKey}`;
 
     let lastError: Error | null = null;
@@ -294,7 +301,8 @@ export class GeminiAIProvider implements IAIProvider {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             model: `models/${embeddingModel}`,
-            content: { parts: [{ text }] }
+            content: { parts: [{ text }] },
+            outputDimensionality: env.AI_EMBEDDING_DIMENSIONS || 1536
           }),
           signal: controller.signal
         });

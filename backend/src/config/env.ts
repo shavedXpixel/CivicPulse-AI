@@ -17,7 +17,7 @@ const EnvSchema = z.object({
   GEMINI_FALLBACK_MODEL: z.string().optional().default('gemini-3.5-flash'),
   AI_MODEL_GENERAL: z.string().default('gemini-3.6-flash'),
   AI_MODEL_EMBEDDING: z.string().optional(),
-  AI_EMBEDDING_MODEL: z.string().optional().default('text-embedding-004'),
+  AI_EMBEDDING_MODEL: z.string().optional(),
   FIREBASE_PROJECT_ID: z.string().optional().default(''),
   FIREBASE_WEB_API_KEY: z.string().optional().default(''),
   GOOGLE_APPLICATION_CREDENTIALS: z.string().optional().default(''),
@@ -76,7 +76,8 @@ export const env = {
   BACKEND_INTERNAL_URL: parsed.BACKEND_INTERNAL_URL || '',
   GEMINI_PRIMARY_MODEL: parsed.GEMINI_PRIMARY_MODEL || parsed.AI_MODEL_GENERAL || 'gemini-3.6-flash',
   GEMINI_FALLBACK_MODEL: parsed.GEMINI_FALLBACK_MODEL || 'gemini-3.5-flash',
-  AI_EMBEDDING_MODEL: parsed.AI_EMBEDDING_MODEL || parsed.AI_MODEL_EMBEDDING || 'text-embedding-004',
+  AI_EMBEDDING_MODEL: parsed.AI_EMBEDDING_MODEL || parsed.AI_MODEL_EMBEDDING || 'gemini-embedding-001',
+  AI_MODEL_EMBEDDING: parsed.AI_MODEL_EMBEDDING || parsed.AI_EMBEDDING_MODEL || 'gemini-embedding-001',
   CORS_ALLOWED_ORIGINS: (parsed.CORS_ALLOWED_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000')
     .split(',')
     .map((s) => s.trim())

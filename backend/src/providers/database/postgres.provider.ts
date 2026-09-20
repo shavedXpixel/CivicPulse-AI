@@ -136,7 +136,9 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     if (rows.length === 0) return null;
     const r = rows[0];
     return {
-      id: r.legacy_firebase_uid || r.id,
+      id: isUuid ? r.id : (r.legacy_firebase_uid || r.id),
+      auth_user_id: r.auth_user_id || undefined,
+      legacy_firebase_uid: r.legacy_firebase_uid || undefined,
       email: r.email,
       display_name: r.display_name,
       role: r.role,
@@ -154,6 +156,8 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     const r = rows[0];
     return {
       id: r.id, // Internal CivicPulse UUID
+      auth_user_id: r.auth_user_id || undefined,
+      legacy_firebase_uid: r.legacy_firebase_uid || undefined,
       email: r.email,
       display_name: r.display_name,
       role: r.role,
@@ -534,6 +538,10 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       signal.updated_at || now
     ]);
 
+    if (citizenInternalUuid) {
+      signal.citizen_id = citizenInternalUuid;
+    }
+
     return signal;
   }
 
@@ -640,12 +648,14 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
   private mapSignalRow(r: any): Signal {
     return {
       id: r.id,
-      citizen_id: r.citizen_legacy_uid || r.citizen_id || undefined,
+      citizen_id: r.citizen_id || undefined,
+      citizen_legacy_uid: r.citizen_legacy_uid || undefined,
       source_type: r.source_type,
       original_text: r.original_text,
       normalized_text: r.normalized_text || undefined,
       category: r.category,
       subcategory: r.subcategory || undefined,
+      department_id: r.department_id || undefined,
       recommended_department: r.recommended_department || undefined,
       severity: r.severity || undefined,
       language: r.language || 'en',

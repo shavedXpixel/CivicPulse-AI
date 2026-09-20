@@ -32,6 +32,7 @@ export interface AdminAuditRecord {
 export interface UserProfile {
   id: string;
   auth_user_id?: string;
+  legacy_firebase_uid?: string;
   email?: string;
   display_name: string;
   photo_url?: string;
