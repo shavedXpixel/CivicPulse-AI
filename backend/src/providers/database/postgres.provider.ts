@@ -969,29 +969,61 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
   // 5. Workflow, Assignments & Actions
   // ---------------------------------------------------------------------------
 
-  async createAssignment(assignment: Assignment): Promise<Assignment> {
+  async createAssignment(assignment: Assignment, client?: PoolClient): Promise<Assignment> {
     const now = new Date().toISOString();
     // Resolve assigned_to UUID if string
-    let assignedToUuid = null;
+    let assignedToUuid: string | null = null;
     if (assignment.assigned_to) {
-      const uRows = await this.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1;`, [assignment.assigned_to]);
-      if (uRows.length > 0) assignedToUuid = uRows[0].id;
+      if (client) {
+        const uRows = await client.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id = $1;`, [assignment.assigned_to]);
+        if (uRows.rows.length > 0) assignedToUuid = uRows.rows[0].id;
+      } else {
+        const uRows = await this.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id = $1;`, [assignment.assigned_to]);
+        if (uRows.length > 0) assignedToUuid = uRows[0].id;
+      }
+      if (!assignedToUuid && /^[0-9a-fA-F-]{36}$/.test(assignment.assigned_to)) {
+        assignedToUuid = assignment.assigned_to;
+      }
+    }
+
+    // Resolve assigned_by to authoritative public.users.id
+    let assignedByUuid: string | null = null;
+    if (assignment.assigned_by) {
+      if (client) {
+        const uByRows = await client.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id = $1;`, [assignment.assigned_by]);
+        if (uByRows.rows.length > 0) assignedByUuid = uByRows.rows[0].id;
+      } else {
+        const uByRows = await this.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id = $1;`, [assignment.assigned_by]);
+        if (uByRows.length > 0) assignedByUuid = uByRows[0].id;
+      }
+      if (!assignedByUuid && /^[0-9a-fA-F-]{36}$/.test(assignment.assigned_by)) {
+        assignedByUuid = assignment.assigned_by;
+      }
+    }
+
+    if (!assignedByUuid) {
+      throw new AppError({
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+        message: 'Assignment assigned_by must resolve to an authoritative public.users.id UUID.'
+      });
     }
 
     const sql = `
       INSERT INTO assignments (
-        id, problem_id, department_id, previous_department_id, assigned_to,
+        id, problem_id, department_id, previous_department_id, assigned_to, assigned_by,
         priority, status, notes, assigned_at, due_at, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *;
     `;
 
-    await this.query(sql, [
+    const params = [
       assignment.id,
       assignment.problem_id,
       assignment.department_id,
       assignment.previous_department_id || null,
       assignedToUuid,
+      assignedByUuid,
       assignment.priority || 'MEDIUM',
       assignment.status || 'PENDING',
       assignment.notes || null,
@@ -999,7 +1031,13 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       assignment.due_at || null,
       assignment.created_at || now,
       assignment.updated_at || now
-    ]);
+    ];
+
+    if (client) {
+      await client.query(sql, params);
+    } else {
+      await this.query(sql, params);
+    }
 
     return assignment;
   }
@@ -1082,7 +1120,7 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     }));
   }
 
-  async createAction(action: ProblemAction): Promise<ProblemAction> {
+  async createAction(action: ProblemAction, client?: PoolClient): Promise<ProblemAction> {
     const isSystemActor =
       action.actor_id === 'civicpulse_ai_advisory' ||
       action.actor_id === 'SYSTEM' ||
@@ -1093,8 +1131,16 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     let actorUserUuid: string | null = null;
 
     if (!isSystemActor && action.actor_id) {
-      const uRows = await this.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1;`, [action.actor_id]);
-      if (uRows.length > 0) actorUserUuid = uRows[0].id;
+      if (client) {
+        const uRows = await client.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id = $1;`, [action.actor_id]);
+        if (uRows.rows.length > 0) actorUserUuid = uRows.rows[0].id;
+      } else {
+        const uRows = await this.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id = $1;`, [action.actor_id]);
+        if (uRows.length > 0) actorUserUuid = uRows[0].id;
+      }
+      if (!actorUserUuid && /^[0-9a-fA-F-]{36}$/.test(action.actor_id)) {
+        actorUserUuid = action.actor_id;
+      }
     }
 
     const sql = `
@@ -1105,7 +1151,7 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       RETURNING *;
     `;
 
-    await this.query(sql, [
+    const params = [
       action.id,
       action.problem_id,
       actorType,
@@ -1118,7 +1164,13 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       action.target_department_id || null,
       action.note || null,
       action.created_at || new Date().toISOString()
-    ]);
+    ];
+
+    if (client) {
+      await client.query(sql, params);
+    } else {
+      await this.query(sql, params);
+    }
 
     return action;
   }
@@ -1407,20 +1459,28 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       }
 
       // 1. Update problem
-      await client.query(
-        `UPDATE problem_clusters SET status = $1, department_id = $2, updated_at = NOW() WHERE id = $3;`,
+      const updatedRes = await client.query(
+        `UPDATE problem_clusters SET status = $1, department_id = $2, updated_at = NOW() WHERE id = $3 RETURNING *;`,
         [nextStatus, assignment.department_id, problemId]
       );
 
       // 2. Insert assignment
-      await this.createAssignment(assignment);
+      await this.createAssignment(assignment, client);
 
       // 3. Insert action
-      await this.createAction(action);
+      await this.createAction(action, client);
 
-      const updatedProblem = await this.getProblemCluster(problemId);
+      const updatedProblem = (updatedRes.rows && updatedRes.rows.length > 0)
+        ? this.mapProblemRow(updatedRes.rows[0])
+        : {
+            ...this.mapProblemRow(current),
+            status: nextStatus,
+            department_id: assignment.department_id,
+            assigned_to: assignment.assigned_to,
+            updated_at: new Date().toISOString()
+          };
       return {
-        problem: updatedProblem!,
+        problem: updatedProblem,
         assignment,
         action
       };
@@ -1448,15 +1508,21 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
         });
       }
 
-      await client.query(
-        `UPDATE problem_clusters SET status = $1, updated_at = NOW() WHERE id = $2;`,
+      const updatedRes = await client.query(
+        `UPDATE problem_clusters SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *;`,
         [nextStatus, problemId]
       );
 
-      await this.createAction(action);
-      const updated = await this.getProblemCluster(problemId);
+      await this.createAction(action, client);
+      const updatedProblem = (updatedRes.rows && updatedRes.rows.length > 0)
+        ? this.mapProblemRow(updatedRes.rows[0])
+        : {
+            ...this.mapProblemRow(current),
+            status: nextStatus,
+            updated_at: new Date().toISOString()
+          };
       return {
-        problem: updated!,
+        problem: updatedProblem,
         action
       };
     });
@@ -1498,13 +1564,20 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       if (pRes.rows.length === 0) {
         throw new AppError({ statusCode: 404, code: ERROR_CODES.NOT_FOUND, message: `Problem ${problemId} not found.` });
       }
+      const current = pRes.rows[0];
 
-      const nextStatus = decision === 'ACCEPT' ? 'RESOLVED' : 'IN_PROGRESS';
-      await client.query(`UPDATE problem_clusters SET status = $1, updated_at = NOW() WHERE id = $2;`, [nextStatus, problemId]);
-      await this.createAction(action);
-      const updated = await this.getProblemCluster(problemId);
+      const nextStatus: ProblemStatus = decision === 'ACCEPT' ? ProblemStatus.RESOLVED : ProblemStatus.IN_PROGRESS;
+      const updatedRes = await client.query(`UPDATE problem_clusters SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *;`, [nextStatus, problemId]);
+      await this.createAction(action, client);
+      const updatedProblem = (updatedRes.rows && updatedRes.rows.length > 0)
+        ? this.mapProblemRow(updatedRes.rows[0])
+        : {
+            ...this.mapProblemRow(current),
+            status: nextStatus,
+            updated_at: new Date().toISOString()
+          };
       return {
-        problem: updated!,
+        problem: updatedProblem,
         action,
         decision
       };

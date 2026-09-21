@@ -931,7 +931,7 @@ export class MockDatabaseProvider implements IDatabaseProvider {
   }
 
   // Workflow, Assignments & Actions
-  async createAssignment(assignment: Assignment): Promise<Assignment> {
+  async createAssignment(assignment: Assignment, _client?: any): Promise<Assignment> {
     const list = this.assignments.get(assignment.problem_id) || [];
     list.push({ ...assignment });
     this.assignments.set(assignment.problem_id, list);
@@ -956,7 +956,7 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     return results;
   }
 
-  async createAction(action: ProblemAction): Promise<ProblemAction> {
+  async createAction(action: ProblemAction, _client?: any): Promise<ProblemAction> {
     const list = this.actions.get(action.problem_id) || [];
     list.push({ ...action });
     this.actions.set(action.problem_id, list);

@@ -83,10 +83,10 @@ export interface IDatabaseProvider {
   getSignalClusterMemberships(signalId: string): Promise<ProblemClusterMember[]>;
 
   // Workflow, Assignments & Actions
-  createAssignment(assignment: Assignment): Promise<Assignment>;
+  createAssignment(assignment: Assignment, client?: any): Promise<Assignment>;
   getAssignments(problemId: string): Promise<Assignment[]>;
   listAssignments(filter: { department_id?: string; assigned_to?: string; status?: string }): Promise<Assignment[]>;
-  createAction(action: ProblemAction): Promise<ProblemAction>;
+  createAction(action: ProblemAction, client?: any): Promise<ProblemAction>;
   getActions(problemId: string): Promise<ProblemAction[]>;
 
   // Departments & Workload
