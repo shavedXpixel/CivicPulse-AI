@@ -19,7 +19,8 @@ import {
   ERROR_CODES,
   UserRole,
   UserStatus,
-  AdminAuditRecord
+  AdminAuditRecord,
+  SignalStatus
 } from '@civicpulse/shared';
 import {
   IDatabaseProvider,
@@ -583,6 +584,34 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       setClauses.push(`ai_analysis = $${pIdx++}`);
       params.push(JSON.stringify(updates.ai_analysis));
     }
+    if (updates.problem_cluster_id !== undefined) {
+      setClauses.push(`problem_cluster_id = $${pIdx++}`);
+      params.push(updates.problem_cluster_id);
+    }
+    if (updates.severity) {
+      setClauses.push(`severity = $${pIdx++}`);
+      params.push(updates.severity);
+    }
+    if (updates.language) {
+      setClauses.push(`language = $${pIdx++}`);
+      params.push(updates.language);
+    }
+    if (updates.subcategory) {
+      setClauses.push(`subcategory = $${pIdx++}`);
+      params.push(updates.subcategory);
+    }
+    if (updates.duration_days !== undefined) {
+      setClauses.push(`duration_days = $${pIdx++}`);
+      params.push(updates.duration_days);
+    }
+    if (updates.critical_facility !== undefined) {
+      setClauses.push(`critical_facility = $${pIdx++}`);
+      params.push(updates.critical_facility);
+    }
+    if (updates.ai_confidence !== undefined) {
+      setClauses.push(`ai_confidence = $${pIdx++}`);
+      params.push(updates.ai_confidence);
+    }
 
     const sql = `UPDATE signals SET ${setClauses.join(', ')} WHERE id = $1 RETURNING *;`;
     const rows = await this.query(sql, params);
@@ -660,6 +689,7 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       severity: r.severity || undefined,
       language: r.language || 'en',
       status: r.status,
+      problem_cluster_id: r.problem_cluster_id || undefined,
       processing_status: r.processing_status,
       location: (r.latitude !== null && r.longitude !== null && r.latitude !== undefined && r.longitude !== undefined)
         ? { lat: Number(r.latitude), lng: Number(r.longitude) }
@@ -680,7 +710,7 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
   // 3. Problem Clusters
   // ---------------------------------------------------------------------------
 
-  async createProblemCluster(problem: ProblemCluster): Promise<ProblemCluster> {
+  async createProblemCluster(problem: ProblemCluster, client?: PoolClient): Promise<ProblemCluster> {
     const now = new Date().toISOString();
     const sql = `
       INSERT INTO problem_clusters (
@@ -696,7 +726,7 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       ) RETURNING *;
     `;
 
-    await this.query(sql, [
+    const params = [
       problem.id,
       problem.title,
       problem.description || null,
@@ -727,7 +757,13 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       problem.last_updated_at || now,
       problem.created_at || now,
       problem.updated_at || now
-    ]);
+    ];
+
+    if (client) {
+      await client.query(sql, params);
+    } else {
+      await this.query(sql, params);
+    }
 
     return problem;
   }
@@ -880,13 +916,13 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
   // 4. Cluster Members
   // ---------------------------------------------------------------------------
 
-  async addProblemClusterMember(member: ProblemClusterMember): Promise<ProblemClusterMember> {
+  async addProblemClusterMember(member: ProblemClusterMember, client?: PoolClient): Promise<ProblemClusterMember> {
     const sql = `
       INSERT INTO cluster_members (id, problem_id, signal_id, relationship, similarity, reason, created_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *;
     `;
-    await this.query(sql, [
+    const params = [
       member.id || `mem_${member.problem_id}_${member.signal_id}`,
       member.problem_id,
       member.signal_id,
@@ -894,7 +930,12 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       member.similarity || 0.8,
       member.reason || 'Semantic and geographic proximity',
       member.created_at || new Date().toISOString()
-    ]);
+    ];
+    if (client) {
+      await client.query(sql, params);
+    } else {
+      await this.query(sql, params);
+    }
     return member;
   }
 
@@ -1427,10 +1468,20 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     signalId: string
   ): Promise<{ problem: ProblemCluster; member: ProblemClusterMember }> {
     return this.withTransaction(async (client) => {
-      await client.query(`SELECT * FROM signals WHERE id = $1 FOR UPDATE;`, [signalId]);
-      await this.createProblemCluster(problem);
-      await this.addProblemClusterMember(member);
-      await client.query(`UPDATE signals SET status = 'NORMALIZED', updated_at = NOW() WHERE id = $1;`, [signalId]);
+      const sRes = await client.query(`SELECT id FROM signals WHERE id = $1 FOR UPDATE;`, [signalId]);
+      if (sRes.rows.length === 0) {
+        throw new AppError({
+          statusCode: 404,
+          code: ERROR_CODES.NOT_FOUND,
+          message: `Signal ${signalId} not found during cluster creation.`
+        });
+      }
+      await this.createProblemCluster(problem, client);
+      await this.addProblemClusterMember(member, client);
+      await client.query(
+        `UPDATE signals SET status = $1, problem_cluster_id = $2, updated_at = NOW() WHERE id = $3;`,
+        [SignalStatus.ATTACHED_TO_PROBLEM, problem.id, signalId]
+      );
       return { problem, member };
     });
   }
