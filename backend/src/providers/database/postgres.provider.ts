@@ -771,7 +771,26 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
   async getProblemCluster(id: string): Promise<ProblemCluster | null> {
     const rows = await this.query(`SELECT * FROM problem_clusters WHERE id = $1;`, [id]);
     if (rows.length === 0) return null;
-    return this.mapProblemRow(rows[0]);
+    const problem = this.mapProblemRow(rows[0]);
+
+    // Backward-compatibility fallback: if assigned_to is not populated on problem_clusters,
+    // resolve from the latest active assignment record for this problem.
+    if (!problem.assigned_to) {
+      const asgnRows = await this.query(
+        `SELECT assigned_to, assigned_at FROM assignments WHERE problem_id = $1 AND status != 'CANCELLED' ORDER BY created_at DESC LIMIT 1;`,
+        [id]
+      );
+      if (asgnRows.length > 0 && asgnRows[0].assigned_to) {
+        problem.assigned_to = asgnRows[0].assigned_to;
+        if (!problem.assigned_at && asgnRows[0].assigned_at) {
+          problem.assigned_at = asgnRows[0].assigned_at?.toISOString
+            ? asgnRows[0].assigned_at.toISOString()
+            : asgnRows[0].assigned_at;
+        }
+      }
+    }
+
+    return problem;
   }
 
   async updateProblemCluster(id: string, updates: Partial<ProblemCluster>): Promise<ProblemCluster> {
@@ -798,6 +817,14 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     if (updates.department_id !== undefined) {
       setClauses.push(`department_id = $${pIdx++}`);
       params.push(updates.department_id);
+    }
+    if (updates.assigned_to !== undefined) {
+      setClauses.push(`assigned_to = $${pIdx++}`);
+      params.push(updates.assigned_to);
+    }
+    if (updates.assigned_at !== undefined) {
+      setClauses.push(`assigned_at = $${pIdx++}`);
+      params.push(updates.assigned_at);
     }
     if (updates.resolved_at) {
       setClauses.push(`resolved_at = $${pIdx++}`);
@@ -903,6 +930,8 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       recurrence_score: Number(r.recurrence_score) || 0,
       evidence_score: Number(r.evidence_score) || 0,
       is_demo: r.is_demo || false,
+      assigned_to: r.assigned_to || undefined,
+      assigned_at: r.assigned_at?.toISOString ? r.assigned_at.toISOString() : r.assigned_at || undefined,
       first_detected_at: r.first_detected_at?.toISOString ? r.first_detected_at.toISOString() : r.first_detected_at,
       last_updated_at: r.last_updated_at?.toISOString ? r.last_updated_at.toISOString() : r.last_updated_at,
       created_at: r.created_at?.toISOString ? r.created_at.toISOString() : r.created_at,
@@ -1458,10 +1487,25 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
         });
       }
 
+      // Resolve assigned_to UUID if provided
+      let assignedToUuid: string | null = null;
+      if (assignment.assigned_to) {
+        const uRows = await client.query(
+          `SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id::text = $1;`,
+          [assignment.assigned_to]
+        );
+        if (uRows.rows.length > 0) assignedToUuid = uRows.rows[0].id;
+        if (!assignedToUuid && /^[0-9a-fA-F-]{36}$/.test(assignment.assigned_to)) {
+          assignedToUuid = assignment.assigned_to;
+        }
+      }
+
+      const assignedAt = assignment.assigned_at || new Date().toISOString();
+
       // 1. Update problem
       const updatedRes = await client.query(
-        `UPDATE problem_clusters SET status = $1, department_id = $2, updated_at = NOW() WHERE id = $3 RETURNING *;`,
-        [nextStatus, assignment.department_id, problemId]
+        `UPDATE problem_clusters SET status = $1, department_id = $2, assigned_to = $3, assigned_at = $4, updated_at = NOW() WHERE id = $5 RETURNING *;`,
+        [nextStatus, assignment.department_id, assignedToUuid, assignedAt, problemId]
       );
 
       // 2. Insert assignment
@@ -1476,7 +1520,8 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
             ...this.mapProblemRow(current),
             status: nextStatus,
             department_id: assignment.department_id,
-            assigned_to: assignment.assigned_to,
+            assigned_to: assignedToUuid || assignment.assigned_to,
+            assigned_at: assignedAt,
             updated_at: new Date().toISOString()
           };
       return {

@@ -29,6 +29,7 @@ import {
 import { PostgresDatabaseProvider } from '../src/providers/database/postgres.provider';
 import * as firebaseAdminModule from '../src/infrastructure/firebase/firebase-admin';
 import { WorkflowService } from '../src/modules/workflow/workflow.service';
+import { WorkflowStateMachine } from '../src/modules/workflow/workflow.machine';
 
 describe('Phase 14 Concurrency & Idempotency Hardening', () => {
   let app: any;
@@ -682,6 +683,8 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
                 ...sampleProblemClusterRow,
                 status: params ? params[0] : ProblemStatus.ASSIGNED,
                 department_id: params && params[1] ? params[1] : PROD_DEPT_ID,
+                assigned_to: params && params[2] ? params[2] : FIELD_OFFICER_ID,
+                assigned_at: params && params[3] ? params[3] : new Date(),
                 updated_at: new Date()
               }]
             };
@@ -1286,6 +1289,341 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
         expect(executedClientQueries.some(q => q.sql === 'ROLLBACK')).toBe(true);
         expect(executedClientQueries.some(q => q.sql === 'COMMIT')).toBe(false);
         expect(mockClient.release).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    // -------------------------------------------------------------------------
+    // Scenario L: Phase 15B.5.3.18-HF5.1 Assignment Problem-Scope Propagation
+    // -------------------------------------------------------------------------
+    describe('Scenario L: Assignment Problem-Scope Propagation & Field Officer Authority (HF5.1)', () => {
+      const PROD_PROBLEM_ID = 'PRB-2026-8299';
+      const PROD_DEPT_ID = 'WATCO';
+      const FIELD_OFFICER_ID = '10000000-0000-4000-8000-000000000003';
+      const OTHER_FIELD_OFFICER_ID = 'ea9d00a6-e646-4e97-a705-ceac2c9eb5c1';
+      const DEPT_OFFICER_ID = '10000000-0000-4000-8000-000000000002';
+
+      const sampleAssignment: Assignment = {
+        id: 'asgn_hf5_test_1',
+        problem_id: PROD_PROBLEM_ID,
+        department_id: PROD_DEPT_ID,
+        assigned_to: FIELD_OFFICER_ID,
+        assigned_by: DEPT_OFFICER_ID,
+        priority: AssignmentPriority.HIGH,
+        status: AssignmentStatus.ASSIGNED,
+        assigned_at: '2026-09-21T19:33:00.691Z',
+        created_at: '2026-09-21T19:33:00.691Z',
+        updated_at: '2026-09-21T19:33:00.691Z'
+      };
+
+      const sampleAction: ProblemAction = {
+        id: 'act_hf5_test_1',
+        problem_id: PROD_PROBLEM_ID,
+        actor_id: DEPT_OFFICER_ID,
+        actor_role: UserRole.DEPARTMENT_OFFICER,
+        action_type: ActionType.ASSIGNED,
+        previous_state: ProblemStatus.TRIAGED,
+        new_state: ProblemStatus.ASSIGNED,
+        target_department_id: PROD_DEPT_ID,
+        target_officer_id: FIELD_OFFICER_ID,
+        created_at: '2026-09-21T19:33:00.691Z'
+      };
+
+      let mockClient: any;
+      let mockPool: any;
+      let provider: PostgresDatabaseProvider;
+      let executedClientQueries: Array<{ sql: string; params?: any[] }>;
+      let executedPoolQueries: Array<{ sql: string; params?: any[] }>;
+
+      beforeEach(() => {
+        executedClientQueries = [];
+        executedPoolQueries = [];
+
+        mockClient = {
+          query: vi.fn().mockImplementation(async (sql: string, params?: any[]) => {
+            executedClientQueries.push({ sql, params });
+
+            if (sql.includes('SELECT * FROM problem_clusters WHERE id = $1 FOR UPDATE')) {
+              return {
+                rows: [{
+                  id: PROD_PROBLEM_ID,
+                  title: 'Water pipe rupture on GGP Colony Main Road',
+                  category: 'water_supply',
+                  department_id: PROD_DEPT_ID,
+                  status: ProblemStatus.TRIAGED,
+                  assigned_to: null,
+                  assigned_at: null,
+                  created_at: new Date(),
+                  updated_at: new Date()
+                }]
+              };
+            }
+
+            if (sql.includes('UPDATE problem_clusters SET status = $1')) {
+              return {
+                rows: [{
+                  id: PROD_PROBLEM_ID,
+                  title: 'Water pipe rupture on GGP Colony Main Road',
+                  category: 'water_supply',
+                  department_id: params ? params[1] : PROD_DEPT_ID,
+                  status: params ? params[0] : ProblemStatus.ASSIGNED,
+                  assigned_to: params ? params[2] : FIELD_OFFICER_ID,
+                  assigned_at: params ? params[3] : '2026-09-21T19:33:00.691Z',
+                  created_at: new Date(),
+                  updated_at: new Date()
+                }]
+              };
+            }
+
+            if (sql.includes('SELECT id FROM users WHERE id::text = $1')) {
+              const input = params ? params[0] : null;
+              if (input === FIELD_OFFICER_ID || input === 'usr_watco_field') {
+                return { rows: [{ id: FIELD_OFFICER_ID }] };
+              }
+              if (input === DEPT_OFFICER_ID) {
+                return { rows: [{ id: DEPT_OFFICER_ID }] };
+              }
+              return { rows: [{ id: input }] };
+            }
+
+            if (sql.includes('INSERT INTO assignments') || sql.includes('INSERT INTO problem_actions')) {
+              return { rows: [{ id: 'mock_inserted_id' }] };
+            }
+
+            return { rows: [] };
+          }),
+          release: vi.fn()
+        };
+
+        mockPool = {
+          connect: vi.fn().mockResolvedValue(mockClient),
+          query: vi.fn().mockImplementation(async (sql: string, params?: any[]) => {
+            executedPoolQueries.push({ sql, params });
+            return { rows: [] };
+          })
+        };
+
+        provider = new PostgresDatabaseProvider('postgresql://fake:fake@localhost:5432/fake');
+        (provider as any).pool = mockPool;
+      });
+
+      it('L.1: atomicAssignProblem persists assigned_to and assigned_at onto problem_clusters', async () => {
+        const result = await provider.atomicAssignProblem(
+          PROD_PROBLEM_ID,
+          sampleAssignment,
+          ProblemStatus.ASSIGNED,
+          sampleAction,
+          ProblemStatus.TRIAGED
+        );
+
+        expect(result.problem.status).toBe(ProblemStatus.ASSIGNED);
+        expect(result.problem.assigned_to).toBe(FIELD_OFFICER_ID);
+        expect(result.problem.assigned_at).toBe('2026-09-21T19:33:00.691Z');
+
+        const updateQuery = executedClientQueries.find(q => q.sql.includes('UPDATE problem_clusters SET status = $1'));
+        expect(updateQuery).toBeDefined();
+        expect(updateQuery!.sql).toContain('assigned_to = $3');
+        expect(updateQuery!.sql).toContain('assigned_at = $4');
+        expect(updateQuery!.params![2]).toBe(FIELD_OFFICER_ID);
+      });
+
+      it('L.2: atomicAssignProblem resolves legacy UID to authoritative public.users.id UUID', async () => {
+        const legacyAssignment = { ...sampleAssignment, assigned_to: 'usr_watco_field' };
+        const result = await provider.atomicAssignProblem(
+          PROD_PROBLEM_ID,
+          legacyAssignment,
+          ProblemStatus.ASSIGNED,
+          sampleAction,
+          ProblemStatus.TRIAGED
+        );
+
+        expect(result.problem.assigned_to).toBe(FIELD_OFFICER_ID);
+        const updateQuery = executedClientQueries.find(q => q.sql.includes('UPDATE problem_clusters SET status = $1'));
+        expect(updateQuery!.params![2]).toBe(FIELD_OFFICER_ID);
+      });
+
+      it('L.3: getProblemCluster exposes assigned_to and assigned_at when directly present on row', async () => {
+        mockPool.query.mockImplementation(async (sql: string, params?: any[]) => {
+          executedPoolQueries.push({ sql, params });
+          if (sql.includes('SELECT * FROM problem_clusters WHERE id = $1')) {
+            return {
+              rows: [{
+                id: PROD_PROBLEM_ID,
+                title: 'Water pipe rupture on GGP Colony Main Road',
+                category: 'water_supply',
+                department_id: PROD_DEPT_ID,
+                status: ProblemStatus.ASSIGNED,
+                assigned_to: FIELD_OFFICER_ID,
+                assigned_at: new Date('2026-09-21T19:33:00.691Z'),
+                created_at: new Date(),
+                updated_at: new Date()
+              }]
+            };
+          }
+          return { rows: [] };
+        });
+
+        const problem = await provider.getProblemCluster(PROD_PROBLEM_ID);
+        expect(problem).not.toBeNull();
+        expect(problem!.id).toBe(PROD_PROBLEM_ID);
+        expect(problem!.assigned_to).toBe(FIELD_OFFICER_ID);
+        expect(problem!.assigned_at).toBe('2026-09-21T19:33:00.691Z');
+      });
+
+      it('L.4: getProblemCluster falls back to active assignment when problem_clusters.assigned_to is NULL', async () => {
+        mockPool.query.mockImplementation(async (sql: string, params?: any[]) => {
+          executedPoolQueries.push({ sql, params });
+          if (sql.includes('SELECT * FROM problem_clusters WHERE id = $1')) {
+            return {
+              rows: [{
+                id: PROD_PROBLEM_ID,
+                title: 'Water pipe rupture on GGP Colony Main Road',
+                category: 'water_supply',
+                department_id: PROD_DEPT_ID,
+                status: ProblemStatus.ASSIGNED,
+                assigned_to: null, // Historical NULL state
+                assigned_at: null,
+                created_at: new Date(),
+                updated_at: new Date()
+              }]
+            };
+          }
+          if (sql.includes('FROM assignments') && sql.includes('problem_id = $1')) {
+            return {
+              rows: [{
+                assigned_to: FIELD_OFFICER_ID,
+                assigned_at: new Date('2026-09-21T19:33:00.691Z')
+              }]
+            };
+          }
+          return { rows: [] };
+        });
+
+        const problem = await provider.getProblemCluster(PROD_PROBLEM_ID);
+        expect(problem).not.toBeNull();
+        expect(problem!.assigned_to).toBe(FIELD_OFFICER_ID);
+        expect(problem!.assigned_at).toBe('2026-09-21T19:33:00.691Z');
+
+        // Confirm fallback query was executed
+        const fallbackQuery = executedPoolQueries.find(q => q.sql.includes('FROM assignments') && q.sql.includes('problem_id = $1'));
+        expect(fallbackQuery).toBeDefined();
+        expect(fallbackQuery!.params).toEqual([PROD_PROBLEM_ID]);
+      });
+
+      it('L.5: WorkflowStateMachine permits ASSIGNED -> IN_PROGRESS for matching Field Officer', () => {
+        const problem: ProblemCluster = {
+          id: PROD_PROBLEM_ID,
+          title: 'Water pipe rupture',
+          category: 'water_supply',
+          department_id: PROD_DEPT_ID,
+          status: ProblemStatus.ASSIGNED,
+          assigned_to: FIELD_OFFICER_ID,
+          signal_count: 1,
+          impact_score: 49,
+          impact_level: ImpactLevel.MEDIUM,
+          first_detected_at: '2026-09-20T09:19:44.486Z',
+          last_updated_at: '2026-09-20T10:29:32.616Z',
+          created_at: '2026-09-20T10:29:32.616Z',
+          updated_at: '2026-09-21T19:33:00.720Z'
+        };
+
+        const matchingFieldOfficer: UserProfile = {
+          id: FIELD_OFFICER_ID,
+          role: UserRole.FIELD_OFFICER,
+          department_id: PROD_DEPT_ID,
+          status: 'ACTIVE' as any
+        };
+
+        expect(() => {
+          WorkflowStateMachine.validateTransition(
+            problem,
+            ProblemStatus.IN_PROGRESS,
+            ActionType.STARTED_WORK,
+            matchingFieldOfficer
+          );
+        }).not.toThrow();
+      });
+
+      it('L.6: WorkflowStateMachine rejects ASSIGNED -> IN_PROGRESS with 403 for different Field Officer', () => {
+        const problem: ProblemCluster = {
+          id: PROD_PROBLEM_ID,
+          title: 'Water pipe rupture',
+          category: 'water_supply',
+          department_id: PROD_DEPT_ID,
+          status: ProblemStatus.ASSIGNED,
+          assigned_to: FIELD_OFFICER_ID,
+          signal_count: 1,
+          impact_score: 49,
+          impact_level: ImpactLevel.MEDIUM,
+          first_detected_at: '2026-09-20T09:19:44.486Z',
+          last_updated_at: '2026-09-20T10:29:32.616Z',
+          created_at: '2026-09-20T10:29:32.616Z',
+          updated_at: '2026-09-21T19:33:00.720Z'
+        };
+
+        const unassignedFieldOfficer: UserProfile = {
+          id: OTHER_FIELD_OFFICER_ID,
+          role: UserRole.FIELD_OFFICER,
+          department_id: PROD_DEPT_ID,
+          status: 'ACTIVE' as any
+        };
+
+        expect(() => {
+          WorkflowStateMachine.validateTransition(
+            problem,
+            ProblemStatus.IN_PROGRESS,
+            ActionType.STARTED_WORK,
+            unassignedFieldOfficer
+          );
+        }).toThrowError(/Field officer ea9d00a6-e646-4e97-a705-ceac2c9eb5c1 can only act on explicitly assigned problems/);
+      });
+
+      it('L.7: Department Officer and Admin authorization behavior is preserved', () => {
+        const problem: ProblemCluster = {
+          id: PROD_PROBLEM_ID,
+          title: 'Water pipe rupture',
+          category: 'water_supply',
+          department_id: PROD_DEPT_ID,
+          status: ProblemStatus.ASSIGNED,
+          assigned_to: FIELD_OFFICER_ID,
+          signal_count: 1,
+          impact_score: 49,
+          impact_level: ImpactLevel.MEDIUM,
+          first_detected_at: '2026-09-20T09:19:44.486Z',
+          last_updated_at: '2026-09-20T10:29:32.616Z',
+          created_at: '2026-09-20T10:29:32.616Z',
+          updated_at: '2026-09-21T19:33:00.720Z'
+        };
+
+        const deptOfficer: UserProfile = {
+          id: DEPT_OFFICER_ID,
+          role: UserRole.DEPARTMENT_OFFICER,
+          department_id: PROD_DEPT_ID,
+          status: 'ACTIVE' as any
+        };
+
+        const admin: UserProfile = {
+          id: '10000000-0000-4000-8000-000000000001',
+          role: UserRole.ADMIN,
+          status: 'ACTIVE' as any
+        };
+
+        expect(() => {
+          WorkflowStateMachine.validateTransition(
+            problem,
+            ProblemStatus.IN_PROGRESS,
+            ActionType.STARTED_WORK,
+            deptOfficer
+          );
+        }).not.toThrow();
+
+        expect(() => {
+          WorkflowStateMachine.validateTransition(
+            problem,
+            ProblemStatus.IN_PROGRESS,
+            ActionType.STARTED_WORK,
+            admin
+          );
+        }).not.toThrow();
       });
     });
   });
