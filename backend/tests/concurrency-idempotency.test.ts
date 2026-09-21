@@ -1141,5 +1141,152 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
       expect(executedClientQueries[executedClientQueries.length - 1].sql).toBe('COMMIT');
       expect(mockClient.release).toHaveBeenCalledTimes(1);
     });
+
+    // SCENARIO K (Phase 15B.5.3.18-HF4.2): Auth User ID and User Resolution Query Text-Casting
+    describe('Scenario K (HF4.2): User resolution query pattern and auth_user_id::text type safety', () => {
+      const EXPECTED_USER_QUERY_PATTERN = 'SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id::text = $1;';
+      const FORBIDDEN_UNCAST_PATTERN = 'auth_user_id = $1';
+
+      it('K.1: assigned_to and assigned_by user resolution queries strictly use auth_user_id::text = $1', async () => {
+        await provider.createAssignment({
+          ...sampleAssignment,
+          id: 'asgn_k1',
+          assigned_to: FIELD_OFFICER_ID,
+          assigned_by: DEPT_OFFICER_ID
+        }, mockClient);
+
+        // Find user lookup queries
+        const userLookups = executedClientQueries.filter(q => q.sql.includes('SELECT id FROM users WHERE'));
+        expect(userLookups.length).toBeGreaterThanOrEqual(2);
+
+        for (const lookup of userLookups) {
+          expect(lookup.sql).toContain('auth_user_id::text = $1');
+          expect(lookup.sql).not.toContain(FORBIDDEN_UNCAST_PATTERN);
+        }
+      });
+
+      it('K.2: actor_id user resolution query in createAction strictly uses auth_user_id::text = $1', async () => {
+        await provider.createAction({
+          ...sampleAction,
+          id: 'act_k2',
+          actor_id: DEPT_OFFICER_ID
+        }, mockClient);
+
+        const actorLookups = executedClientQueries.filter(q => q.sql.includes('SELECT id FROM users WHERE'));
+        expect(actorLookups.length).toBeGreaterThanOrEqual(1);
+
+        for (const lookup of actorLookups) {
+          expect(lookup.sql).toContain('auth_user_id::text = $1');
+          expect(lookup.sql).not.toContain(FORBIDDEN_UNCAST_PATTERN);
+        }
+      });
+
+      it('K.3: Resolves public.users.id UUID string, auth_user_id string, and legacy_firebase_uid correctly', async () => {
+        // 1. Resolve from public.users.id
+        await provider.createAssignment({
+          ...sampleAssignment,
+          id: 'asgn_k3_uuid',
+          assigned_to: FIELD_OFFICER_ID,
+          assigned_by: DEPT_OFFICER_ID
+        }, mockClient);
+
+        const insertUuid = executedClientQueries.find(q => q.sql.includes('INSERT INTO assignments') && q.params?.[0] === 'asgn_k3_uuid');
+        expect(insertUuid?.params?.[4]).toBe(FIELD_OFFICER_ID);
+        expect(insertUuid?.params?.[5]).toBe(DEPT_OFFICER_ID);
+
+        // 2. Resolve from auth_user_id
+        await provider.createAssignment({
+          ...sampleAssignment,
+          id: 'asgn_k3_auth',
+          assigned_to: 'sub_field_officer_240',
+          assigned_by: 'sub_dept_officer_420'
+        }, mockClient);
+
+        const insertAuth = executedClientQueries.find(q => q.sql.includes('INSERT INTO assignments') && q.params?.[0] === 'asgn_k3_auth');
+        expect(insertAuth?.params?.[4]).toBe(FIELD_OFFICER_ID);
+        expect(insertAuth?.params?.[5]).toBe(DEPT_OFFICER_ID);
+
+        // 3. Resolve from legacy_firebase_uid
+        await provider.createAssignment({
+          ...sampleAssignment,
+          id: 'asgn_k3_legacy',
+          assigned_to: FIELD_OFFICER_LEGACY_UID,
+          assigned_by: DEPT_OFFICER_LEGACY_UID
+        }, mockClient);
+
+        const insertLegacy = executedClientQueries.find(q => q.sql.includes('INSERT INTO assignments') && q.params?.[0] === 'asgn_k3_legacy');
+        expect(insertLegacy?.params?.[4]).toBe(FIELD_OFFICER_ID);
+        expect(insertLegacy?.params?.[5]).toBe(DEPT_OFFICER_ID);
+      });
+
+      it('K.4: Unresolvable assigned_by fails cleanly with 400 validation error', async () => {
+        await expect(
+          provider.createAssignment({
+            ...sampleAssignment,
+            id: 'asgn_k4_invalid',
+            assigned_by: 'usr_unresolvable_ghost'
+          }, mockClient)
+        ).rejects.toMatchObject({
+          statusCode: 400,
+          code: ERROR_CODES.VALIDATION_ERROR
+        });
+      });
+
+      it('K.5: atomicAssignProblem executes complete transaction atomically with cast queries and commits', async () => {
+        const result = await provider.atomicAssignProblem(
+          PROD_PROBLEM_ID,
+          sampleAssignment,
+          ProblemStatus.ASSIGNED,
+          sampleAction,
+          ProblemStatus.TRIAGED
+        );
+
+        expect(result.problem.status).toBe(ProblemStatus.ASSIGNED);
+        expect(result.assignment.assigned_to).toBe(FIELD_OFFICER_ID);
+        expect(result.assignment.assigned_by).toBe(DEPT_OFFICER_ID);
+        expect(result.action.actor_id).toBe(DEPT_OFFICER_ID);
+
+        // Confirm all user queries in this atomic flow used auth_user_id::text
+        const lookups = executedClientQueries.filter(q => q.sql.includes('SELECT id FROM users WHERE'));
+        expect(lookups.length).toBeGreaterThanOrEqual(2);
+        for (const lookup of lookups) {
+          expect(lookup.sql).toBe(EXPECTED_USER_QUERY_PATTERN);
+        }
+
+        expect(executedClientQueries[0].sql).toBe('BEGIN');
+        expect(executedClientQueries[executedClientQueries.length - 1].sql).toBe('COMMIT');
+        expect(mockPool.query).not.toHaveBeenCalled();
+      });
+
+      it('K.6: Failure in atomicAssignProblem rolls back completely and releases client', async () => {
+        mockClient.query.mockImplementation(async (sql: string, params?: any[]) => {
+          executedClientQueries.push({ sql, params });
+          if (sql.includes('SELECT * FROM problem_clusters WHERE id = $1 FOR UPDATE')) {
+            return { rows: [{ ...sampleProblemClusterRow }] };
+          }
+          if (sql.includes('UPDATE problem_clusters SET status = $1')) {
+            return { rows: [{ ...sampleProblemClusterRow, status: ProblemStatus.ASSIGNED }] };
+          }
+          if (sql.includes('INSERT INTO assignments')) {
+            throw new Error('PostgreSQL constraint violation');
+          }
+          return { rows: [] };
+        });
+
+        await expect(
+          provider.atomicAssignProblem(
+            PROD_PROBLEM_ID,
+            sampleAssignment,
+            ProblemStatus.ASSIGNED,
+            sampleAction,
+            ProblemStatus.TRIAGED
+          )
+        ).rejects.toThrow('PostgreSQL constraint violation');
+
+        expect(executedClientQueries.some(q => q.sql === 'ROLLBACK')).toBe(true);
+        expect(executedClientQueries.some(q => q.sql === 'COMMIT')).toBe(false);
+        expect(mockClient.release).toHaveBeenCalledTimes(1);
+      });
+    });
   });
 });

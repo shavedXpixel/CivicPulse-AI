@@ -975,10 +975,10 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     let assignedToUuid: string | null = null;
     if (assignment.assigned_to) {
       if (client) {
-        const uRows = await client.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id = $1;`, [assignment.assigned_to]);
+        const uRows = await client.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id::text = $1;`, [assignment.assigned_to]);
         if (uRows.rows.length > 0) assignedToUuid = uRows.rows[0].id;
       } else {
-        const uRows = await this.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id = $1;`, [assignment.assigned_to]);
+        const uRows = await this.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id::text = $1;`, [assignment.assigned_to]);
         if (uRows.length > 0) assignedToUuid = uRows[0].id;
       }
       if (!assignedToUuid && /^[0-9a-fA-F-]{36}$/.test(assignment.assigned_to)) {
@@ -990,10 +990,10 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     let assignedByUuid: string | null = null;
     if (assignment.assigned_by) {
       if (client) {
-        const uByRows = await client.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id = $1;`, [assignment.assigned_by]);
+        const uByRows = await client.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id::text = $1;`, [assignment.assigned_by]);
         if (uByRows.rows.length > 0) assignedByUuid = uByRows.rows[0].id;
       } else {
-        const uByRows = await this.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id = $1;`, [assignment.assigned_by]);
+        const uByRows = await this.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id::text = $1;`, [assignment.assigned_by]);
         if (uByRows.length > 0) assignedByUuid = uByRows[0].id;
       }
       if (!assignedByUuid && /^[0-9a-fA-F-]{36}$/.test(assignment.assigned_by)) {
@@ -1132,10 +1132,10 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
 
     if (!isSystemActor && action.actor_id) {
       if (client) {
-        const uRows = await client.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id = $1;`, [action.actor_id]);
+        const uRows = await client.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id::text = $1;`, [action.actor_id]);
         if (uRows.rows.length > 0) actorUserUuid = uRows.rows[0].id;
       } else {
-        const uRows = await this.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id = $1;`, [action.actor_id]);
+        const uRows = await this.query(`SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id::text = $1;`, [action.actor_id]);
         if (uRows.length > 0) actorUserUuid = uRows[0].id;
       }
       if (!actorUserUuid && /^[0-9a-fA-F-]{36}$/.test(action.actor_id)) {
