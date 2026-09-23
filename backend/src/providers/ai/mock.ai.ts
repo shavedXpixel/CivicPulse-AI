@@ -236,7 +236,7 @@ export class MockAIProvider implements IAIProvider {
       throw new Error('Simulated Mock AI embedding failure');
     }
 
-    const dim = 64;
+    const dim = 1536;
     const vec = new Array(dim).fill(0);
     const normalized = text.toLowerCase();
 

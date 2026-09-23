@@ -6,6 +6,7 @@ export interface WardInfo {
   ward_number?: number;
   provenance: ProvenanceSource;
   boundary?: any;
+  centroid?: { lat: number; lng: number };
 }
 
 export interface PopulationEstimate {
@@ -29,6 +30,7 @@ export interface IGeographyProvider {
   getWardByCoordinates(lat: number, lng: number): Promise<WardInfo | null>;
   getWardById(wardId: string): Promise<WardInfo | null>;
   listWards(): Promise<WardInfo[]>;
+  getWardCentroid?(wardId: string): Promise<{ lat: number; lng: number } | null>;
 }
 
 export interface IPopulationProvider {

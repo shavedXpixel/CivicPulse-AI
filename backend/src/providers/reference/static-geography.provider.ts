@@ -31,6 +31,30 @@ function isPointInGeometry(lng: number, lat: number, geometry: any): boolean {
   return false;
 }
 
+function computeGeometryCentroid(geometry: any): { lat: number; lng: number } | null {
+  if (!geometry || !geometry.coordinates) return null;
+  let sumLat = 0;
+  let sumLng = 0;
+  let count = 0;
+
+  const traverse = (item: any) => {
+    if (Array.isArray(item) && item.length >= 2 && typeof item[0] === 'number' && typeof item[1] === 'number') {
+      sumLng += item[0];
+      sumLat += item[1];
+      count++;
+    } else if (Array.isArray(item)) {
+      for (const sub of item) traverse(sub);
+    }
+  };
+
+  traverse(geometry.coordinates);
+  if (count === 0) return null;
+  return {
+    lat: Number((sumLat / count).toFixed(6)),
+    lng: Number((sumLng / count).toFixed(6))
+  };
+}
+
 /**
  * REAL_MODE geography provider backed by static GeoJSON boundaries.
  * Reads data/reference/geography/bmc_wards.geojson if available.
@@ -85,12 +109,15 @@ export class StaticGeographyProvider implements IGeographyProvider {
             ? parseInt(rawWardNo, 10)
             : undefined;
 
+        const centroid = computeGeometryCentroid(feat.geometry);
+
         return {
           ward_id: String(wardId),
           ward_name: String(wardName),
           ward_number: wardNumber,
           provenance: 'REAL',
-          boundary: feat.geometry
+          boundary: feat.geometry,
+          centroid: centroid || undefined
         };
       });
 
@@ -113,7 +140,8 @@ export class StaticGeographyProvider implements IGeographyProvider {
           ward_id: ward.ward_id,
           ward_name: ward.ward_name,
           ward_number: ward.ward_number,
-          provenance: ward.provenance
+          provenance: ward.provenance,
+          centroid: ward.centroid
         };
       }
     }
@@ -129,7 +157,16 @@ export class StaticGeographyProvider implements IGeographyProvider {
       const cleanWard = w.ward_id.replace(/^WARD-0*/i, '').replace(/^W0*/i, '').trim();
       return cleanInput.length > 0 && cleanInput === cleanWard;
     });
-    return found ? { ward_id: found.ward_id, ward_name: found.ward_name, ward_number: found.ward_number, provenance: found.provenance } : null;
+    return found
+      ? {
+          ward_id: found.ward_id,
+          ward_name: found.ward_name,
+          ward_number: found.ward_number,
+          provenance: found.provenance,
+          boundary: found.boundary,
+          centroid: found.centroid
+        }
+      : null;
   }
 
   async listWards(): Promise<WardInfo[]> {
@@ -137,7 +174,13 @@ export class StaticGeographyProvider implements IGeographyProvider {
       ward_id: w.ward_id,
       ward_name: w.ward_name,
       ward_number: w.ward_number,
-      provenance: w.provenance
+      provenance: w.provenance,
+      centroid: w.centroid
     }));
+  }
+
+  async getWardCentroid(wardId: string): Promise<{ lat: number; lng: number } | null> {
+    const ward = await this.getWardById(wardId);
+    return ward?.centroid || null;
   }
 }
