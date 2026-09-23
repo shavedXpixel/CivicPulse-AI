@@ -7,10 +7,12 @@ export * from './types/governance';
 export * from './types/simulation';
 export * from './types/api';
 export * from './types/ai';
+export * from './types/development-demand';
 
 export * from './constants/errors';
 export * from './constants/impact';
 export * from './constants/taxonomy';
+export * from './constants/demand-taxonomy';
 export * from './constants/simulation';
 
 export * from './schemas/index';

@@ -146,4 +146,5 @@ export const DataProvenanceSchema = z.object({
 export * from './evidence.schema';
 export * from './governance.schema';
 export * from './simulation.schema';
+export * from './development-demand.schema';
 
