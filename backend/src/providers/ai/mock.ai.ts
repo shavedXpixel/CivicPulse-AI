@@ -1,11 +1,18 @@
-import { IAIProvider, SignalAnalysisInput } from './ai.interface';
-import { SignalAnalysisOutput } from '@civicpulse/shared';
+import {
+  IAIProvider,
+  SignalAnalysisInput,
+  DemandNormalizationInput,
+  DemandNormalizationAIOutput
+} from './ai.interface';
+import { SignalAnalysisOutput, DEVELOPMENT_DEMAND_SECTORS } from '@civicpulse/shared';
+import { PROMPT_VERSION_DEVELOPMENT_DEMAND_NORMALIZATION } from '../../infrastructure/ai/prompts/development_demand_normalization_v1';
 
 export class MockAIProvider implements IAIProvider {
   private _simulateFailure = false;
   private _simulateMalformed = false;
   private _simulateLowConfidence = false;
   private _simulateTimeout = false;
+  private _simulateInvalidCategory = false;
 
   public simulateFailure(val: boolean = true) {
     this._simulateFailure = val;
@@ -21,6 +28,10 @@ export class MockAIProvider implements IAIProvider {
 
   public simulateTimeout(val: boolean = true) {
     this._simulateTimeout = val;
+  }
+
+  public simulateInvalidCategory(val: boolean = true) {
+    this._simulateInvalidCategory = val;
   }
 
   public getModelName(): string {
@@ -332,6 +343,313 @@ export class MockAIProvider implements IAIProvider {
     const cat = input.category.replace('_', ' ');
     const durationText = input.duration_days ? ` over ${input.duration_days} days` : '';
     return `A concentrated ${cat} disruption is affecting ${input.location}, with ${input.signal_count} related reports${durationText}.`;
+  }
+
+  public getDemandPromptVersion(): string {
+    return PROMPT_VERSION_DEVELOPMENT_DEMAND_NORMALIZATION;
+  }
+
+  async normalizeDemand(input: DemandNormalizationInput): Promise<DemandNormalizationAIOutput> {
+    if (this._simulateTimeout) {
+      throw new Error('Simulated Mock AI demand normalization timeout');
+    }
+
+    if (this._simulateFailure) {
+      throw new Error('Simulated Mock AI demand normalization failure for resilience testing');
+    }
+
+    if (this._simulateMalformed) {
+      return {
+        invalid_field: true
+      } as any;
+    }
+
+    if (this._simulateInvalidCategory) {
+      return {
+        detected_language: 'en',
+        normalized_text: 'Simulated invalid category response',
+        detected_category: 'invalid_nonexistent_sector',
+        detected_urgency: 'MEDIUM',
+        normalization_confidence: 0.95,
+        reasoning: 'Simulated invalid taxonomy output for testing',
+        resolved_model: 'mock-multilingual-civic-v1'
+      };
+    }
+
+    const text = input.text.toLowerCase();
+
+    // 1. Language Detection
+    const hasOdia = /[\u0B00-\u0B7F]/.test(input.text);
+    const hasDevanagari = /[\u0900-\u097F]/.test(input.text);
+    const hasLatin = /[a-zA-Z]/.test(input.text);
+
+    let detected_language: 'en' | 'or' | 'hi' | 'mixed' = 'en';
+
+    // Transliterated code-mixed markers
+    const codeMixedMarkers = [
+      'pani supply', 'water supply nahi', 'rasta kharab', 'drain nala', 'bada drain',
+      'paani nahi', 'sadak toot', 'bijli cut', 'kachra uthana', 'toilet chahiye',
+      'khala bada', 'light nahi', 'darkness street'
+    ];
+    const isTransliteratedMixed = codeMixedMarkers.some((marker) => text.includes(marker));
+
+    if ((hasOdia && hasLatin) || (hasDevanagari && hasLatin) || isTransliteratedMixed) {
+      detected_language = 'mixed';
+    } else if (hasOdia) {
+      detected_language = 'or';
+    } else if (hasDevanagari) {
+      detected_language = 'hi';
+    } else {
+      detected_language = 'en';
+    }
+
+    // 2. Canonical HF7.1 Taxonomy Classification
+    let detected_category = 'roads_pedestrian';
+
+    if (
+      text.includes('drain') ||
+      text.includes('stormwater') ||
+      text.includes('waterlogging') ||
+      text.includes('flood') ||
+      text.includes('nala') ||
+      text.includes('culvert') ||
+      text.includes('ନାଳ') ||
+      text.includes('ଡ୍ରେନ୍') ||
+      text.includes('नाली') ||
+      text.includes('जलभराव')
+    ) {
+      detected_category = 'drainage_flood_stormwater';
+    } else if (
+      /\b(?:park|trees?|plantation|pond|lake|waterbody|greenery|garden|urban forest)\b/i.test(input.text) ||
+      text.includes('ପୋଖରୀ') ||
+      text.includes('तालाब') ||
+      text.includes('पेड़')
+    ) {
+      detected_category = 'environmental_restoration';
+    } else if (
+      (text.includes('water') && !text.includes('waterlog') && !text.includes('waterbody')) ||
+      text.includes('drinking') ||
+      text.includes('pipe') ||
+      text.includes('tap') ||
+      text.includes('paani') ||
+      text.includes('pani') ||
+      text.includes('ପାଣି') ||
+      text.includes('ଜଳ') ||
+      text.includes('पानी') ||
+      text.includes('नल')
+    ) {
+      detected_category = 'drinking_water';
+    } else if (
+      text.includes('toilet') ||
+      text.includes('sanitation') ||
+      text.includes('shauchalaya') ||
+      text.includes('hygiene') ||
+      text.includes('ଶୌଚାଳୟ') ||
+      text.includes('शौचालय')
+    ) {
+      detected_category = 'sanitation_hygiene';
+    } else if (
+      text.includes('street light') ||
+      text.includes('lighting') ||
+      text.includes('transformer') ||
+      text.includes('electricity') ||
+      text.includes('dark street') ||
+      text.includes('power cut') ||
+      text.includes('power') ||
+      text.includes('light') ||
+      text.includes('ଆଲୋକ') ||
+      text.includes('बिजली')
+    ) {
+      detected_category = 'power_public_lighting';
+    } else if (
+      text.includes('bus') ||
+      text.includes('transit') ||
+      text.includes('metro') ||
+      text.includes('mobility') ||
+      text.includes('bus stop') ||
+      text.includes('transport') ||
+      text.includes('ବସ୍') ||
+      text.includes('बस')
+    ) {
+      detected_category = 'public_transit_mobility';
+    } else if (
+      text.includes('hospital') ||
+      text.includes('clinic') ||
+      text.includes('health') ||
+      text.includes('phc') ||
+      text.includes('chc') ||
+      text.includes('doctor') ||
+      text.includes('medicine') ||
+      text.includes('dispensary') ||
+      text.includes('ଡାକ୍ତରଖାନା') ||
+      text.includes('अस्पताल')
+    ) {
+      detected_category = 'healthcare_accessibility';
+    } else if (
+      text.includes('school') ||
+      text.includes('college') ||
+      text.includes('anganwadi') ||
+      text.includes('library') ||
+      text.includes('classroom') ||
+      text.includes('education') ||
+      text.includes('ବିଦ୍ୟାଳୟ') ||
+      text.includes('स्कूल') ||
+      text.includes('आंगनवाड़ी')
+    ) {
+      detected_category = 'educational_facilities';
+    } else if (
+      text.includes('wifi') ||
+      text.includes('internet') ||
+      text.includes('network') ||
+      text.includes('fiber') ||
+      text.includes('broadband') ||
+      text.includes('digital') ||
+      text.includes('connectivity')
+    ) {
+      detected_category = 'digital_connectivity';
+    } else if (
+      text.includes('garbage') ||
+      text.includes('waste') ||
+      text.includes('dump') ||
+      text.includes('dustbin') ||
+      text.includes('trash') ||
+      text.includes('solid waste') ||
+      text.includes('ଅଳିଆ') ||
+      text.includes('କଚରା') ||
+      text.includes('कचरा') ||
+      text.includes('कूड़ा')
+    ) {
+      detected_category = 'solid_waste_management';
+    } else if (
+      text.includes('cyclone') ||
+      text.includes('heat') ||
+      text.includes('heatwave') ||
+      text.includes('shelter') ||
+      text.includes('disaster') ||
+      text.includes('ବାତ୍ୟା') ||
+      text.includes('लू')
+    ) {
+      detected_category = 'disaster_heat_resilience';
+    } else if (
+      text.includes('cctv') ||
+      text.includes('surveillance') ||
+      text.includes('police post') ||
+      text.includes('guardrail') ||
+      text.includes('public safety') ||
+      text.includes('security')
+    ) {
+      detected_category = 'public_safety_infrastructure';
+    } else if (
+      text.includes('market') ||
+      text.includes('vending') ||
+      text.includes('mandi') ||
+      text.includes('haat') ||
+      text.includes('bazaar') ||
+      text.includes('vendor') ||
+      text.includes('shed') ||
+      text.includes('ମାର୍କେଟ') ||
+      text.includes('ହାଟ') ||
+      text.includes('मंडी')
+    ) {
+      detected_category = 'livelihood_supporting_infrastructure';
+    } else if (
+      text.includes('road') ||
+      text.includes('pothole') ||
+      text.includes('footpath') ||
+      text.includes('street') ||
+      text.includes('pavement') ||
+      text.includes('rasta') ||
+      text.includes('ରାସ୍ତା') ||
+      text.includes('ଖାଲ') ||
+      text.includes('सड़क') ||
+      text.includes('रास्ता')
+    ) {
+      detected_category = 'roads_pedestrian';
+    }
+
+    // 3. Urgency Assessment
+    let detected_urgency: 'LOW' | 'MEDIUM' | 'HIGH' = 'MEDIUM';
+    if (
+      text.includes('urgent') ||
+      text.includes('immediate') ||
+      text.includes('emergency') ||
+      text.includes('danger') ||
+      text.includes('hazard') ||
+      text.includes('critical') ||
+      text.includes('accident') ||
+      text.includes('तुरंत') ||
+      text.includes('जल्दी') ||
+      text.includes('ଜରୁରୀ') ||
+      text.includes('ବିପଦ')
+    ) {
+      detected_urgency = 'HIGH';
+    } else if (
+      text.includes('routine') ||
+      text.includes('maintenance') ||
+      text.includes('future') ||
+      text.includes('suggestion') ||
+      text.includes('beautification') ||
+      text.includes('optional')
+    ) {
+      detected_urgency = 'LOW';
+    }
+
+    // 4. Normalized English Text
+    let normalized_text: string;
+    if (detected_language === 'or') {
+      if (detected_category === 'drinking_water') {
+        normalized_text = 'Citizen reports acute drinking water scarcity and demands piped water supply infrastructure.';
+      } else if (detected_category === 'roads_pedestrian') {
+        normalized_text = 'Citizen requests urgent repair of broken road and pothole resurfacing for safe transit.';
+      } else {
+        normalized_text = `Citizen demands municipal infrastructure improvement for ${detected_category.replace(/_/g, ' ')}.`;
+      }
+    } else if (detected_language === 'hi') {
+      if (detected_category === 'drinking_water') {
+        normalized_text = 'Citizen reports severe shortage of clean drinking water and requests pipeline connection.';
+      } else if (detected_category === 'roads_pedestrian') {
+        normalized_text = 'Citizen reports damaged road conditions requiring immediate resurfacing and pedestrian safety.';
+      } else {
+        normalized_text = `Citizen submits municipal development demand for ${detected_category.replace(/_/g, ' ')}.`;
+      }
+    } else if (detected_language === 'mixed') {
+      normalized_text = `Citizen reports local infrastructure deficit in ${detected_category.replace(/_/g, ' ')} and demands civic remediation.`;
+    } else {
+      normalized_text = input.text.trim();
+    }
+
+    // 5. Coarse Locality and Ward Extraction (Only from explicitly supplied context or explicit mentions)
+    let extracted_ward: string | undefined = input.ward_id;
+    let extracted_locality: string | undefined = input.locality_name;
+
+    const wardMatch = input.text.match(/\b(?:ward|ward-)\s*(\d{1,3})\b/i);
+    if (!extracted_ward && wardMatch) {
+      extracted_ward = `WARD-${wardMatch[1]?.padStart(3, '0')}`;
+    }
+
+    const knownLocalities = ['Saheed Nagar', 'Nayapalli', 'GGP Colony', 'Unit 3', 'Chandrasekharpur', 'Patia', 'Old Town', 'Khandagiri'];
+    if (!extracted_locality) {
+      for (const loc of knownLocalities) {
+        if (new RegExp(`\\b${loc}\\b`, 'i').test(input.text)) {
+          extracted_locality = loc;
+          break;
+        }
+      }
+    }
+
+    const confidence = this._simulateLowConfidence ? 0.35 : 0.94;
+
+    return {
+      detected_language,
+      normalized_text,
+      detected_category,
+      detected_urgency,
+      extracted_locality,
+      extracted_ward,
+      normalization_confidence: confidence,
+      reasoning: `Categorized into canonical sector ${detected_category} with urgency ${detected_urgency} based on civic intent.`,
+      resolved_model: 'mock-multilingual-civic-v1'
+    };
   }
 }
 

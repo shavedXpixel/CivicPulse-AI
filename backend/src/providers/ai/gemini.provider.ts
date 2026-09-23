@@ -1,11 +1,28 @@
-import { IAIProvider, SignalAnalysisInput, SignalAnalysisResult, ClusterSummaryInput } from './ai.interface';
-import { SignalAnalysisOutput, SignalAnalysisOutputSchema, AppError } from '@civicpulse/shared';
+import {
+  IAIProvider,
+  SignalAnalysisInput,
+  SignalAnalysisResult,
+  ClusterSummaryInput,
+  DemandNormalizationInput,
+  DemandNormalizationAIOutput
+} from './ai.interface';
+import {
+  SignalAnalysisOutput,
+  SignalAnalysisOutputSchema,
+  AppError,
+  DEVELOPMENT_DEMAND_SECTORS
+} from '@civicpulse/shared';
 import { env } from '../../config/env';
 import {
   SYSTEM_INSTRUCTION_SIGNAL_UNDERSTANDING,
   buildSignalUnderstandingPrompt,
   PROMPT_VERSION_SIGNAL_UNDERSTANDING
 } from '../../infrastructure/ai/prompts/signal_understanding_v1';
+import {
+  SYSTEM_INSTRUCTION_DEVELOPMENT_DEMAND_NORMALIZATION,
+  buildDemandNormalizationPrompt,
+  PROMPT_VERSION_DEVELOPMENT_DEMAND_NORMALIZATION
+} from '../../infrastructure/ai/prompts/development_demand_normalization_v1';
 
 export interface GeminiAIProviderConfig {
   apiKey?: string;
@@ -355,6 +372,215 @@ export class GeminiAIProvider implements IAIProvider {
     return `A concentrated ${cat} disruption is affecting ${input.location}, with ${input.signal_count} related reports${durationText}.`;
   }
 
+  /**
+   * Invokes Gemini generateContent for demand normalization with structured JSON schema.
+   */
+  private async callGenerateDemandNormalization(
+    modelName: string,
+    input: DemandNormalizationInput
+  ): Promise<DemandNormalizationAIOutput> {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${this.apiKey}`;
+    const userPrompt = buildDemandNormalizationPrompt(input.text, {
+      ward_id: input.ward_id,
+      locality_name: input.locality_name
+    });
+
+    const requestPayload = {
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: userPrompt }]
+        }
+      ],
+      systemInstruction: {
+        parts: [{ text: SYSTEM_INSTRUCTION_DEVELOPMENT_DEMAND_NORMALIZATION }]
+      },
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.1
+      }
+    };
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestPayload),
+        signal: controller.signal
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        const err: any = new Error(`Gemini Demand API HTTP ${res.status}: ${errorText.substring(0, 300)}`);
+        err.status = res.status;
+        err.statusCode = res.status;
+        err.model = modelName;
+        throw err;
+      }
+
+      const data: any = await res.json();
+      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!rawText) {
+        const err: any = new Error(
+          `Gemini demand normalization response did not contain candidates or content text from model ${modelName}.`
+        );
+        err.status = 502;
+        err.model = modelName;
+        throw err;
+      }
+
+      let parsedJson: any;
+      try {
+        parsedJson = JSON.parse(rawText);
+      } catch (jsonErr: any) {
+        const err: any = new Error(
+          `Malformed JSON returned by Gemini demand normalization from model ${modelName}: ${jsonErr.message}`
+        );
+        err.status = 502;
+        err.model = modelName;
+        throw err;
+      }
+
+      // Validate taxonomy category against canonical HF7.1 taxonomy
+      if (!parsedJson.detected_category || !DEVELOPMENT_DEMAND_SECTORS.includes(parsedJson.detected_category as any)) {
+        const err: any = new Error(
+          `Invalid or non-canonical taxonomy category '${parsedJson.detected_category}' returned by Gemini from model ${modelName}. Must be one of canonical HF7.1 taxonomy sectors.`
+        );
+        err.status = 502;
+        err.model = modelName;
+        throw err;
+      }
+
+      // Validate urgency
+      if (!['LOW', 'MEDIUM', 'HIGH'].includes(parsedJson.detected_urgency)) {
+        const err: any = new Error(
+          `Invalid urgency '${parsedJson.detected_urgency}' returned by Gemini. Must be LOW, MEDIUM, or HIGH.`
+        );
+        err.status = 502;
+        err.model = modelName;
+        throw err;
+      }
+
+      // Validate confidence
+      const confidence = Number(parsedJson.normalization_confidence);
+      if (isNaN(confidence) || confidence < 0 || confidence > 1) {
+        const err: any = new Error(
+          `Invalid normalization confidence '${parsedJson.normalization_confidence}' returned by Gemini. Must be between 0.0 and 1.0.`
+        );
+        err.status = 502;
+        err.model = modelName;
+        throw err;
+      }
+
+      // Validate normalized_text
+      if (!parsedJson.normalized_text || typeof parsedJson.normalized_text !== 'string') {
+        const err: any = new Error(`Missing or invalid normalized_text in Gemini demand normalization output.`);
+        err.status = 502;
+        err.model = modelName;
+        throw err;
+      }
+
+      return {
+        detected_language: parsedJson.detected_language || 'en',
+        normalized_text: parsedJson.normalized_text,
+        detected_category: parsedJson.detected_category,
+        detected_urgency: parsedJson.detected_urgency,
+        extracted_locality: parsedJson.extracted_locality || undefined,
+        extracted_ward: parsedJson.extracted_ward || undefined,
+        normalization_confidence: confidence,
+        reasoning: parsedJson.reasoning || 'Categorized via canonical municipal development taxonomy.',
+        resolved_model: modelName
+      };
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  /**
+   * Normalizes a multilingual development demand signal using Gemini with bounded retry,
+   * exponential backoff with jitter, and automatic fallback.
+   */
+  async normalizeDemand(input: DemandNormalizationInput): Promise<DemandNormalizationAIOutput> {
+    if (!this.apiKey) {
+      throw new AppError({
+        statusCode: 500,
+        code: 'CONFIGURATION_ERROR',
+        message: 'GEMINI_API_KEY is not configured in production mode for demand normalization.'
+      });
+    }
+
+    const modelsToTry = [this.primaryModel];
+    if (this.fallbackModel && this.fallbackModel !== this.primaryModel) {
+      modelsToTry.push(this.fallbackModel);
+    }
+
+    let lastError: Error | null = null;
+    let allTransient = true;
+
+    for (let mIdx = 0; mIdx < modelsToTry.length; mIdx++) {
+      const currentModel = modelsToTry[mIdx]!;
+      const isFallback = mIdx > 0;
+
+      if (isFallback) {
+        console.warn(
+          `[GeminiAIProvider] Primary model '${this.primaryModel}' exhausted retries on transient errors during demand normalization. Switching to fallback model: '${currentModel}'`
+        );
+      }
+
+      for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+        try {
+          const result = await this.callGenerateDemandNormalization(currentModel, input);
+          this.lastUsedModel = currentModel;
+          return {
+            ...result,
+            resolved_model: currentModel
+          };
+        } catch (err: any) {
+          lastError = err;
+          const status = err.status || err.statusCode;
+          const transient = isTransientError(status, err);
+
+          if (!transient) {
+            allTransient = false;
+            if (err instanceof AppError) {
+              throw err;
+            }
+            throw new AppError({
+              statusCode: status || 502,
+              code: 'AI_PROVIDER_ERROR',
+              message: `Gemini demand normalization error on model ${currentModel}: ${err.message}`
+            });
+          }
+
+          if (attempt < this.maxRetries) {
+            const delay = calculateBackoffWithJitter(attempt, this.baseDelayMs, this.maxDelayMs);
+            await new Promise((r) => setTimeout(r, delay));
+          }
+        }
+      }
+    }
+
+    if (allTransient) {
+      throw new AppError({
+        statusCode: 503,
+        code: 'AI_PROVIDER_UNAVAILABLE',
+        message: `Gemini AI provider is unavailable for demand normalization. Both primary (${this.primaryModel}) and fallback (${this.fallbackModel}) models exhausted ${this.maxRetries} attempts due to transient errors: ${lastError?.message || 'High demand'}`
+      });
+    }
+
+    throw new AppError({
+      statusCode: 502,
+      code: 'AI_PROVIDER_ERROR',
+      message: `Failed to normalize demand with Gemini after retry and fallback attempts: ${lastError?.message || 'Unknown error'}`
+    });
+  }
+
   public getModelName(): string {
     return this.lastUsedModel || this.primaryModel;
   }
@@ -373,5 +599,9 @@ export class GeminiAIProvider implements IAIProvider {
 
   public getPromptVersion(): string {
     return PROMPT_VERSION_SIGNAL_UNDERSTANDING;
+  }
+
+  public getDemandPromptVersion(): string {
+    return PROMPT_VERSION_DEVELOPMENT_DEMAND_NORMALIZATION;
   }
 }
