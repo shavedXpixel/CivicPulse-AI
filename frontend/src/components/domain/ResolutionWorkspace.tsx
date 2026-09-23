@@ -498,6 +498,11 @@ export function ResolutionWorkspace({
                               : 'Low'}
                             )
                           </span>
+                          {latestVerification.failure_reason && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                              FAILURE REASON: {latestVerification.failure_reason}
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs leading-relaxed">{latestVerification.explanation}</p>
                       </div>

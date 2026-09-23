@@ -1,6 +1,8 @@
 import {
   ResolutionEvidence,
   VerificationResultStatus,
+  VerificationFailureReason,
+  VerificationFailureReasonType,
   BeforeAfterComparison
 } from '@civicpulse/shared';
 
@@ -15,6 +17,7 @@ export interface VerifyResolutionInput {
 
 export interface VerificationAnalysisOutput {
   verification_result: VerificationResultStatus;
+  failure_reason?: VerificationFailureReason | VerificationFailureReasonType;
   confidence: number;
   observed_conditions: string[];
   evidence_summary: string;

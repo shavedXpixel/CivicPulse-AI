@@ -14,6 +14,7 @@ import { getDatabaseProvider } from '../../providers';
 import { AppError } from '../../middleware/error.middleware';
 import { WorkflowService } from '../workflow/workflow.service';
 import { SubmitEvidenceInput, ResolutionReviewInput } from '@civicpulse/shared';
+import { env } from '../../config/env';
 
 export class ResolutionService {
   /**
@@ -86,6 +87,26 @@ export class ResolutionService {
     // Sanitize untrusted text input against prompt injection
     const sanitizedDescription = input.description ? input.description.trim() : '';
 
+    // Authoritative Evidence Provenance Enforcement (Server-Side Trust Boundary):
+    // 1. Production baseline defaults to false (or problem.is_demo / DEMO_MODE).
+    // 2. Ordinary FIELD_OFFICER cannot arbitrarily spoof provenance (403 if attempting unauthorized override).
+    // 3. Authorized ADMIN or SYSTEM_ADMIN can explicitly declare synthetic/test evidence (is_demo: true).
+    // 4. Description text (e.g. "[SYNTHETIC...]") is never used to derive provenance.
+    const baselineIsDemo = Boolean(problem.is_demo || env.DEMO_MODE);
+    let finalIsDemo = baselineIsDemo;
+
+    if (input.is_demo !== undefined) {
+      const isAdmin = user.role === UserRole.ADMIN || user.role === UserRole.SYSTEM_ADMIN;
+      if (!isAdmin && input.is_demo !== baselineIsDemo) {
+        throw new AppError({
+          statusCode: 403,
+          code: ERROR_CODES.FORBIDDEN,
+          message: 'Only administrators are authorized to explicitly specify or override evidence demo/synthetic provenance.'
+        });
+      }
+      finalIsDemo = input.is_demo;
+    }
+
     const evidence: ResolutionEvidence = {
       id: evidenceId,
       problem_id: problem.id,
@@ -102,6 +123,7 @@ export class ResolutionService {
       file_size_bytes: input.file_size_bytes,
       sha256_hash: input.sha256_hash,
       status: EvidenceStatus.SUBMITTED,
+      is_demo: finalIsDemo,
       created_at: nowIso
     };
 

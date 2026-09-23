@@ -3,7 +3,12 @@ import {
   VerifyResolutionInput,
   VerificationAnalysisOutput
 } from './verification.interface';
-import { VerificationResultStatus, VerificationResultSchema, AppError } from '@civicpulse/shared';
+import {
+  VerificationResultStatus,
+  VerificationFailureReason,
+  VerificationResultSchema,
+  AppError
+} from '@civicpulse/shared';
 import { env } from '../../config/env';
 import {
   SYSTEM_INSTRUCTION_RESOLUTION_VERIFICATION,
@@ -12,6 +17,9 @@ import {
 } from '../../infrastructure/ai/prompts/resolution_verification_v1';
 
 export class GeminiVerificationProvider implements IAIVerificationProvider {
+  public static readonly TIMEOUT_MS = 30000; // 30s timeout aligned with standard Gemini SLA
+  public static readonly MAX_RETRIES = 3;
+
   private apiKey: string;
   private model: string;
 
@@ -69,13 +77,15 @@ export class GeminiVerificationProvider implements IAIVerificationProvider {
     };
 
     let lastError: Error | null = null;
-    const maxRetries = 3;
+    let failureReason: VerificationFailureReason = VerificationFailureReason.UNKNOWN;
+    const maxRetries = GeminiVerificationProvider.MAX_RETRIES;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
+      let isDeterministicFailure = false;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), GeminiVerificationProvider.TIMEOUT_MS);
 
+      try {
         const res = await fetch(endpoint, {
           method: 'POST',
           headers: {
@@ -88,38 +98,92 @@ export class GeminiVerificationProvider implements IAIVerificationProvider {
         clearTimeout(timeoutId);
 
         if (!res.ok) {
+          const status = res.status;
           const errorText = await res.text();
-          throw new Error(`Gemini API HTTP ${res.status}: ${errorText.substring(0, 300)}`);
+          // Never log raw endpoint with apiKey query parameter
+          const sanitizedSnippet = errorText.substring(0, 300).replace(this.apiKey, '[REDACTED]');
+          
+          if (status === 503 || status >= 500) {
+            failureReason = VerificationFailureReason.PROVIDER_UNAVAILABLE;
+            throw new Error(`Gemini API HTTP ${status}: ${sanitizedSnippet}`);
+          } else {
+            // HTTP 4xx (400, 401, 403, 404): deterministic client error, do not retry
+            failureReason = VerificationFailureReason.INVALID_RESPONSE;
+            isDeterministicFailure = true;
+            throw new Error(`Gemini API HTTP ${status}: ${sanitizedSnippet}`);
+          }
         }
 
-        const data: any = await res.json();
+        let data: any;
+        try {
+          data = await res.json();
+        } catch (jsonErr: any) {
+          failureReason = VerificationFailureReason.INVALID_RESPONSE;
+          isDeterministicFailure = true;
+          throw new Error('Gemini response could not be parsed as valid JSON.');
+        }
+
         const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (!rawText) {
+          failureReason = VerificationFailureReason.INVALID_RESPONSE;
+          isDeterministicFailure = true;
           throw new Error('Gemini response did not contain candidates or content text.');
         }
 
-        const parsedJson = JSON.parse(rawText);
+        let parsedJson: any;
+        try {
+          parsedJson = JSON.parse(rawText);
+        } catch (parseErr: any) {
+          failureReason = VerificationFailureReason.INVALID_RESPONSE;
+          isDeterministicFailure = true;
+          throw new Error(`Candidate text could not be parsed as JSON: ${parseErr.message}`);
+        }
+
         const validated = VerificationResultSchema.safeParse(parsedJson);
 
         if (!validated.success) {
+          failureReason = VerificationFailureReason.SCHEMA_VALIDATION;
+          isDeterministicFailure = true;
           throw new Error(`Schema validation failed on Gemini verification output: ${validated.error.message}`);
         }
 
-        return validated.data;
+        // Legitimate model response: failure_reason MUST be undefined even if INCONCLUSIVE
+        return {
+          ...validated.data,
+          failure_reason: undefined
+        };
       } catch (err: any) {
+        clearTimeout(timeoutId);
         lastError = err;
+
+        if (controller.signal.aborted || err?.name === 'AbortError' || (err?.message && err.message.toLowerCase().includes('timeout'))) {
+          failureReason = VerificationFailureReason.TIMEOUT;
+        } else if (!isDeterministicFailure && failureReason === VerificationFailureReason.UNKNOWN) {
+          failureReason = VerificationFailureReason.PROVIDER_UNAVAILABLE;
+        }
+
+        // Do not retry deterministic validation or client failures
+        if (isDeterministicFailure) {
+          break;
+        }
+
+        // Bounded exponential backoff with small random jitter for transient errors
         if (attempt < maxRetries) {
-          await new Promise((r) => setTimeout(r, 500 * attempt));
+          const baseDelay = 500 * Math.pow(2, attempt - 1); // 500ms, 1000ms
+          const jitter = Math.floor(Math.random() * 100 * attempt); // 0-100ms, 0-200ms
+          const delay = Math.min(2000, baseDelay + jitter);
+          await new Promise((r) => setTimeout(r, delay));
         }
       }
     }
 
     // Graceful fallback per user requirement:
     // If provider fails, times out, or output is malformed:
-    // verification_result = INCONCLUSIVE, review_required = true
+    // verification_result = INCONCLUSIVE, failure_reason = structured enum, review_required = true
     return {
       verification_result: VerificationResultStatus.INCONCLUSIVE,
+      failure_reason: failureReason,
       confidence: 0.5,
       observed_conditions: ['Automated AI provider verification unavailable; fallback invoked.'],
       evidence_summary: 'AI verification encountered a provider timeout or failure. Falling back to human review.',

@@ -822,7 +822,22 @@ export class MockDatabaseProvider implements IDatabaseProvider {
 
   async getProblemCluster(id: string): Promise<ProblemCluster | null> {
     const problem = this.problemClusters.get(id);
-    return problem ? { ...problem } : null;
+    if (!problem) return null;
+    const copy = { ...problem };
+    if (!copy.assigned_to) {
+      const asgns = this.assignments.get(id) || [];
+      const active = asgns.filter((a) => a.status !== 'CANCELLED');
+      if (active.length > 0) {
+        const latest = active[active.length - 1];
+        if (latest.assigned_to) {
+          copy.assigned_to = latest.assigned_to;
+          if (!copy.assigned_at && latest.assigned_at) {
+            copy.assigned_at = latest.assigned_at;
+          }
+        }
+      }
+    }
+    return copy;
   }
 
   async updateProblemCluster(id: string, updates: Partial<ProblemCluster>): Promise<ProblemCluster> {
@@ -1219,7 +1234,22 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     this.problemClusters.set(problemId, updatedProblem);
     const createdAction = await this.createAction(action);
 
-    return { problem: updatedProblem, action: createdAction };
+    const returnedProblem = { ...updatedProblem };
+    if (!returnedProblem.assigned_to) {
+      const asgns = this.assignments.get(problemId) || [];
+      const active = asgns.filter((a) => a.status !== 'CANCELLED');
+      if (active.length > 0) {
+        const latest = active[active.length - 1];
+        if (latest.assigned_to) {
+          returnedProblem.assigned_to = latest.assigned_to;
+          if (!returnedProblem.assigned_at && latest.assigned_at) {
+            returnedProblem.assigned_at = latest.assigned_at;
+          }
+        }
+      }
+    }
+
+    return { problem: returnedProblem, action: createdAction };
   }
 
   // Resolution Evidence & Verification (Phase 6)

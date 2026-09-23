@@ -1566,6 +1566,24 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
             status: nextStatus,
             updated_at: new Date().toISOString()
           };
+
+      // Backward-compatibility fallback: if assigned_to is not populated on problem_clusters,
+      // resolve from the latest active assignment record for this problem read-only.
+      if (!updatedProblem.assigned_to) {
+        const asgnRows = await client.query(
+          `SELECT assigned_to, assigned_at FROM assignments WHERE problem_id = $1 AND status != 'CANCELLED' ORDER BY created_at DESC LIMIT 1;`,
+          [problemId]
+        );
+        if (asgnRows.rows.length > 0 && asgnRows.rows[0].assigned_to) {
+          updatedProblem.assigned_to = asgnRows.rows[0].assigned_to;
+          if (!updatedProblem.assigned_at && asgnRows.rows[0].assigned_at) {
+            updatedProblem.assigned_at = asgnRows.rows[0].assigned_at?.toISOString
+              ? asgnRows.rows[0].assigned_at.toISOString()
+              : asgnRows.rows[0].assigned_at;
+          }
+        }
+      }
+
       return {
         problem: updatedProblem,
         action
@@ -1888,6 +1906,11 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       RETURNING *;
     `;
 
+    // Persist failure_reason inside JSONB before_after_comparison to preserve without table migration
+    const comparisonPayload = result.before_after_comparison
+      ? { ...result.before_after_comparison, ...(result.failure_reason ? { failure_reason: result.failure_reason } : {}) }
+      : (result.failure_reason ? { failure_reason: result.failure_reason } : null);
+
     await this.query(sql, [
       result.id,
       result.problem_id,
@@ -1896,7 +1919,7 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       result.confidence,
       result.observed_conditions || [],
       result.evidence_summary || '',
-      result.before_after_comparison ? JSON.stringify(result.before_after_comparison) : null,
+      comparisonPayload ? JSON.stringify(comparisonPayload) : null,
       result.inconsistencies || [],
       result.explanation,
       result.recommended_review_reason || null,
@@ -1915,24 +1938,38 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       `SELECT * FROM verification_results WHERE problem_id = $1 ORDER BY created_at DESC;`,
       [problemId]
     );
-    return rows.map((r) => ({
-      id: r.id,
-      problem_id: r.problem_id,
-      evidence_id: r.evidence_id,
-      verification_result: r.verification_result,
-      confidence: Number(r.confidence),
-      observed_conditions: r.observed_conditions || [],
-      evidence_summary: r.evidence_summary,
-      before_after_comparison: r.before_after_comparison || undefined,
-      inconsistencies: r.inconsistencies || [],
-      explanation: r.explanation,
-      recommended_review_reason: r.recommended_review_reason || undefined,
-      limitations: r.limitations || [],
-      review_required: r.review_required,
-      model: r.model,
-      prompt_version: r.prompt_version,
-      created_at: r.created_at?.toISOString ? r.created_at.toISOString() : r.created_at
-    }));
+    return rows.map((r) => {
+      const compRaw = r.before_after_comparison;
+      const failureReason = compRaw?.failure_reason || undefined;
+      const cleanComparison = (compRaw && typeof compRaw === 'object' && 'improved' in compRaw)
+        ? {
+            improved: compRaw.improved,
+            summary: compRaw.summary,
+            changes_observed: compRaw.changes_observed || [],
+            limitations: compRaw.limitations || []
+          }
+        : undefined;
+
+      return {
+        id: r.id,
+        problem_id: r.problem_id,
+        evidence_id: r.evidence_id,
+        verification_result: r.verification_result,
+        failure_reason: failureReason,
+        confidence: Number(r.confidence),
+        observed_conditions: r.observed_conditions || [],
+        evidence_summary: r.evidence_summary,
+        before_after_comparison: cleanComparison,
+        inconsistencies: r.inconsistencies || [],
+        explanation: r.explanation,
+        recommended_review_reason: r.recommended_review_reason || undefined,
+        limitations: r.limitations || [],
+        review_required: r.review_required,
+        model: r.model,
+        prompt_version: r.prompt_version,
+        created_at: r.created_at?.toISOString ? r.created_at.toISOString() : r.created_at
+      };
+    });
   }
 
   async getLatestVerification(evidenceId: string): Promise<VerificationResult | null> {
@@ -1942,15 +1979,27 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     );
     if (rows.length === 0) return null;
     const r = rows[0];
+    const compRaw = r.before_after_comparison;
+    const failureReason = compRaw?.failure_reason || undefined;
+    const cleanComparison = (compRaw && typeof compRaw === 'object' && 'improved' in compRaw)
+      ? {
+          improved: compRaw.improved,
+          summary: compRaw.summary,
+          changes_observed: compRaw.changes_observed || [],
+          limitations: compRaw.limitations || []
+        }
+      : undefined;
+
     return {
       id: r.id,
       problem_id: r.problem_id,
       evidence_id: r.evidence_id,
       verification_result: r.verification_result,
+      failure_reason: failureReason,
       confidence: Number(r.confidence),
       observed_conditions: r.observed_conditions || [],
       evidence_summary: r.evidence_summary,
-      before_after_comparison: r.before_after_comparison || undefined,
+      before_after_comparison: cleanComparison,
       inconsistencies: r.inconsistencies || [],
       explanation: r.explanation,
       recommended_review_reason: r.recommended_review_reason || undefined,

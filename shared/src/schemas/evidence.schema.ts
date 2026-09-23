@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   VerificationResultStatus,
+  VerificationFailureReason,
   EvidenceType,
   BeforeOrAfter,
   EvidenceStatus
@@ -31,7 +32,8 @@ export const SubmitEvidenceSchema = z.object({
     .optional(),
   observed_at: z.string().optional(),
   file_size_bytes: z.number().nonnegative().optional(),
-  sha256_hash: z.string().optional()
+  sha256_hash: z.string().optional(),
+  is_demo: z.boolean().optional()
 });
 
 export type SubmitEvidenceInput = z.infer<typeof SubmitEvidenceSchema>;
@@ -45,6 +47,7 @@ export const BeforeAfterComparisonSchema = z.object({
 
 export const VerificationResultSchema = z.object({
   verification_result: z.nativeEnum(VerificationResultStatus),
+  failure_reason: z.nativeEnum(VerificationFailureReason).nullable().optional(),
   confidence: z.number().min(0).max(1),
   observed_conditions: z.array(z.string()).default([]),
   evidence_summary: z.string().default(''),

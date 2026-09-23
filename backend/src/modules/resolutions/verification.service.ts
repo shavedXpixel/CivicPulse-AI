@@ -7,6 +7,7 @@ import {
   EvidenceStatus,
   VerificationResult,
   VerificationResultStatus,
+  VerificationFailureReason,
   AIOperationRecord,
   AIOperationType,
   AIOperationStatus,
@@ -132,8 +133,21 @@ export class VerificationService {
     } catch (err: any) {
       // Safe fallback on provider error or timeout
       opStatus = 'FAILED';
+      let caughtReason: VerificationFailureReason = VerificationFailureReason.UNKNOWN;
+      const msg = (err?.message || '').toLowerCase();
+      if (err?.name === 'AbortError' || msg.includes('timeout')) {
+        caughtReason = VerificationFailureReason.TIMEOUT;
+      } else if (msg.includes('503') || msg.includes('unavailable') || msg.includes('provider')) {
+        caughtReason = VerificationFailureReason.PROVIDER_UNAVAILABLE;
+      } else if (msg.includes('schema') || msg.includes('validation')) {
+        caughtReason = VerificationFailureReason.SCHEMA_VALIDATION;
+      } else if (msg.includes('json') || msg.includes('malformed') || msg.includes('candidate')) {
+        caughtReason = VerificationFailureReason.INVALID_RESPONSE;
+      }
+
       rawOutput = {
         verification_result: VerificationResultStatus.INCONCLUSIVE,
+        failure_reason: caughtReason,
         confidence: 0.5,
         observed_conditions: ['Automated verification service unavailable.'],
         evidence_summary: 'AI verification provider encountered an error. Safely degraded to human supervisory review.',
@@ -141,6 +155,23 @@ export class VerificationService {
         explanation: 'AI verification could not complete. Case remains awaiting verification for manual inspection.',
         recommended_review_reason: 'AI service unavailable; manual verification required.',
         limitations: ['Verification provider failure'],
+        review_required: true
+      };
+    }
+
+    // Fallback if rawOutput was malformed without throwing
+    if (!rawOutput || typeof rawOutput !== 'object' || !rawOutput.verification_result) {
+      opStatus = 'FAILED';
+      rawOutput = {
+        verification_result: VerificationResultStatus.INCONCLUSIVE,
+        failure_reason: VerificationFailureReason.INVALID_RESPONSE,
+        confidence: 0.5,
+        observed_conditions: ['Automated AI provider returned invalid structure.'],
+        evidence_summary: 'AI verification response was malformed. Safely degraded to human supervisory review.',
+        inconsistencies: ['Malformed provider output structure'],
+        explanation: 'AI verification returned invalid structure. Manual verification required.',
+        recommended_review_reason: 'Provider returned invalid response.',
+        limitations: ['Malformed provider response'],
         review_required: true
       };
     }
@@ -162,6 +193,7 @@ export class VerificationService {
       problem_id: problem.id,
       evidence_id: targetEvidence.id,
       verification_result: finalResult,
+      failure_reason: rawOutput.failure_reason || undefined,
       confidence: Number(rawOutput.confidence.toFixed(2)),
       observed_conditions: rawOutput.observed_conditions || [],
       evidence_summary: rawOutput.evidence_summary || '',
@@ -216,7 +248,8 @@ export class VerificationService {
         triggered_by_role: user.role,
         model: verificationRecord.model,
         confidence: verificationRecord.confidence,
-        result: verificationRecord.verification_result
+        result: verificationRecord.verification_result,
+        failure_reason: verificationRecord.failure_reason || null
       }
     });
 

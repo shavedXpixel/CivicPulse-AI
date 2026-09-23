@@ -60,11 +60,27 @@ export interface BeforeAfterComparison {
   limitations: string[];
 }
 
+export enum VerificationFailureReason {
+  TIMEOUT = 'TIMEOUT',
+  PROVIDER_UNAVAILABLE = 'PROVIDER_UNAVAILABLE',
+  INVALID_RESPONSE = 'INVALID_RESPONSE',
+  SCHEMA_VALIDATION = 'SCHEMA_VALIDATION',
+  UNKNOWN = 'UNKNOWN'
+}
+
+export type VerificationFailureReasonType =
+  | 'TIMEOUT'
+  | 'PROVIDER_UNAVAILABLE'
+  | 'INVALID_RESPONSE'
+  | 'SCHEMA_VALIDATION'
+  | 'UNKNOWN';
+
 export interface VerificationResult {
   id: string;
   problem_id: string;
   evidence_id: string;
   verification_result: VerificationResultStatus;
+  failure_reason?: VerificationFailureReason | VerificationFailureReasonType | null;
   confidence: number;
   observed_conditions: string[];
   evidence_summary: string;
@@ -80,3 +96,4 @@ export interface VerificationResult {
   reviewed_at?: string | null;
   created_at: string;
 }
+
