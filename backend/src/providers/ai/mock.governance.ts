@@ -8,6 +8,7 @@ import {
   GovernanceSourceType
 } from '@civicpulse/shared';
 import { PROMPT_VERSION_GOVERNANCE_INTELLIGENCE } from '../../infrastructure/ai/prompts/governance_intelligence_v1';
+import { env } from '../../config/env';
 
 export class MockGovernanceAIProvider implements IGovernanceAIProvider {
   private _simulateFailure = false;
@@ -287,7 +288,11 @@ export class MockGovernanceAIProvider implements IGovernanceAIProvider {
         const problem: any = data.problem || (data.problems as any[])?.[0] || {};
         const pTitle = problem.title || 'Water Supply Disruption — Nayapalli Ward 18';
         const pStatus = problem.status || 'IN_PROGRESS';
-        const pOfficer = problem.assigned_to === 'usr_officer_01' ? 'Rajesh K. (Field Officer)' : problem.assigned_to || 'Assigned Officer';
+        const pOfficer = problem.assigned_to === 'Assigned Field Officer'
+          ? (env.DEMO_MODE ? 'Rajesh K. (Field Officer)' : 'Assigned Field Officer')
+          : problem.assigned_to === 'usr_officer_01'
+          ? 'Rajesh K. (Field Officer)'
+          : problem.assigned_to || 'Assigned Officer';
         const pScore = problem.impact_score || 92;
 
         return {

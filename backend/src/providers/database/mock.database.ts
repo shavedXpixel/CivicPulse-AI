@@ -875,6 +875,9 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     if (filter.assigned_to) {
       result = result.filter((p) => p.assigned_to === filter.assigned_to);
     }
+    if (filter.is_demo !== undefined) {
+      result = result.filter((p) => (p.is_demo || false) === filter.is_demo);
+    }
     if (filter.min_impact !== undefined) {
       result = result.filter((p) => p.impact_score >= filter.min_impact!);
     }
@@ -1018,7 +1021,7 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     return { ...updated };
   }
 
-  async getDepartmentWorkload(id: string): Promise<DepartmentWorkload> {
+  async getDepartmentWorkload(id: string, options?: { is_demo?: boolean }): Promise<DepartmentWorkload> {
     const dept = this.departments.get(id);
     if (!dept) {
       throw new AppError({
@@ -1037,6 +1040,14 @@ export class MockDatabaseProvider implements IDatabaseProvider {
 
     for (const p of this.problemClusters.values()) {
       if (p.department_id === id) {
+        if (options?.is_demo !== undefined && (p.is_demo || false) !== options.is_demo) {
+          continue;
+        }
+        // Phase E: Exclude terminal cases from active workload denominator
+        if (p.status === ProblemStatus.RESOLVED || p.status === ProblemStatus.CLOSED) {
+          continue;
+        }
+
         totalAssigned++;
         if (p.status === ProblemStatus.IN_PROGRESS) activeInProgress++;
         if (p.status === ProblemStatus.AWAITING_VERIFICATION) awaitingVerification++;
@@ -1261,8 +1272,12 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     return evidence;
   }
 
-  async getResolutionEvidence(problemId: string): Promise<ResolutionEvidence[]> {
-    return this.resolutionEvidence.get(problemId) || [];
+  async getResolutionEvidence(problemId: string, options?: { is_demo?: boolean }): Promise<ResolutionEvidence[]> {
+    let list = this.resolutionEvidence.get(problemId) || [];
+    if (options?.is_demo !== undefined) {
+      list = list.filter((e) => (e.is_demo || false) === options.is_demo);
+    }
+    return list;
   }
 
   async getResolutionEvidenceByPath(storagePath: string): Promise<ResolutionEvidence | null> {

@@ -196,7 +196,14 @@ export class GovernanceService {
     }
 
     const db = getDatabaseProvider();
-    const { data: problems } = await db.listProblemClusters({ limit: 5 });
+    const isDemoFilter = env.DEMO_MODE ? undefined : false;
+    const { data: rawProblems } = await db.listProblemClusters({
+      limit: 5,
+      is_demo: isDemoFilter
+    });
+    const problems = isDemoFilter !== undefined
+      ? rawProblems.filter((p) => (p.is_demo || false) === isDemoFilter)
+      : rawProblems;
 
     if (problems.length === 0) {
       if (env.DEMO_MODE) {

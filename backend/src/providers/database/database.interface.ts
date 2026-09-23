@@ -39,6 +39,7 @@ export interface ProblemFilterCriteria {
   assigned_to?: string;
   sort?: string;
   search?: string;
+  is_demo?: boolean;
 }
 
 export interface IDatabaseProvider {
@@ -94,7 +95,7 @@ export interface IDatabaseProvider {
   getDepartment(id: string): Promise<Department | null>;
   createDepartment?(department: Department): Promise<Department>;
   updateDepartment?(id: string, updates: Partial<Department>): Promise<Department>;
-  getDepartmentWorkload(id: string): Promise<DepartmentWorkload>;
+  getDepartmentWorkload(id: string, options?: { is_demo?: boolean }): Promise<DepartmentWorkload>;
   listDepartmentOfficers(departmentId: string): Promise<UserProfile[]>;
 
   // Atomic Workflow Mutations (Concurrency & State Integrity)
@@ -133,7 +134,7 @@ export interface IDatabaseProvider {
 
   // Resolution Evidence & Verification (Phase 6)
   createResolutionEvidence(evidence: import('@civicpulse/shared').ResolutionEvidence): Promise<import('@civicpulse/shared').ResolutionEvidence>;
-  getResolutionEvidence(problemId: string): Promise<import('@civicpulse/shared').ResolutionEvidence[]>;
+  getResolutionEvidence(problemId: string, options?: { is_demo?: boolean }): Promise<import('@civicpulse/shared').ResolutionEvidence[]>;
   getResolutionEvidenceByPath(storagePath: string): Promise<import('@civicpulse/shared').ResolutionEvidence | null>;
   getEvidenceById(id: string): Promise<import('@civicpulse/shared').ResolutionEvidence | null>;
   updateResolutionEvidence(

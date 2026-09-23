@@ -876,6 +876,10 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       conditions.push(`created_at < $${pIdx++}`);
       params.push(filter.cursor);
     }
+    if (filter.is_demo !== undefined) {
+      conditions.push(`is_demo = $${pIdx++}`);
+      params.push(filter.is_demo);
+    }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     const limit = filter.limit || 50;
@@ -1395,7 +1399,7 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     };
   }
 
-  async getDepartmentWorkload(id: string): Promise<DepartmentWorkload> {
+  async getDepartmentWorkload(id: string, options?: { is_demo?: boolean }): Promise<DepartmentWorkload> {
     const dept = await this.getDepartment(id);
     if (!dept) {
       throw new AppError({
@@ -1405,9 +1409,18 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       });
     }
 
+    const conditions: string[] = ['department_id = $1'];
+    const params: any[] = [id];
+    let pIdx = 2;
+
+    if (options?.is_demo !== undefined) {
+      conditions.push(`is_demo = $${pIdx++}`);
+      params.push(options.is_demo);
+    }
+
     const rows = await this.query(
-      `SELECT status, impact_level, sla_state FROM problem_clusters WHERE department_id = $1;`,
-      [id]
+      `SELECT status, impact_level, sla_state FROM problem_clusters WHERE ${conditions.join(' AND ')};`,
+      params
     );
 
     let totalAssigned = 0;
@@ -1418,6 +1431,11 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     let slaAtRisk = 0;
 
     for (const r of rows) {
+      // Phase E: Exclude terminal cases from active workload denominator
+      if (r.status === ProblemStatus.RESOLVED || r.status === ProblemStatus.CLOSED) {
+        continue;
+      }
+
       totalAssigned++;
       if (r.status === ProblemStatus.IN_PROGRESS) activeInProgress++;
       if (r.status === ProblemStatus.AWAITING_VERIFICATION) awaitingVerification++;
@@ -1829,15 +1847,24 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     return evidence;
   }
 
-  async getResolutionEvidence(problemId: string): Promise<ResolutionEvidence[]> {
+  async getResolutionEvidence(problemId: string, options?: { is_demo?: boolean }): Promise<ResolutionEvidence[]> {
+    const conditions: string[] = ['re.problem_id = $1'];
+    const params: any[] = [problemId];
+    let pIdx = 2;
+
+    if (options?.is_demo !== undefined) {
+      conditions.push(`re.is_demo = $${pIdx++}`);
+      params.push(options.is_demo);
+    }
+
     const sql = `
       SELECT re.*, u.legacy_firebase_uid as officer_legacy_uid
       FROM resolution_evidence re
       LEFT JOIN users u ON u.id = re.submitted_by
-      WHERE re.problem_id = $1
+      WHERE ${conditions.join(' AND ')}
       ORDER BY re.created_at DESC;
     `;
-    const rows = await this.query(sql, [problemId]);
+    const rows = await this.query(sql, params);
     return rows.map((r) => this.mapEvidenceRow(r));
   }
 

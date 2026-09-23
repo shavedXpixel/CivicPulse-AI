@@ -328,6 +328,9 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
     if (filter.ward_id) {
       query = query.where('ward_id', '==', filter.ward_id);
     }
+    if (filter.is_demo !== undefined) {
+      query = query.where('is_demo', '==', filter.is_demo);
+    }
 
     if (filter.sort === 'impact_asc') {
       query = query.orderBy('impact_score', 'asc');
@@ -507,7 +510,7 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
     return department;
   }
 
-  async getDepartmentWorkload(id: string): Promise<DepartmentWorkload> {
+  async getDepartmentWorkload(id: string, options?: { is_demo?: boolean }): Promise<DepartmentWorkload> {
     const dept = await this.getDepartment(id);
     if (!dept) {
       throw new AppError({
@@ -517,7 +520,11 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
       });
     }
 
-    const snap = await this.db.collection('problem_clusters').where('department_id', '==', id).get();
+    let query: Query = this.db.collection('problem_clusters').where('department_id', '==', id);
+    if (options?.is_demo !== undefined) {
+      query = query.where('is_demo', '==', options.is_demo);
+    }
+    const snap = await query.get();
     const problems = snap.docs.map((d: DocumentSnapshot) => d.data() as ProblemCluster);
 
     let totalAssigned = 0;
@@ -528,6 +535,11 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
     let slaAtRisk = 0;
 
     for (const p of problems) {
+      // Exclude terminal cases from active workload denominator
+      if (p.status === ProblemStatus.RESOLVED || p.status === ProblemStatus.CLOSED) {
+        continue;
+      }
+
       totalAssigned++;
       if (p.status === ProblemStatus.IN_PROGRESS) activeInProgress++;
       if (p.status === ProblemStatus.AWAITING_VERIFICATION) awaitingVerification++;
@@ -772,8 +784,12 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
     return evidence;
   }
 
-  async getResolutionEvidence(problemId: string): Promise<ResolutionEvidence[]> {
-    const snap = await this.db.collection('resolution_evidence').where('problem_id', '==', problemId).get();
+  async getResolutionEvidence(problemId: string, options?: { is_demo?: boolean }): Promise<ResolutionEvidence[]> {
+    let query: Query = this.db.collection('resolution_evidence').where('problem_id', '==', problemId);
+    if (options?.is_demo !== undefined) {
+      query = query.where('is_demo', '==', options.is_demo);
+    }
+    const snap = await query.get();
     return snap.docs.map((d: DocumentSnapshot) => d.data() as ResolutionEvidence);
   }
 

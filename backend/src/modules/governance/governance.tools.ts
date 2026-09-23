@@ -7,6 +7,7 @@ import {
 } from '@civicpulse/shared';
 import { getDatabaseProvider } from '../../providers';
 import { AppError } from '../../middleware/error.middleware';
+import { env } from '../../config/env';
 
 export class GovernanceTools {
   /**
@@ -46,6 +47,7 @@ export class GovernanceTools {
   /**
    * Tool 1: getTopProblems
    * Retrieves top-ranked problem clusters within user scope.
+   * In REAL_MODE, demo problems (is_demo=true) are strictly excluded.
    */
   public static async getTopProblems(
     user: UserProfile,
@@ -54,16 +56,22 @@ export class GovernanceTools {
     const scopedDept = this.enforceDepartmentScope(user, params.department_id);
     const db = getDatabaseProvider();
 
+    const isDemoFilter = env.DEMO_MODE ? undefined : false;
     const { data } = await db.listProblemClusters({
       ward_id: params.ward_id,
       department_id: scopedDept,
       category: params.category,
       status: params.status,
-      limit: params.limit || 5
+      limit: params.limit || 5,
+      is_demo: isDemoFilter
     });
 
+    const filtered = isDemoFilter !== undefined
+      ? data.filter((p) => (p.is_demo || false) === isDemoFilter)
+      : data;
+
     // In-memory sort by impact_score DESC
-    const sorted = [...data].sort((a, b) => b.impact_score - a.impact_score);
+    const sorted = [...filtered].sort((a, b) => b.impact_score - a.impact_score);
 
     const sanitized = sorted.map((p) => ({
       id: p.id,
@@ -77,7 +85,7 @@ export class GovernanceTools {
       signal_count: p.signal_count,
       estimated_population: p.estimated_population,
       duration_days: p.duration_days,
-      is_demo: p.is_demo
+      is_demo: p.is_demo || false
     }));
 
     return {
@@ -89,6 +97,8 @@ export class GovernanceTools {
   /**
    * Tool 2: getProblemDetails
    * Retrieves full details of a specific problem cluster, including 7-factor breakdown.
+   * In REAL_MODE, demo problems are rejected (404).
+   * Officer UUIDs are minimized to semantic role indicators.
    */
   public static async getProblemDetails(
     user: UserProfile,
@@ -112,6 +122,15 @@ export class GovernanceTools {
       });
     }
 
+    // In REAL_MODE, demo problems must not be served as production governance intelligence
+    if (!env.DEMO_MODE && problem.is_demo) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: `ProblemCluster ${params.problem_id} not found in production.`
+      });
+    }
+
     // Role scoping
     if (user.role === UserRole.DEPARTMENT_OFFICER) {
       if (problem.department_id && user.department_id && problem.department_id !== user.department_id) {
@@ -131,7 +150,7 @@ export class GovernanceTools {
         category: problem.category,
         subcategory: problem.subcategory,
         department_id: problem.department_id,
-        assigned_to: problem.assigned_to,
+        assigned_to: problem.assigned_to ? 'Assigned Field Officer' : undefined,
         ward_id: problem.ward_id,
         status: problem.status,
         impact_score: problem.impact_score,
@@ -149,7 +168,7 @@ export class GovernanceTools {
         confidence: problem.confidence,
         first_detected_at: problem.first_detected_at,
         created_at: problem.created_at,
-        is_demo: problem.is_demo
+        is_demo: problem.is_demo || false
       },
       evidence_label: 'Problem Details'
     };
@@ -158,6 +177,7 @@ export class GovernanceTools {
   /**
    * Tool 3: getWardImpact
    * Aggregates unresolved civic impact and problem count per ward.
+   * Excludes resolved/closed and demo problems in REAL_MODE.
    */
   public static async getWardImpact(
     user: UserProfile,
@@ -165,12 +185,18 @@ export class GovernanceTools {
   ): Promise<{ ward_metrics: any[]; evidence_label: string }> {
     this.enforceDepartmentScope(user);
     const db = getDatabaseProvider();
-    const { data: allProblems } = await db.listProblemClusters({ limit: 100 });
+
+    const isDemoFilter = env.DEMO_MODE ? undefined : false;
+    const { data: allProblems } = await db.listProblemClusters({
+      limit: 100,
+      is_demo: isDemoFilter
+    });
 
     const wardMap = new Map<string, { total_impact: number; problem_count: number; critical_count: number; total_signals: number }>();
 
     for (const p of allProblems) {
       if (p.status === ProblemStatus.RESOLVED || p.status === ProblemStatus.CLOSED) continue;
+      if (isDemoFilter !== undefined && (p.is_demo || false) !== isDemoFilter) continue;
       const wId = p.ward_id || 'WARD-UNKNOWN';
       if (params.ward_id && wId !== params.ward_id) continue;
 
@@ -211,9 +237,10 @@ export class GovernanceTools {
       ? [{ id: scopedDept }]
       : await db.listDepartments();
 
+    const isDemoFilter = env.DEMO_MODE ? undefined : false;
     const workloads: any[] = [];
     for (const d of depts) {
-      const w = await db.getDepartmentWorkload(d.id);
+      const w = await db.getDepartmentWorkload(d.id, { is_demo: isDemoFilter });
       workloads.push(w);
     }
 
@@ -238,9 +265,10 @@ export class GovernanceTools {
       ? [{ id: scopedDept }]
       : await db.listDepartments();
 
+    const isDemoFilter = env.DEMO_MODE ? undefined : false;
     const performance: any[] = [];
     for (const d of depts) {
-      const w = await db.getDepartmentWorkload(d.id);
+      const w = await db.getDepartmentWorkload(d.id, { is_demo: isDemoFilter });
       performance.push({
         department_id: d.id,
         total_assigned: w.total_assigned,
@@ -270,15 +298,21 @@ export class GovernanceTools {
     const scopedDept = this.enforceDepartmentScope(user, params.department_id);
     const db = getDatabaseProvider();
 
+    const isDemoFilter = env.DEMO_MODE ? undefined : false;
     const { data: problems } = await db.listProblemClusters({
       category: params.category,
       ward_id: params.ward_id,
       department_id: scopedDept,
-      limit: 100
+      limit: 100,
+      is_demo: isDemoFilter
     });
 
-    const activeCount = problems.filter((p) => p.status !== ProblemStatus.RESOLVED && p.status !== ProblemStatus.CLOSED).length;
-    const isSynthetic = problems.some((p) => p.is_demo);
+    const filtered = isDemoFilter !== undefined
+      ? problems.filter((p) => (p.is_demo || false) === isDemoFilter)
+      : problems;
+
+    const activeCount = filtered.filter((p) => p.status !== ProblemStatus.RESOLVED && p.status !== ProblemStatus.CLOSED).length;
+    const isSynthetic = filtered.some((p) => p.is_demo);
     const wardContext = params.ward_id ? `in ${params.ward_id}` : 'across municipal reporting areas';
 
     return {
@@ -299,6 +333,7 @@ export class GovernanceTools {
   /**
    * Tool 7: getSlaRisk
    * Identifies problems nearing or exceeding SLA response limits.
+   * In REAL_MODE, excludes demo problems and terminal statuses.
    */
   public static async getSlaRisk(
     user: UserProfile,
@@ -307,13 +342,16 @@ export class GovernanceTools {
     const scopedDept = this.enforceDepartmentScope(user, params.department_id);
     const db = getDatabaseProvider();
 
+    const isDemoFilter = env.DEMO_MODE ? undefined : false;
     const { data: problems } = await db.listProblemClusters({
       department_id: scopedDept,
-      limit: 50
+      limit: 50,
+      is_demo: isDemoFilter
     });
 
     const atRisk = problems.filter((p) => {
       if (p.status === ProblemStatus.RESOLVED || p.status === ProblemStatus.CLOSED) return false;
+      if (isDemoFilter !== undefined && (p.is_demo || false) !== isDemoFilter) return false;
       return p.impact_level === ImpactLevel.CRITICAL || p.impact_level === ImpactLevel.HIGH;
     }).map((p) => ({
       id: p.id,
@@ -322,7 +360,7 @@ export class GovernanceTools {
       department_id: p.department_id,
       impact_score: p.impact_score,
       status: p.status,
-      assigned_to: p.assigned_to,
+      assigned_to: p.assigned_to ? 'Assigned Field Officer' : undefined,
       assigned_at: p.assigned_at,
       risk_level: p.impact_level === ImpactLevel.CRITICAL ? 'HIGH_RISK' : 'MODERATE_RISK'
     }));
@@ -343,9 +381,15 @@ export class GovernanceTools {
   ): Promise<{ facility_problems: any[]; evidence_label: string }> {
     this.enforceDepartmentScope(user);
     const db = getDatabaseProvider();
-    const { data: problems } = await db.listProblemClusters({ limit: 50 });
+
+    const isDemoFilter = env.DEMO_MODE ? undefined : false;
+    const { data: problems } = await db.listProblemClusters({
+      limit: 50,
+      is_demo: isDemoFilter
+    });
 
     const facilityProblems = problems.filter((p) => {
+      if (isDemoFilter !== undefined && (p.is_demo || false) !== isDemoFilter) return false;
       if (p.critical_exposure_score && p.critical_exposure_score >= 8) return true;
       if (params.facility_name && p.description && p.description.toLowerCase().includes(params.facility_name.toLowerCase())) {
         return true;
@@ -378,6 +422,18 @@ export class GovernanceTools {
     this.enforceDepartmentScope(user);
     const db = getDatabaseProvider();
 
+    const isDemoFilter = env.DEMO_MODE ? undefined : false;
+    if (isDemoFilter !== undefined) {
+      const problem = await db.getProblemCluster(params.problem_id);
+      if (problem && (problem.is_demo || false) !== isDemoFilter) {
+        return {
+          signals: [],
+          total_count: 0,
+          evidence_label: 'Citizen Signals'
+        };
+      }
+    }
+
     const members = await db.getProblemClusterMembers(params.problem_id);
     const signals = members.slice(0, params.limit || 5).map((m) => ({
       signal_id: m.signal_id,
@@ -397,6 +453,8 @@ export class GovernanceTools {
   /**
    * Tool 10: getResolutionPerformance
    * Retrieves Phase 6 resolution evidence and verification result.
+   * In REAL_MODE, excludes demo evidence and preserves structured provenance.
+   * Free-form narrative is wrapped with explicit untrusted trust metadata.
    */
   public static async getResolutionPerformance(
     user: UserProfile,
@@ -405,7 +463,23 @@ export class GovernanceTools {
     this.enforceDepartmentScope(user);
     const db = getDatabaseProvider();
 
-    const evidenceList = await db.getResolutionEvidence(params.problem_id);
+    const isDemoFilter = env.DEMO_MODE ? undefined : false;
+
+    // Reject demo problem resolution in REAL_MODE
+    if (isDemoFilter !== undefined) {
+      const problem = await db.getProblemCluster(params.problem_id);
+      if (problem && (problem.is_demo || false) !== isDemoFilter) {
+        return {
+          evidence: [],
+          verification: null,
+          evidence_label: 'Resolution Evidence'
+        };
+      }
+    }
+
+    const evidenceList = await db.getResolutionEvidence(params.problem_id, {
+      is_demo: isDemoFilter
+    });
     const verificationHistory = await db.getVerificationHistory(params.problem_id);
     const latestVerification = verificationHistory.length > 0 ? verificationHistory[verificationHistory.length - 1] : null;
 
@@ -415,7 +489,15 @@ export class GovernanceTools {
       evidence_type: e.evidence_type,
       before_or_after: e.before_or_after,
       status: e.status,
-      description: e.description,
+      is_demo: Boolean(e.is_demo),
+      provenance: {
+        is_demo: Boolean(e.is_demo),
+        source: 'resolution_evidence'
+      },
+      description: {
+        content: e.description || '',
+        trust: 'untrusted_user_content'
+      },
       submitted_at: e.submitted_at
     }));
 
@@ -435,6 +517,7 @@ export class GovernanceTools {
   /**
    * Tool 11: getProblemTimeline
    * Retrieves immutable audit action trail for a problem.
+   * Action notes are wrapped with untrusted trust metadata.
    */
   public static async getProblemTimeline(
     user: UserProfile,
@@ -450,7 +533,10 @@ export class GovernanceTools {
       actor_role: a.actor_role,
       previous_state: a.previous_state,
       new_state: a.new_state,
-      note: a.note,
+      note: {
+        content: a.note || '',
+        trust: 'untrusted_user_content'
+      },
       created_at: a.created_at
     }));
 

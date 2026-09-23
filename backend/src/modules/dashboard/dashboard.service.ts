@@ -7,6 +7,7 @@ import {
 } from '@civicpulse/shared';
 import { getDatabaseProvider } from '../../providers';
 import { SLAService } from '../workflow/sla.service';
+import { env } from '../../config/env';
 
 export interface DashboardSummary {
   total_signals: number;
@@ -28,8 +29,14 @@ export class DashboardService {
    */
   public static async getSummary(user: UserProfile): Promise<DashboardSummary> {
     const db = getDatabaseProvider();
-    const problemListResult = await db.listProblemClusters({ limit: 500 });
-    const allProblems = problemListResult.data;
+    const isDemoFilter = env.DEMO_MODE ? undefined : false;
+    const problemListResult = await db.listProblemClusters({
+      limit: 500,
+      is_demo: isDemoFilter
+    });
+    const allProblems = isDemoFilter !== undefined
+      ? problemListResult.data.filter((p) => (p.is_demo || false) === isDemoFilter)
+      : problemListResult.data;
 
     // Filter problems according to role scope
     let scopedProblems: ProblemCluster[] = allProblems;
@@ -123,14 +130,20 @@ export class DashboardService {
    */
   public static async getPriorityProblems(user: UserProfile, limit: number = 20): Promise<ProblemCluster[]> {
     const db = getDatabaseProvider();
-    const filter: { department_id?: string; limit: number } = { limit: 100 };
+    const isDemoFilter = env.DEMO_MODE ? undefined : false;
+    const filter: { department_id?: string; limit: number; is_demo?: boolean } = {
+      limit: 100,
+      is_demo: isDemoFilter
+    };
 
     if (user.role === UserRole.DEPARTMENT_OFFICER && user.department_id) {
       filter.department_id = user.department_id;
     }
 
     const result = await db.listProblemClusters(filter);
-    let problems = result.data;
+    let problems = isDemoFilter !== undefined
+      ? result.data.filter((p) => (p.is_demo || false) === isDemoFilter)
+      : result.data;
 
     if (user.role === UserRole.FIELD_OFFICER) {
       problems = problems.filter((p) => p.assigned_to === user.id);
@@ -157,8 +170,14 @@ export class DashboardService {
     }
   ): Promise<ProblemCluster[]> {
     const db = getDatabaseProvider();
-    const result = await db.listProblemClusters({ limit: 100 });
-    let problems = result.data;
+    const isDemoFilter = env.DEMO_MODE ? undefined : false;
+    const result = await db.listProblemClusters({
+      limit: 100,
+      is_demo: isDemoFilter
+    });
+    let problems = isDemoFilter !== undefined
+      ? result.data.filter((p) => (p.is_demo || false) === isDemoFilter)
+      : result.data;
 
     // 1. Strict Server-Side RBAC Enforcement
     if (user.role === UserRole.CITIZEN) {
