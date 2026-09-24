@@ -64,6 +64,32 @@ export const DeterministicDemandMetricsSchema = z.object({
     .max(100, 'Composite demand index max is 100')
 });
 
+export const MetricComponentDetailSchema = z.object({
+  metric: z.string().min(1),
+  score: z.number().min(0),
+  max_score: z.number().positive(),
+  raw_inputs: z.record(z.unknown()),
+  formula: z.string().min(1),
+  explanation: z.string().min(1),
+  data_available: z.boolean(),
+  provenance: DemandProvenanceSchema
+});
+
+export const DetailedDemandMetricsResultSchema = z.object({
+  metrics: DeterministicDemandMetricsSchema,
+  priority_band: z.nativeEnum(DemandPriorityBand),
+  components: z.object({
+    demand_volume: MetricComponentDetailSchema,
+    recurrence: MetricComponentDetailSchema,
+    geographic_concentration: MetricComponentDetailSchema,
+    population_exposure: MetricComponentDetailSchema,
+    infrastructure_deficit: MetricComponentDetailSchema,
+    investment_gap: MetricComponentDetailSchema
+  }),
+  calculated_at: z.string().datetime(),
+  is_demo: z.boolean()
+});
+
 // ============================================================================
 // MULTILINGUAL DEMAND SIGNAL SCHEMA
 // ============================================================================

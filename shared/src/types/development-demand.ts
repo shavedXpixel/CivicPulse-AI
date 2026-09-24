@@ -82,6 +82,32 @@ export interface DeterministicDemandMetrics {
   composite_demand_index: number;         // 0–100
 }
 
+export interface MetricComponentDetail {
+  metric: string;
+  score: number;
+  max_score: number;
+  raw_inputs: Record<string, unknown>;
+  formula: string;
+  explanation: string;
+  data_available: boolean;
+  provenance: DemandProvenance;
+}
+
+export interface DetailedDemandMetricsResult {
+  metrics: DeterministicDemandMetrics;
+  priority_band: DemandPriorityBand;
+  components: {
+    demand_volume: MetricComponentDetail;
+    recurrence: MetricComponentDetail;
+    geographic_concentration: MetricComponentDetail;
+    population_exposure: MetricComponentDetail;
+    infrastructure_deficit: MetricComponentDetail;
+    investment_gap: MetricComponentDetail;
+  };
+  calculated_at: string;
+  is_demo: boolean;
+}
+
 // ============================================================================
 // MULTILINGUAL SIGNAL CONTRACT
 // ============================================================================
