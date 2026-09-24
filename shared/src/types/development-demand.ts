@@ -152,13 +152,16 @@ export interface DevelopmentIndicator {
   id: string;
   ward_id: string;
   indicator_type: string;
+  type?: string;
   name: string;
   value: number;
   unit: string;
   measurement_date: string;
+  date?: string;
   source: string;
   confidence: number; // 0.00 to 1.00
   provenance: DemandProvenance;
+  is_demo?: boolean;
 }
 
 export interface PublicInvestmentRecord {
@@ -171,9 +174,12 @@ export interface PublicInvestmentRecord {
   documented_budget: number;
   currency: 'INR';
   announcement_date: string;
+  date?: string;
+  announcement?: string;
   source_agency: string;
   source_url: string;
   provenance: DemandProvenance;
+  is_demo?: boolean;
 }
 
 // ============================================================================

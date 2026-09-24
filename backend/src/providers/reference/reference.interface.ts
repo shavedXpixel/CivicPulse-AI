@@ -31,6 +31,7 @@ export interface IGeographyProvider {
   getWardById(wardId: string): Promise<WardInfo | null>;
   listWards(): Promise<WardInfo[]>;
   getWardCentroid?(wardId: string): Promise<{ lat: number; lng: number } | null>;
+  getWardAreaKm2?(wardId: string): Promise<number | null>;
 }
 
 export interface IPopulationProvider {
@@ -39,4 +40,5 @@ export interface IPopulationProvider {
 
 export interface IFacilityProvider {
   getNearbyFacilities(lat: number, lng: number, radiusMeters?: number): Promise<FacilityRecord[]>;
+  getAllFacilities?(): Promise<FacilityRecord[]>;
 }

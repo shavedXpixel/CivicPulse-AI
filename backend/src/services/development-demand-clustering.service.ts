@@ -82,12 +82,7 @@ export interface DemandClusterMemberInfo {
 
 export interface DemandClusteringMetadata {
   algorithm_version: string;
-  weights: {
-    semantic: number;
-    geographic: number;
-    temporal: number;
-    category: number;
-  };
+  weights: typeof CLUSTERING_WEIGHTS;
   threshold: number;
   temporal_window_days: number;
   embedding_model: string;
@@ -342,12 +337,7 @@ export class DevelopmentDemandClusteringService {
         memberships: [],
         metadata: {
           algorithm_version: CLUSTERING_ALGORITHM_VERSION,
-          weights: {
-            semantic: CLUSTERING_WEIGHTS.SEMANTIC,
-            geographic: CLUSTERING_WEIGHTS.GEOGRAPHIC,
-            temporal: CLUSTERING_WEIGHTS.TEMPORAL,
-            category: CLUSTERING_WEIGHTS.CATEGORY
-          },
+          weights: CLUSTERING_WEIGHTS,
           threshold: CLUSTER_DISTANCE_THRESHOLD,
           temporal_window_days: TEMPORAL_ROLLING_WINDOW_DAYS,
           embedding_model: EMBEDDING_MODEL_NAME,
@@ -375,12 +365,7 @@ export class DevelopmentDemandClusteringService {
         memberships: [],
         metadata: {
           algorithm_version: CLUSTERING_ALGORITHM_VERSION,
-          weights: {
-            semantic: CLUSTERING_WEIGHTS.SEMANTIC,
-            geographic: CLUSTERING_WEIGHTS.GEOGRAPHIC,
-            temporal: CLUSTERING_WEIGHTS.TEMPORAL,
-            category: CLUSTERING_WEIGHTS.CATEGORY
-          },
+          weights: CLUSTERING_WEIGHTS,
           threshold: CLUSTER_DISTANCE_THRESHOLD,
           temporal_window_days: TEMPORAL_ROLLING_WINDOW_DAYS,
           embedding_model: EMBEDDING_MODEL_NAME,
@@ -572,12 +557,7 @@ export class DevelopmentDemandClusteringService {
       memberships: allMemberships,
       metadata: {
         algorithm_version: CLUSTERING_ALGORITHM_VERSION,
-        weights: {
-          semantic: CLUSTERING_WEIGHTS.SEMANTIC,
-          geographic: CLUSTERING_WEIGHTS.GEOGRAPHIC,
-          temporal: CLUSTERING_WEIGHTS.TEMPORAL,
-          category: CLUSTERING_WEIGHTS.CATEGORY
-        },
+        weights: CLUSTERING_WEIGHTS,
         threshold: CLUSTER_DISTANCE_THRESHOLD,
         temporal_window_days: TEMPORAL_ROLLING_WINDOW_DAYS,
         embedding_model: EMBEDDING_MODEL_NAME,

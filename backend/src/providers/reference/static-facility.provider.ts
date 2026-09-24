@@ -112,4 +112,9 @@ export class StaticFacilityProvider implements IFacilityProvider {
 
     return matches.sort((a, b) => a.distance_meters - b.distance_meters);
   }
+
+  async getAllFacilities(): Promise<FacilityRecord[]> {
+    const facilities = this.loadFacilities();
+    return facilities.map((f) => ({ ...f }));
+  }
 }

@@ -138,13 +138,16 @@ export const DevelopmentIndicatorSchema = z.object({
   id: z.string().min(1, 'Indicator ID is required'),
   ward_id: z.string().min(1),
   indicator_type: z.string().min(1),
+  type: z.string().optional(),
   name: z.string().min(1).max(200),
   value: z.number(),
   unit: z.string().min(1).max(50),
   measurement_date: z.string().datetime(),
+  date: z.string().datetime().optional(),
   source: z.string().min(1).max(200),
   confidence: DemandConfidenceSchema,
-  provenance: DemandProvenanceSchema
+  provenance: DemandProvenanceSchema,
+  is_demo: z.boolean().optional()
 });
 
 export const PublicInvestmentRecordSchema = z.object({
@@ -157,9 +160,12 @@ export const PublicInvestmentRecordSchema = z.object({
   documented_budget: z.number().nonnegative(),
   currency: z.literal('INR'),
   announcement_date: z.string().datetime(),
+  date: z.string().datetime().optional(),
+  announcement: z.string().optional(),
   source_agency: z.string().min(1).max(200),
   source_url: z.string().url().max(1000),
-  provenance: DemandProvenanceSchema
+  provenance: DemandProvenanceSchema,
+  is_demo: z.boolean().optional()
 });
 
 // ============================================================================

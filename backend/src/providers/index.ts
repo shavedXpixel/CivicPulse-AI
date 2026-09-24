@@ -31,13 +31,21 @@ import {
   IFacilityProvider
 } from './reference/reference.interface';
 import {
+  IDevelopmentIndicatorProvider,
+  IPublicInvestmentProvider
+} from '@civicpulse/shared';
+import {
   MockGeographyProvider,
   MockPopulationProvider,
-  MockFacilityProvider
+  MockFacilityProvider,
+  MockDevelopmentIndicatorProvider,
+  MockPublicInvestmentProvider
 } from './reference/mock-reference.providers';
 import { StaticGeographyProvider } from './reference/static-geography.provider';
 import { StaticPopulationProvider } from './reference/static-population.provider';
 import { StaticFacilityProvider } from './reference/static-facility.provider';
+import { StaticDevelopmentIndicatorProvider } from './reference/static-development-indicator.provider';
+import { StaticPublicInvestmentProvider } from './reference/static-public-investment.provider';
 
 import { IAuthProvider } from './auth/auth.interface';
 import { SupabaseAuthProvider } from './auth/supabase.auth.provider';
@@ -60,6 +68,8 @@ class ProviderContainer {
   private static geographyInstance: IGeographyProvider | null = null;
   private static populationInstance: IPopulationProvider | null = null;
   private static facilityInstance: IFacilityProvider | null = null;
+  private static indicatorInstance: IDevelopmentIndicatorProvider | null = null;
+  private static investmentInstance: IPublicInvestmentProvider | null = null;
   private static emailInstance: IEmailProvider | null = null;
 
   public static getEmailProvider(): IEmailProvider {
@@ -249,6 +259,34 @@ class ProviderContainer {
     return this.facilityInstance;
   }
 
+  public static getDevelopmentIndicatorProvider(): IDevelopmentIndicatorProvider {
+    if (!this.indicatorInstance) {
+      if (env.DEMO_MODE) {
+        this.indicatorInstance = new MockDevelopmentIndicatorProvider();
+      } else {
+        this.indicatorInstance = new StaticDevelopmentIndicatorProvider(
+          this.getPopulationProvider(),
+          this.getGeographyProvider(),
+          this.getFacilityProvider(),
+          this.getDatabaseProvider(),
+          { isDemo: false }
+        );
+      }
+    }
+    return this.indicatorInstance;
+  }
+
+  public static getPublicInvestmentProvider(): IPublicInvestmentProvider {
+    if (!this.investmentInstance) {
+      if (env.DEMO_MODE) {
+        this.investmentInstance = new MockPublicInvestmentProvider();
+      } else {
+        this.investmentInstance = new StaticPublicInvestmentProvider(undefined, undefined, { isDemo: false });
+      }
+    }
+    return this.investmentInstance;
+  }
+
   // Testing helper to reset or inject test providers
   public static setDatabaseProvider(provider: IDatabaseProvider | null) {
     this.dbInstance = provider;
@@ -286,6 +324,14 @@ class ProviderContainer {
     this.facilityInstance = provider;
   }
 
+  public static setDevelopmentIndicatorProvider(provider: IDevelopmentIndicatorProvider | null) {
+    this.indicatorInstance = provider;
+  }
+
+  public static setPublicInvestmentProvider(provider: IPublicInvestmentProvider | null) {
+    this.investmentInstance = provider;
+  }
+
   public static setEmailProvider(provider: IEmailProvider | null) {
     this.emailInstance = provider;
   }
@@ -320,6 +366,8 @@ class ProviderContainer {
     this.geographyInstance = null;
     this.populationInstance = null;
     this.facilityInstance = null;
+    this.indicatorInstance = null;
+    this.investmentInstance = null;
     this.emailInstance = null;
   }
 }
@@ -334,6 +382,8 @@ export const getSimulationProvider = () => ProviderContainer.getSimulationProvid
 export const getGeographyProvider = () => ProviderContainer.getGeographyProvider();
 export const getPopulationProvider = () => ProviderContainer.getPopulationProvider();
 export const getFacilityProvider = () => ProviderContainer.getFacilityProvider();
+export const getDevelopmentIndicatorProvider = () => ProviderContainer.getDevelopmentIndicatorProvider();
+export const getPublicInvestmentProvider = () => ProviderContainer.getPublicInvestmentProvider();
 export const getEmailProvider = () => ProviderContainer.getEmailProvider();
 
 export { ProviderContainer };
@@ -360,10 +410,18 @@ export { MockGovernanceAIProvider } from './ai/mock.governance';
 export { GeminiGovernanceAIProvider } from './ai/gemini.governance';
 export { MockSimulationAIProvider } from './ai/mock.simulation';
 export { GeminiSimulationAIProvider } from './ai/gemini.simulation';
-export { MockGeographyProvider, MockPopulationProvider, MockFacilityProvider } from './reference/mock-reference.providers';
+export {
+  MockGeographyProvider,
+  MockPopulationProvider,
+  MockFacilityProvider,
+  MockDevelopmentIndicatorProvider,
+  MockPublicInvestmentProvider
+} from './reference/mock-reference.providers';
 export { StaticGeographyProvider } from './reference/static-geography.provider';
 export { StaticPopulationProvider } from './reference/static-population.provider';
 export { StaticFacilityProvider } from './reference/static-facility.provider';
+export { StaticDevelopmentIndicatorProvider } from './reference/static-development-indicator.provider';
+export { StaticPublicInvestmentProvider } from './reference/static-public-investment.provider';
 
 // Target Non-Google Providers (Phase 15B Scaffolding)
 export { PostgresDatabaseProvider } from './database/postgres.provider';

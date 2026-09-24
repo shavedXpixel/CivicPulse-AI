@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { IGeographyProvider, WardInfo } from './reference.interface';
 
-function isPointInRing(lng: number, lat: number, ring: number[][]): boolean {
+export function isPointInRing(lng: number, lat: number, ring: number[][]): boolean {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
     const xi = ring[i]![0]!, yi = ring[i]![1]!;
@@ -13,7 +13,7 @@ function isPointInRing(lng: number, lat: number, ring: number[][]): boolean {
   return inside;
 }
 
-function isPointInGeometry(lng: number, lat: number, geometry: any): boolean {
+export function isPointInGeometry(lng: number, lat: number, geometry: any): boolean {
   if (!geometry || !geometry.coordinates) return false;
 
   if (geometry.type === 'Polygon') {
@@ -29,6 +29,46 @@ function isPointInGeometry(lng: number, lat: number, geometry: any): boolean {
     }
   }
   return false;
+}
+
+export function computeGeometryAreaKm2(geometry: any): number {
+  if (!geometry || !geometry.coordinates) return 0;
+
+  const computeRingAreaKm2 = (ring: number[][]): number => {
+    if (!ring || ring.length < 3) return 0;
+    let latSum = 0;
+    for (const pt of ring) {
+      if (pt && typeof pt[1] === 'number') latSum += pt[1];
+    }
+    const avgLatRad = (latSum / ring.length) * (Math.PI / 180);
+    const kx = 111.32 * Math.cos(avgLatRad);
+    const ky = 110.574;
+    let area = 0;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const p1 = ring[i];
+      const p2 = ring[j];
+      if (!p1 || !p2 || p1.length < 2 || p2.length < 2) continue;
+      const xi = p1[0]! * kx;
+      const yi = p1[1]! * ky;
+      const xj = p2[0]! * kx;
+      const yj = p2[1]! * ky;
+      area += (xj + xi) * (yj - yi);
+    }
+    return Math.abs(area) / 2;
+  };
+
+  if (geometry.type === 'Polygon') {
+    return computeRingAreaKm2(geometry.coordinates[0]);
+  } else if (geometry.type === 'MultiPolygon') {
+    let sum = 0;
+    for (const polygon of geometry.coordinates) {
+      if (polygon && polygon[0]) {
+        sum += computeRingAreaKm2(polygon[0]);
+      }
+    }
+    return sum;
+  }
+  return 0;
 }
 
 function computeGeometryCentroid(geometry: any): { lat: number; lng: number } | null {
@@ -182,5 +222,11 @@ export class StaticGeographyProvider implements IGeographyProvider {
   async getWardCentroid(wardId: string): Promise<{ lat: number; lng: number } | null> {
     const ward = await this.getWardById(wardId);
     return ward?.centroid || null;
+  }
+
+  async getWardAreaKm2(wardId: string): Promise<number | null> {
+    const ward = await this.getWardById(wardId);
+    if (!ward || !ward.boundary) return null;
+    return computeGeometryAreaKm2(ward.boundary);
   }
 }
