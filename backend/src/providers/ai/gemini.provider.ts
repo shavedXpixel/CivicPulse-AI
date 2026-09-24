@@ -4,7 +4,9 @@ import {
   SignalAnalysisResult,
   ClusterSummaryInput,
   DemandNormalizationInput,
-  DemandNormalizationAIOutput
+  DemandNormalizationAIOutput,
+  DevelopmentDemandGovernanceInput,
+  DevelopmentDemandGovernanceAIOutput
 } from './ai.interface';
 import {
   SignalAnalysisOutput,
@@ -23,6 +25,11 @@ import {
   buildDemandNormalizationPrompt,
   PROMPT_VERSION_DEVELOPMENT_DEMAND_NORMALIZATION
 } from '../../infrastructure/ai/prompts/development_demand_normalization_v1';
+import {
+  SYSTEM_INSTRUCTION_DEVELOPMENT_DEMAND_GOVERNANCE,
+  buildDevelopmentDemandGovernancePrompt,
+  PROMPT_VERSION_DEVELOPMENT_DEMAND_GOVERNANCE
+} from '../../infrastructure/ai/prompts/development_demand_governance_v1';
 
 export interface GeminiAIProviderConfig {
   apiKey?: string;
@@ -581,6 +588,197 @@ export class GeminiAIProvider implements IAIProvider {
     });
   }
 
+  private async callGenerateDevelopmentDemandInterpretation(
+    modelName: string,
+    input: DevelopmentDemandGovernanceInput
+  ): Promise<DevelopmentDemandGovernanceAIOutput> {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${this.apiKey}`;
+    const userPrompt = buildDevelopmentDemandGovernancePrompt(input as any);
+
+    const requestPayload = {
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: userPrompt }]
+        }
+      ],
+      systemInstruction: {
+        parts: [{ text: SYSTEM_INSTRUCTION_DEVELOPMENT_DEMAND_GOVERNANCE }]
+      },
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.2
+      }
+    };
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestPayload),
+        signal: controller.signal
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        const err: any = new Error(`Gemini Governance API HTTP ${res.status}: ${errorText.substring(0, 300)}`);
+        err.status = res.status;
+        err.statusCode = res.status;
+        err.model = modelName;
+        throw err;
+      }
+
+      const data: any = await res.json();
+      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!rawText) {
+        const err: any = new Error(
+          `Gemini development demand governance response did not contain candidates or content text from model ${modelName}.`
+        );
+        err.status = 502;
+        err.model = modelName;
+        throw err;
+      }
+
+      let parsedJson: any;
+      try {
+        parsedJson = JSON.parse(rawText);
+      } catch (jsonErr: any) {
+        const err: any = new Error(
+          `Malformed JSON returned by Gemini development demand governance from model ${modelName}: ${jsonErr.message}`
+        );
+        err.status = 502;
+        err.model = modelName;
+        throw err;
+      }
+
+      // Validate required conceptual sections
+      if (!parsedJson.evidence_citations || !parsedJson.advisory_interpretation || !parsedJson.uncertainty) {
+        const err: any = new Error('Gemini response missing required sections: evidence_citations, advisory_interpretation, or uncertainty.');
+        err.status = 502;
+        err.model = modelName;
+        throw err;
+      }
+
+      const confidence = Number(parsedJson.uncertainty.confidence);
+      if (isNaN(confidence) || confidence < 0 || confidence > 1) {
+        const err: any = new Error('Invalid uncertainty confidence returned by Gemini. Must be between 0.0 and 1.0.');
+        err.status = 502;
+        err.model = modelName;
+        throw err;
+      }
+
+      return {
+        evidence_citations: {
+          signal_ids: Array.isArray(parsedJson.evidence_citations.signal_ids) ? parsedJson.evidence_citations.signal_ids : [],
+          indicator_sources: Array.isArray(parsedJson.evidence_citations.indicator_sources) ? parsedJson.evidence_citations.indicator_sources : [],
+          investment_references: Array.isArray(parsedJson.evidence_citations.investment_references) ? parsedJson.evidence_citations.investment_references : []
+        },
+        advisory_interpretation: {
+          summary: String(parsedJson.advisory_interpretation.summary || ''),
+          need_justification: String(parsedJson.advisory_interpretation.need_justification || ''),
+          tradeoffs_and_considerations: Array.isArray(parsedJson.advisory_interpretation.tradeoffs_and_considerations)
+            ? parsedJson.advisory_interpretation.tradeoffs_and_considerations
+            : []
+        },
+        uncertainty: {
+          confidence,
+          limitations: Array.isArray(parsedJson.uncertainty.limitations) ? parsedJson.uncertainty.limitations : []
+        },
+        metrics: parsedJson.metrics,
+        resolved_model: modelName
+      };
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  /**
+   * Interprets a development demand cluster and reference data using Gemini
+   * with bounded retry, exponential backoff with jitter, and automatic fallback.
+   */
+  async interpretDevelopmentDemand(
+    input: DevelopmentDemandGovernanceInput
+  ): Promise<DevelopmentDemandGovernanceAIOutput> {
+    if (!this.apiKey) {
+      throw new AppError({
+        statusCode: 500,
+        code: 'CONFIGURATION_ERROR',
+        message: 'GEMINI_API_KEY is not configured in production mode for demand governance analysis.'
+      });
+    }
+
+    const modelsToTry = [this.primaryModel];
+    if (this.fallbackModel && this.fallbackModel !== this.primaryModel) {
+      modelsToTry.push(this.fallbackModel);
+    }
+
+    let lastError: Error | null = null;
+    let allTransient = true;
+
+    for (let mIdx = 0; mIdx < modelsToTry.length; mIdx++) {
+      const currentModel = modelsToTry[mIdx]!;
+      const isFallback = mIdx > 0;
+
+      if (isFallback) {
+        console.warn(
+          `[GeminiAIProvider] Primary model '${this.primaryModel}' exhausted retries on transient errors during demand governance analysis. Switching to fallback model: '${currentModel}'`
+        );
+      }
+
+      for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+        try {
+          const result = await this.callGenerateDevelopmentDemandInterpretation(currentModel, input);
+          this.lastUsedModel = currentModel;
+          return {
+            ...result,
+            resolved_model: currentModel
+          };
+        } catch (err: any) {
+          lastError = err;
+          const status = err.status || err.statusCode;
+          const transient = isTransientError(status, err);
+
+          if (!transient) {
+            allTransient = false;
+            if (err instanceof AppError) {
+              throw err;
+            }
+            throw new AppError({
+              statusCode: status || 502,
+              code: 'AI_PROVIDER_ERROR',
+              message: `Gemini demand governance analysis error on model ${currentModel}: ${err.message}`
+            });
+          }
+
+          if (attempt < this.maxRetries) {
+            const delay = calculateBackoffWithJitter(attempt, this.baseDelayMs, this.maxDelayMs);
+            await new Promise((r) => setTimeout(r, delay));
+          }
+        }
+      }
+    }
+
+    if (allTransient) {
+      throw new AppError({
+        statusCode: 503,
+        code: 'AI_PROVIDER_UNAVAILABLE',
+        message: `Gemini AI provider is unavailable for demand governance analysis. Both primary (${this.primaryModel}) and fallback (${this.fallbackModel}) models exhausted ${this.maxRetries} attempts due to transient errors: ${lastError?.message || 'High demand'}`
+      });
+    }
+
+    throw new AppError({
+      statusCode: 502,
+      code: 'AI_PROVIDER_ERROR',
+      message: `Failed to analyze development demand with Gemini after retry and fallback attempts: ${lastError?.message || 'Unknown error'}`
+    });
+  }
+
   public getModelName(): string {
     return this.lastUsedModel || this.primaryModel;
   }
@@ -603,5 +801,9 @@ export class GeminiAIProvider implements IAIProvider {
 
   public getDemandPromptVersion(): string {
     return PROMPT_VERSION_DEVELOPMENT_DEMAND_NORMALIZATION;
+  }
+
+  public getGovernanceDemandPromptVersion(): string {
+    return PROMPT_VERSION_DEVELOPMENT_DEMAND_GOVERNANCE;
   }
 }

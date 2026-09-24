@@ -37,6 +37,39 @@ export interface DemandNormalizationAIOutput {
   resolved_model?: string;
 }
 
+export interface DevelopmentDemandGovernanceInput {
+  cluster: any;
+  observed_facts: {
+    total_signals: number;
+    first_detected: string;
+    last_detected: string;
+    intake_channels: any[];
+    sample_narratives: any[];
+  };
+  metrics: any;
+  indicators: any[];
+  investments: any[];
+}
+
+export interface DevelopmentDemandGovernanceAIOutput {
+  evidence_citations: {
+    signal_ids: string[];
+    indicator_sources: string[];
+    investment_references: string[];
+  };
+  advisory_interpretation: {
+    summary: string;
+    need_justification: string;
+    tradeoffs_and_considerations: string[];
+  };
+  uncertainty: {
+    confidence: number;
+    limitations: string[];
+  };
+  metrics?: any;
+  resolved_model?: string;
+}
+
 export interface IAIProvider {
   /**
    * Analyzes an unstructured citizen signal and returns structured, schema-validated intelligence.
@@ -45,6 +78,7 @@ export interface IAIProvider {
   generateEmbedding(text: string): Promise<number[]>;
   summarizeCluster(input: ClusterSummaryInput): Promise<string>;
   normalizeDemand?(input: DemandNormalizationInput): Promise<DemandNormalizationAIOutput>;
+  interpretDevelopmentDemand?(input: DevelopmentDemandGovernanceInput): Promise<DevelopmentDemandGovernanceAIOutput>;
   getModelName(): string;
   getPromptVersion(): string;
 }

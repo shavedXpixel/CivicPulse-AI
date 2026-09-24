@@ -278,8 +278,13 @@ export const DevelopmentDemandAnalyzeRequestSchema = z.object({
   opportunity_id: z.string().optional(),
   cluster_id: z.string().optional(),
   category: z.string().optional(),
-  ward_id: z.string().optional()
-});
+  ward_id: z.string().optional(),
+  cluster: z.any().optional(),
+  signals: z.array(z.any()).optional(),
+  metrics: z.any().optional(),
+  indicators: z.array(z.any()).optional(),
+  investments: z.array(z.any()).optional()
+}).passthrough();
 
 export const DevelopmentDemandQuerySchema = z.object({
   ward_id: z.string().optional(),

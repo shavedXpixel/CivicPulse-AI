@@ -9,12 +9,18 @@
 export interface DemandSanitizationResult {
   sanitizedText: string;
   hasRedactions: boolean;
-  redactedTypes: ('PHONE' | 'EMAIL' | 'PERSONAL_NAME' | 'RESIDENTIAL_IDENTIFIER')[];
+  redactedTypes: ('PHONE' | 'EMAIL' | 'PERSONAL_NAME' | 'RESIDENTIAL_IDENTIFIER' | 'SYSTEM_ID' | 'EXACT_COORDINATES')[];
 }
 
 const PHONE_REGEX = /(?:\+?91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}\b|\b0\d{2,4}[\s-]?\d{6,8}\b|\b[6-9]\d{9}\b/g;
 
 const EMAIL_REGEX = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+
+// User IDs, Auth IDs, submitter UUIDs, officer UUIDs
+const AUTH_OR_SYSTEM_ID_REGEX = /\b(?:usr_|off_|auth_|uid_|user_)[a-zA-Z0-9_-]+\b|\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+
+// Exact household coordinates (e.g. 20.2551234, 85.7821234)
+const EXACT_COORDINATES_REGEX = /\b-?\d{1,3}\.\d{4,},\s*-?\d{1,3}\.\d{4,}\b/g;
 
 // Self-identification name patterns (English, Odia, Hindi)
 const ENGLISH_NAME_INTRO_REGEX = /\b(?:my name is|i am|myself|this is|shri|smt|mr\.|mrs\.|dr\.)\s+([A-Za-z]+(?:\s+[A-Za-z]+){0,2})\b/gi;
@@ -34,7 +40,7 @@ export function sanitizeDemandPII(rawText: string): DemandSanitizationResult {
   }
 
   let text = rawText;
-  const redactedTypes: ('PHONE' | 'EMAIL' | 'PERSONAL_NAME' | 'RESIDENTIAL_IDENTIFIER')[] = [];
+  const redactedTypes: ('PHONE' | 'EMAIL' | 'PERSONAL_NAME' | 'RESIDENTIAL_IDENTIFIER' | 'SYSTEM_ID' | 'EXACT_COORDINATES')[] = [];
 
   // 1. Redact Email addresses
   if (EMAIL_REGEX.test(text)) {
@@ -82,6 +88,18 @@ export function sanitizeDemandPII(rawText: string): DemandSanitizationResult {
 
   if (nameRedacted && !redactedTypes.includes('PERSONAL_NAME')) {
     redactedTypes.push('PERSONAL_NAME');
+  }
+
+  // 5. Redact System IDs, Auth User IDs, and Officer UUIDs
+  if (AUTH_OR_SYSTEM_ID_REGEX.test(text)) {
+    text = text.replace(AUTH_OR_SYSTEM_ID_REGEX, '[REDACTED_ID]');
+    redactedTypes.push('SYSTEM_ID');
+  }
+
+  // 6. Redact Exact Coordinates (GPS Lat/Lng with 4+ decimal places)
+  if (EXACT_COORDINATES_REGEX.test(text)) {
+    text = text.replace(EXACT_COORDINATES_REGEX, '[REDACTED_COORDINATES]');
+    redactedTypes.push('EXACT_COORDINATES');
   }
 
   return {

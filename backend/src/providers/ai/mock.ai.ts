@@ -2,10 +2,13 @@ import {
   IAIProvider,
   SignalAnalysisInput,
   DemandNormalizationInput,
-  DemandNormalizationAIOutput
+  DemandNormalizationAIOutput,
+  DevelopmentDemandGovernanceInput,
+  DevelopmentDemandGovernanceAIOutput
 } from './ai.interface';
 import { SignalAnalysisOutput, DEVELOPMENT_DEMAND_SECTORS } from '@civicpulse/shared';
 import { PROMPT_VERSION_DEVELOPMENT_DEMAND_NORMALIZATION } from '../../infrastructure/ai/prompts/development_demand_normalization_v1';
+import { PROMPT_VERSION_DEVELOPMENT_DEMAND_GOVERNANCE } from '../../infrastructure/ai/prompts/development_demand_governance_v1';
 
 export class MockAIProvider implements IAIProvider {
   private _simulateFailure = false;
@@ -13,6 +16,8 @@ export class MockAIProvider implements IAIProvider {
   private _simulateLowConfidence = false;
   private _simulateTimeout = false;
   private _simulateInvalidCategory = false;
+  private _simulateMetricDiscrepancy = false;
+  private _simulateEmpty = false;
 
   public simulateFailure(val: boolean = true) {
     this._simulateFailure = val;
@@ -32,6 +37,14 @@ export class MockAIProvider implements IAIProvider {
 
   public simulateInvalidCategory(val: boolean = true) {
     this._simulateInvalidCategory = val;
+  }
+
+  public simulateMetricDiscrepancy(val: boolean = true) {
+    this._simulateMetricDiscrepancy = val;
+  }
+
+  public simulateEmpty(val: boolean = true) {
+    this._simulateEmpty = val;
   }
 
   public getModelName(): string {
@@ -648,6 +661,70 @@ export class MockAIProvider implements IAIProvider {
       extracted_ward,
       normalization_confidence: confidence,
       reasoning: `Categorized into canonical sector ${detected_category} with urgency ${detected_urgency} based on civic intent.`,
+      resolved_model: 'mock-multilingual-civic-v1'
+    };
+  }
+
+  async interpretDevelopmentDemand(input: DevelopmentDemandGovernanceInput): Promise<DevelopmentDemandGovernanceAIOutput> {
+    if (this._simulateTimeout) {
+      throw new Error('Simulated Mock AI governance interpretation timeout');
+    }
+    if (this._simulateFailure) {
+      throw new Error('Simulated Mock AI governance interpretation failure for resilience testing');
+    }
+    if (this._simulateMalformed) {
+      return { invalid: true } as any;
+    }
+    if (this._simulateEmpty) {
+      return null as any;
+    }
+
+    const { cluster, observed_facts, metrics, indicators, investments } = input;
+
+    // Grounded citations: strictly cite valid supplied input IDs
+    const signalIds = (observed_facts as any).signal_ids || [];
+    const indicatorSources = Array.from(new Set(indicators.map((i: any) => {
+      if (i.source_agency && i.metric_name) return `${i.source_agency}:${i.metric_name}`;
+      return i.source || i.source_agency;
+    }).filter(Boolean))) as string[];
+    const investmentRefs = Array.from(new Set(investments.map((inv: any) => inv.project_title || inv.plan_name || inv.project_id).filter(Boolean))) as string[];
+
+    const hasIndicators = indicators.length > 0;
+    const hasInvestments = investments.length > 0;
+
+    const limitations: string[] = [];
+    if (!hasIndicators) {
+      limitations.push(`No authoritative reference infrastructure indicators available in repository for sector '${cluster.category}'.`);
+    }
+    if (!hasInvestments) {
+      limitations.push('No verified public investment dataset available for this ward/sector; gap cannot be confirmed from authoritative sources.');
+    }
+
+    const confidence = !hasIndicators || !hasInvestments ? 0.75 : 0.92;
+
+    const outputMetrics = this._simulateMetricDiscrepancy
+      ? { ...metrics, demand_volume_score: 99, composite_demand_index: 199 }
+      : undefined;
+
+    return {
+      evidence_citations: {
+        signal_ids: signalIds,
+        indicator_sources: indicatorSources,
+        investment_references: investmentRefs
+      },
+      advisory_interpretation: {
+        summary: `Cluster indicates a potential development demand for ${cluster.category} across affected ward(s) ${cluster.ward_ids?.join(', ') || 'N/A'}.`,
+        need_justification: `The evidence supports consideration of municipal improvements in ${cluster.category} supported by ${observed_facts.total_signals} demand signals.`,
+        tradeoffs_and_considerations: [
+          `Coordination recommended with departmental engineering teams for ${cluster.category}.`,
+          'Budgetary assessment required against current municipal capital outlay constraints.'
+        ]
+      },
+      uncertainty: {
+        confidence,
+        limitations: limitations.length > 0 ? limitations : ['Standard statistical margin of error across voluntary citizen intake channels.']
+      },
+      metrics: outputMetrics,
       resolved_model: 'mock-multilingual-civic-v1'
     };
   }

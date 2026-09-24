@@ -6,7 +6,8 @@ export enum AIOperationType {
   IMAGE_ANALYSIS = 'IMAGE_ANALYSIS',
   RESOLUTION_VERIFICATION = 'RESOLUTION_VERIFICATION',
   GOVERNANCE_QUERY = 'GOVERNANCE_QUERY',
-  INTERVENTION_SIMULATION = 'INTERVENTION_SIMULATION'
+  INTERVENTION_SIMULATION = 'INTERVENTION_SIMULATION',
+  DEVELOPMENT_DEMAND_ANALYSIS = 'DEVELOPMENT_DEMAND_ANALYSIS'
 }
 
 export enum AIOperationStatus {
@@ -18,7 +19,7 @@ export enum AIOperationStatus {
 export interface AIOperationRecord {
   id: string;
   operation_type: AIOperationType;
-  entity_type: 'signal' | 'problem_cluster' | 'resolution_evidence' | 'governance_query' | 'intervention_simulation';
+  entity_type: 'signal' | 'problem_cluster' | 'resolution_evidence' | 'governance_query' | 'intervention_simulation' | 'development_demand';
   entity_id: string;
   model: string;
   prompt_version: string;
@@ -26,6 +27,7 @@ export interface AIOperationRecord {
   confidence?: number;
   latency_ms?: number;
   error_code?: string;
+  metadata?: Record<string, unknown>;
   created_at: string;
 }
 
