@@ -126,4 +126,15 @@ describe('Phase 15B Auth Role Resolution & Citizen Fallback Elimination', () => 
     expect(html).toContain('MUNICIPAL_ADMIN');
     expect(html).not.toContain('VERIFIED_CITIZEN');
   });
+
+  it('F: isSecretApiKey identifies secret/service_role keys and rejects them from browser client', async () => {
+    const { isSecretApiKey } = await import('../src/lib/supabase-client');
+    expect(isSecretApiKey('sb_secret_something_sensitive')).toBe(true);
+    expect(isSecretApiKey('service_role')).toBe(true);
+    expect(isSecretApiKey('sbp_platform_token')).toBe(true);
+    expect(isSecretApiKey('sb_publishable_safe_for_browser')).toBe(false);
+    expect(isSecretApiKey('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.fake')).toBe(false);
+    expect(isSecretApiKey('')).toBe(false);
+  });
 });
+

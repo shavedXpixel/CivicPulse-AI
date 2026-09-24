@@ -6,8 +6,34 @@ const supabasePublishableKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   '';
 
+/**
+ * Validates that a key is not a backend-only secret or service-role credential.
+ * Secret keys must never be exposed or passed to the browser-side Supabase client.
+ */
+export function isSecretApiKey(key: string): boolean {
+  if (!key) return false;
+  const trimmed = key.trim();
+  return (
+    trimmed.startsWith('sb_secret_') ||
+    trimmed.startsWith('sbp_') ||
+    trimmed.includes('service_role')
+  );
+}
+
 export function isSupabaseConfigured(): boolean {
-  return Boolean(supabaseUrl && supabasePublishableKey);
+  if (!supabaseUrl || !supabasePublishableKey) {
+    return false;
+  }
+  if (isSecretApiKey(supabasePublishableKey)) {
+    if (typeof window !== 'undefined') {
+      console.error(
+        '[Supabase Client Security Guard] Forbidden use of secret API key in browser. ' +
+        'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY must be a publishable (or anon) key, never a secret or service-role key.'
+      );
+    }
+    return false;
+  }
+  return true;
 }
 
 let supabaseInstance: SupabaseClient | null = null;
