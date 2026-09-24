@@ -73,6 +73,7 @@ export function GovernmentShell({ children, problemCount }: GovernmentShellProps
           icon: AlertOctagon,
           badge: String(effectiveProblemCount),
         },
+        { name: 'Development Demand', href: '/governance/development-demand', icon: TrendingUp },
         { name: 'Department Map', href: '/dashboard/map', icon: Map },
       ]
     : isFieldOfficer
@@ -88,6 +89,7 @@ export function GovernmentShell({ children, problemCount }: GovernmentShellProps
           icon: AlertOctagon,
           badge: String(effectiveProblemCount),
         },
+        { name: 'Development Demand', href: '/governance/development-demand', icon: TrendingUp },
         { name: 'Map Workspace', href: '/dashboard/map', icon: Map },
         { name: 'Departments', href: '/dashboard/departments', icon: Building2 },
         { name: 'Department Registry', href: '/admin/departments', icon: Building2 },
@@ -97,6 +99,7 @@ export function GovernmentShell({ children, problemCount }: GovernmentShellProps
         { name: 'Governance AI', href: '/dashboard/ai', icon: Brain, isAI: true },
         { name: 'Intervention Simulator', href: '/dashboard/simulation', icon: Sliders, badge: 'Advisory' },
       ];
+
 
   return (
     <div className="min-h-screen bg-canvas text-ink-primary flex">

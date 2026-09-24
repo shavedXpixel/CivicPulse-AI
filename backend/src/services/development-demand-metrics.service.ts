@@ -482,13 +482,13 @@ function calculateInfrastructureDeficitScore(
   ) {
     const schoolIndicators = indicators.filter(
       (ind) =>
-        ind.id.includes('school') ||
-        ind.name.toLowerCase().includes('school') ||
-        ind.name.toLowerCase().includes('education')
+        Boolean(ind.id?.includes('school')) ||
+        Boolean(ind.name?.toLowerCase().includes('school')) ||
+        Boolean(ind.name?.toLowerCase().includes('education'))
     );
 
     if (schoolIndicators.length > 0) {
-      const totalSchools = schoolIndicators.reduce((sum, ind) => sum + ind.value, 0);
+      const totalSchools = schoolIndicators.reduce((sum, ind) => sum + (ind.value || 0), 0);
 
       // Baseline municipal facility benchmark for average BMC ward (~12k population)
       let score = 2;
@@ -524,13 +524,13 @@ function calculateInfrastructureDeficitScore(
   ) {
     const healthIndicators = indicators.filter(
       (ind) =>
-        ind.id.includes('hospital') ||
-        ind.name.toLowerCase().includes('hospital') ||
-        ind.name.toLowerCase().includes('health')
+        Boolean(ind.id?.includes('hospital')) ||
+        Boolean(ind.name?.toLowerCase().includes('hospital')) ||
+        Boolean(ind.name?.toLowerCase().includes('health'))
     );
 
     if (healthIndicators.length > 0) {
-      const totalHospitals = healthIndicators.reduce((sum, ind) => sum + ind.value, 0);
+      const totalHospitals = healthIndicators.reduce((sum, ind) => sum + (ind.value || 0), 0);
 
       let score = 3;
       if (totalHospitals === 0) score = 14;
@@ -561,8 +561,9 @@ function calculateInfrastructureDeficitScore(
     (ind) =>
       ind.indicator_type === 'OPERATIONAL_PROBLEM_COUNT' ||
       ind.type === 'OPERATIONAL_PROBLEM_COUNT' ||
-      ind.id.includes('ind_ops_problems')
+      Boolean(ind.id?.includes('ind_ops_problems'))
   );
+
 
   if (opsIndicators.length > 0) {
     const totalOpsProblems = opsIndicators.reduce((sum, ind) => sum + ind.value, 0);
