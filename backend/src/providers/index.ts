@@ -97,20 +97,26 @@ class ProviderContainer {
 
   public static getDatabaseProvider(): IDatabaseProvider {
     if (!this.dbInstance) {
-      if (env.DEMO_MODE) {
+      if (!env.DEMO_MODE && env.DATABASE_PROVIDER === 'mock') {
+        throw new AppError({
+          statusCode: 500,
+          code: ERROR_CODES.INTERNAL_ERROR,
+          message: `[ProviderContainer] Unsupported DATABASE_PROVIDER in REAL_MODE: '${env.DATABASE_PROVIDER}'. Must be 'postgres' or 'firestore'. Mock database is strictly prohibited when DEMO_MODE=false.`
+        });
+      }
+
+      if (env.DATABASE_PROVIDER === 'postgres') {
+        this.dbInstance = new PostgresDatabaseProvider();
+      } else if (env.DATABASE_PROVIDER === 'firestore') {
+        this.dbInstance = new FirestoreDatabaseProvider();
+      } else if (env.DATABASE_PROVIDER === 'mock' || env.DEMO_MODE) {
         this.dbInstance = new MockDatabaseProvider();
       } else {
-        if (env.DATABASE_PROVIDER === 'postgres') {
-          this.dbInstance = new PostgresDatabaseProvider();
-        } else if (env.DATABASE_PROVIDER === 'firestore') {
-          this.dbInstance = new FirestoreDatabaseProvider();
-        } else {
-          throw new AppError({
-            statusCode: 500,
-            code: ERROR_CODES.INTERNAL_ERROR,
-            message: `[ProviderContainer] Unsupported DATABASE_PROVIDER in REAL_MODE: '${env.DATABASE_PROVIDER}'. Must be 'postgres' or 'firestore'. Mock database is strictly prohibited when DEMO_MODE=false.`
-          });
-        }
+        throw new AppError({
+          statusCode: 500,
+          code: ERROR_CODES.INTERNAL_ERROR,
+          message: `[ProviderContainer] Unsupported DATABASE_PROVIDER in REAL_MODE: '${env.DATABASE_PROVIDER}'. Must be 'postgres' or 'firestore'. Mock database is strictly prohibited when DEMO_MODE=false.`
+        });
       }
     }
     return this.dbInstance;

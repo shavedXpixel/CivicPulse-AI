@@ -250,7 +250,17 @@ export async function optionalAuthMiddleware(req: Request, _res: Response, next:
 
   try {
     const db = getDatabaseProvider();
-    if (env.DEMO_MODE) {
+    const isExplicitDemoToken =
+      token.startsWith('demo-token-') ||
+      token.startsWith('usr_') ||
+      token === 'citizen' ||
+      token === 'officer' ||
+      token === 'dept_watco' ||
+      token === 'dept_drainage' ||
+      token === 'field_drainage' ||
+      token === 'admin';
+
+    if (env.DEMO_MODE && (isExplicitDemoToken || req.headers['x-demo-mode'] === 'true')) {
       let resolvedUserId = 'usr_citizen_01';
       if (token === 'demo-token-officer' || token === 'officer') resolvedUserId = 'usr_officer_01';
       if (token === 'demo-token-dept-watco' || token === 'dept_watco') resolvedUserId = 'usr_dept_watco';

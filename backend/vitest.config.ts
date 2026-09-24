@@ -5,7 +5,8 @@ export default defineConfig({
     env: {
       NODE_ENV: 'test',
       DEMO_MODE: 'true',
-      PROVIDER_MODE: 'mock'
+      PROVIDER_MODE: 'mock',
+      DATABASE_PROVIDER: 'mock'
     }
   }
 });

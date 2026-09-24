@@ -25,7 +25,7 @@ function LoginContent() {
   const explicitRedirect = searchParams.get('redirect');
   const isSessionExpired = searchParams.get('session_expired') === 'true';
 
-  const { user, userProfile, loading: authLoading, isConfigured, signIn, signUp, signOut } = useAuth();
+  const { user, userProfile, loading: authLoading, isConfigured, signIn, signUp, signOut, refreshProfile } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,7 +35,11 @@ function LoginContent() {
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmationNotice, setConfirmationNotice] = useState<string | null>(null);
 
-  const determineDestination = (role?: string): string => {
+  const determineDestination = (role?: string): string | null => {
+    if (!role) {
+      return null;
+    }
+
     if (explicitRedirect) {
       if (
         role === UserRole.CITIZEN &&
@@ -43,7 +47,8 @@ function LoginContent() {
           explicitRedirect.startsWith('/officer') ||
           explicitRedirect.startsWith('/field-officer') ||
           explicitRedirect.startsWith('/department-officer') ||
-          explicitRedirect.startsWith('/admin'))
+          explicitRedirect.startsWith('/admin') ||
+          explicitRedirect.startsWith('/governance'))
       ) {
         return '/citizen';
       }
@@ -59,8 +64,9 @@ function LoginContent() {
       case UserRole.FIELD_OFFICER:
         return '/field-officer';
       case UserRole.CITIZEN:
-      default:
         return '/citizen';
+      default:
+        return null;
     }
   };
 
@@ -104,11 +110,23 @@ function LoginContent() {
           const meRes = await apiClient.get<{ data: { user: { role: string } } }>('/api/v1/auth/me');
           resolvedRole = meRes?.data?.user?.role;
         } catch {
-          // Default fallback if endpoint temporarily unresponsive
+          console.warn('[CivicPulse Login] Authoritative profile resolution error');
         }
       }
 
+      if (!resolvedRole) {
+        setFormError('Unable to resolve account role. Profile authorization could not be verified by the backend. Please retry or contact municipal IT administration.');
+        setSubmitting(false);
+        return;
+      }
+
       const destination = determineDestination(resolvedRole);
+      if (!destination) {
+        setFormError('Unrecognized user role. Access cannot be granted.');
+        setSubmitting(false);
+        return;
+      }
+
       router.push(destination);
     } catch (err: any) {
       let msg = err.message || 'Authentication failed. Please check your credentials.';
@@ -135,7 +153,7 @@ function LoginContent() {
     }
   };
 
-  const effectiveRole = userProfile?.role || (user ? UserRole.CITIZEN : undefined);
+  const effectiveRole = userProfile?.role;
   const activeDestination = determineDestination(effectiveRole);
   const destinationLabel =
     effectiveRole === UserRole.FIELD_OFFICER
@@ -144,7 +162,9 @@ function LoginContent() {
       ? 'Go to Department Operations Workspace'
       : effectiveRole === UserRole.ADMIN || effectiveRole === UserRole.SYSTEM_ADMIN
       ? 'Go to System Administration'
-      : 'Go to Citizen Portal';
+      : effectiveRole === UserRole.CITIZEN
+      ? 'Go to Citizen Portal'
+      : 'Resolving Role...';
 
   return (
     <div className="min-h-screen bg-canvas flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
@@ -214,20 +234,38 @@ function LoginContent() {
                           ? `FIELD_OFFICER (${userProfile.department_id || 'WATCO'})`
                           : userProfile?.role === UserRole.SYSTEM_ADMIN
                           ? 'SYSTEM_ADMIN'
-                          : 'VERIFIED_CITIZEN'}
+                          : userProfile?.role === UserRole.CITIZEN
+                          ? 'VERIFIED_CITIZEN'
+                          : 'ROLE_PENDING_AUTHORIZATION'}
                       </span>
                     </span>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-center gap-3 pt-2">
-                  <button
-                    onClick={() => router.push(activeDestination)}
-                    className="px-4 py-2 rounded-sm text-xs font-semibold bg-civic-terracotta text-white hover:bg-civic-terracottaDark transition-colors flex items-center gap-1.5"
-                  >
-                    <span>{destinationLabel}</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
+                  {activeDestination ? (
+                    <button
+                      onClick={() => router.push(activeDestination)}
+                      className="px-4 py-2 rounded-sm text-xs font-semibold bg-civic-terracotta text-white hover:bg-civic-terracottaDark transition-colors flex items-center gap-1.5"
+                    >
+                      <span>{destinationLabel}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        const prof = await refreshProfile();
+                        if (prof?.role) {
+                          const dest = determineDestination(prof.role);
+                          if (dest) router.push(dest);
+                        }
+                      }}
+                      className="px-4 py-2 rounded-sm text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 transition-colors flex items-center gap-1.5"
+                    >
+                      <span>Retry Role Verification</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                   <button
                     onClick={signOut}
                     className="px-4 py-2 rounded-sm text-xs font-semibold bg-canvas-card border border-ink-border text-ink-primary hover:bg-canvas-subtle transition-colors flex items-center gap-1.5"

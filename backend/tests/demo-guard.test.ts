@@ -35,6 +35,17 @@ describe('Demo Persona Switching & Endpoint Protection', () => {
     expect(res.body.data.citizen_profile.preferred_language).toBe('od');
   });
 
+  it('preserves authoritative ADMIN role in DEMO_MODE and does not convert to CITIZEN', async () => {
+    const res = await request(app)
+      .get('/api/v1/auth/me')
+      .set('Authorization', 'Bearer demo-token-admin');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.user.id).toBe('usr_admin_01');
+    expect(res.body.data.user.role).toBe('ADMIN');
+    expect(res.body.data.user.role).not.toBe('CITIZEN');
+  });
+
   it('strictly blocks switch-demo-persona when DEMO_MODE is false', async () => {
     // Temporarily simulate DEMO_MODE = false
     const originalDemoMode = env.DEMO_MODE;

@@ -88,15 +88,22 @@ describe('Phase 15B.5.2 — Deployment Implementation & Gemini Provider Suite', 
       expect(getVerificationProvider()).toBeInstanceOf(OpenAIProvider);
     });
 
-    it('returns Mock providers when DEMO_MODE=true regardless of provider flags', () => {
+    it('returns PostgresDatabaseProvider in DEMO_MODE when DATABASE_PROVIDER=postgres, but mock AI', () => {
       (env as any).DEMO_MODE = true;
       (env as any).DATABASE_PROVIDER = 'postgres';
       (env as any).AI_PROVIDER = 'gemini';
 
-      expect(getDatabaseProvider()).toBeInstanceOf(MockDatabaseProvider);
+      expect(getDatabaseProvider()).toBeInstanceOf(PostgresDatabaseProvider);
       expect(getAIProvider()).toBeInstanceOf(MockAIProvider);
       expect(getVerificationProvider()).toBeInstanceOf(MockVerificationProvider);
       expect(getStorageProvider()).toBeInstanceOf(LocalStorageProvider);
+    });
+
+    it('returns MockDatabaseProvider in DEMO_MODE when DATABASE_PROVIDER=mock', () => {
+      (env as any).DEMO_MODE = true;
+      (env as any).DATABASE_PROVIDER = 'mock';
+
+      expect(getDatabaseProvider()).toBeInstanceOf(MockDatabaseProvider);
     });
 
     it('fails closed and throws AppError when DATABASE_PROVIDER=mock in REAL_MODE (DEMO_MODE=false)', () => {
