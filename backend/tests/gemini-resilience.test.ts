@@ -52,10 +52,10 @@ function makeGeminiSuccessPayload(summary = 'Severe stormwater drain collapse ca
   };
 }
 
-function makeEmbeddingPayload() {
+function makeEmbeddingPayload(dim = 1536) {
   return {
     embedding: {
-      values: [0.05, 0.12, 0.35, 0.48, 0.22, 0.18, 0.09, 0.61, 0.44, 0.11]
+      values: new Array(dim).fill(0.05)
     }
   };
 }

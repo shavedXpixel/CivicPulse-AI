@@ -46,6 +46,11 @@ export async function getAuthTokenAsync(): Promise<string> {
     } catch {
       // Token retrieval failed
     }
+
+    const stored = getAuthToken();
+    if (stored) {
+      return stored;
+    }
   }
 
   return '';

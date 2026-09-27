@@ -75,9 +75,16 @@ export const env = {
   AI_PROVIDER: parsed.AI_PROVIDER || 'gemini',
   BACKEND_INTERNAL_URL: parsed.BACKEND_INTERNAL_URL || '',
   GEMINI_PRIMARY_MODEL: parsed.GEMINI_PRIMARY_MODEL || parsed.AI_MODEL_GENERAL || 'gemini-3.6-flash',
-  GEMINI_FALLBACK_MODEL: parsed.GEMINI_FALLBACK_MODEL || 'gemini-3.5-flash',
-  AI_EMBEDDING_MODEL: parsed.AI_EMBEDDING_MODEL || parsed.AI_MODEL_EMBEDDING || 'gemini-embedding-001',
-  AI_MODEL_EMBEDDING: parsed.AI_MODEL_EMBEDDING || parsed.AI_EMBEDDING_MODEL || 'gemini-embedding-001',
+  AI_EMBEDDING_MODEL: (parsed.AI_EMBEDDING_MODEL && parsed.AI_EMBEDDING_MODEL !== 'text-embedding-004')
+    ? parsed.AI_EMBEDDING_MODEL
+    : (parsed.AI_MODEL_EMBEDDING && parsed.AI_MODEL_EMBEDDING !== 'text-embedding-004')
+    ? parsed.AI_MODEL_EMBEDDING
+    : 'gemini-embedding-001',
+  AI_MODEL_EMBEDDING: (parsed.AI_MODEL_EMBEDDING && parsed.AI_MODEL_EMBEDDING !== 'text-embedding-004')
+    ? parsed.AI_MODEL_EMBEDDING
+    : (parsed.AI_EMBEDDING_MODEL && parsed.AI_EMBEDDING_MODEL !== 'text-embedding-004')
+    ? parsed.AI_EMBEDDING_MODEL
+    : 'gemini-embedding-001',
   CORS_ALLOWED_ORIGINS: (parsed.CORS_ALLOWED_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000')
     .split(',')
     .map((s) => s.trim())

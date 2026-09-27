@@ -283,8 +283,7 @@ To prevent polluting domain/business logic with `if (DEMO_MODE)` branches, all i
 
 ## G. Embedding & Similarity Architecture
 
-### 1. Vector Model
-- Use Google's standard embedding model: `text-embedding-004` (768 dimensions) via the `IAIProvider.generateEmbedding(text: string): Promise<number[]>`.
+- Use Google's standard embedding model: `gemini-embedding-001` (1536 dimensions) via the `IAIProvider.generateEmbedding(text: string): Promise<number[]>`. (Note: `text-embedding-004` is deprecated/unsupported in v1beta).
 
 ### 2. Storage
 - Embeddings are stored directly within Firestore documents as an array of floats:
@@ -539,7 +538,7 @@ To ensure that the hackathon demonstration is 100% reliable and reproducible bef
   - `POST /api/v1/problems/:id/recalculate-impact` (**Security**: Accepts NO client-controlled impact components in request body. Server strictly derives all 7 factors from authoritative stored records).
   - `POST /api/v1/problems/:id/cluster-signal` (Explicit operation evaluating a signal against clusters and attaching or forming a new cluster).
 - **Embedding & Similarity Specification**:
-  - Embedding model configurable via `AI_EMBEDDING_MODEL` (e.g. default `text-embedding-004`).
+  - Embedding model configurable via `AI_EMBEDDING_MODEL` (canonical default `gemini-embedding-001`, 1536 dimensions).
   - Provider abstraction: `IAIProvider.generateEmbedding(text: string): Promise<number[]>`.
   - Embeddings are computed and used server-side only; never exposed to frontend clients.
   - Filter-first candidate retrieval: Pre-filters by category and ward/proximity before computing vector cosine similarity.

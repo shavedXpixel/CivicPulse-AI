@@ -48,6 +48,7 @@ Thumbs.db
 # Turbopack cache
 .turbo
 # Operator and migration artifacts
+.scratch/
 secrets/
 .operator/
 migration/snapshots/

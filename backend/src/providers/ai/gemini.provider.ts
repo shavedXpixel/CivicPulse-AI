@@ -129,11 +129,15 @@ export class GeminiAIProvider implements IAIProvider {
       config?.fallbackModel ??
       env.GEMINI_FALLBACK_MODEL ??
       'gemini-3.5-flash';
-    this.embeddingModel =
+    const candidateEmbeddingModel =
       config?.embeddingModel ??
       env.AI_EMBEDDING_MODEL ??
       env.AI_MODEL_EMBEDDING ??
       'gemini-embedding-001';
+    this.embeddingModel =
+      candidateEmbeddingModel === 'text-embedding-004'
+        ? 'gemini-embedding-001'
+        : candidateEmbeddingModel;
     this.maxRetries = config?.maxRetries ?? 3;
     this.baseDelayMs =
       config?.baseDelayMs ?? (process.env.NODE_ENV === 'test' ? 10 : 500);
@@ -344,6 +348,15 @@ export class GeminiAIProvider implements IAIProvider {
         const values: number[] = data?.embedding?.values;
         if (!values || !Array.isArray(values)) {
           const err: any = new Error('Invalid embedding vector returned from Gemini API');
+          err.status = 502;
+          throw err;
+        }
+
+        const expectedDimensions = env.AI_EMBEDDING_DIMENSIONS || 1536;
+        if (values.length !== expectedDimensions) {
+          const err: any = new Error(
+            `Gemini embedding vector dimensionality mismatch: received ${values.length}, expected strictly ${expectedDimensions}`
+          );
           err.status = 502;
           throw err;
         }
