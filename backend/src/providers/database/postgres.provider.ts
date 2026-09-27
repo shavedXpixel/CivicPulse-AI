@@ -77,7 +77,7 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
           ssl: sslConfig,
           max: config?.maxConnections || 10,
           idleTimeoutMillis: 30000,
-          connectionTimeoutMillis: 5000
+          connectionTimeoutMillis: 15000
         });
       }
     }
@@ -1687,6 +1687,15 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
   // ---------------------------------------------------------------------------
 
   async createSignalMedia(media: SignalMediaItem): Promise<SignalMediaItem> {
+    let uploadedByUuid = media.uploaded_by;
+    if (uploadedByUuid && !/^[0-9a-fA-F-]{36}$/.test(uploadedByUuid)) {
+      const uRows = await this.query(
+        `SELECT id FROM users WHERE id::text = $1 OR legacy_firebase_uid = $1 OR auth_user_id::text = $1;`,
+        [uploadedByUuid]
+      );
+      if (uRows.length > 0) uploadedByUuid = uRows[0].id;
+    }
+
     const sql = `
       INSERT INTO signal_media (
         id, signal_id, storage_path, media_type, mime_type, file_size_bytes, uploaded_by, analysis_status, created_at
@@ -1699,7 +1708,7 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       media.media_type || 'IMAGE',
       media.mime_type,
       media.file_size_bytes,
-      media.uploaded_by,
+      uploadedByUuid,
       media.analysis_status || 'NOT_ANALYZED',
       media.created_at || new Date().toISOString()
     ]);

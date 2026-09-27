@@ -12,15 +12,51 @@ import {
   ERROR_CODES,
   MAX_MEDIA_FILE_SIZE_BYTES,
   RegisterMediaInput,
-  RegisterMediaResponse
+  RegisterMediaResponse,
+  ProblemCluster,
+  Assignment,
+  SignalMediaItem
 } from '@civicpulse/shared';
 import { getDatabaseProvider, getStorageProvider } from '../../providers';
+import { IDatabaseProvider } from '../../providers/database/database.interface';
 import { AppError } from '../../middleware/error.middleware';
 import { WorkflowService } from '../workflow/workflow.service';
 import { SubmitEvidenceInput, ResolutionReviewInput } from '@civicpulse/shared';
 import { env } from '../../config/env';
 
 export class ResolutionService {
+  private static async isFieldOfficerAssigned(
+    db: IDatabaseProvider,
+    user: UserProfile,
+    problem: ProblemCluster
+  ): Promise<boolean> {
+    const userIds = new Set<string>();
+    if (user.id) userIds.add(user.id);
+    if ((user as any).legacy_firebase_uid) userIds.add((user as any).legacy_firebase_uid);
+    if ((user as any).auth_user_id) userIds.add((user as any).auth_user_id);
+
+    if (user.id && (!((user as any).legacy_firebase_uid) || !((user as any).auth_user_id))) {
+      try {
+        const u = await db.getUser(user.id);
+        if (u) {
+          if (u.id) userIds.add(u.id);
+          if ((u as any).legacy_firebase_uid) userIds.add((u as any).legacy_firebase_uid);
+          if ((u as any).auth_user_id) userIds.add((u as any).auth_user_id);
+        }
+      } catch {
+        // Fallback to in-memory identifiers
+      }
+    }
+
+    if (problem.assigned_to && userIds.has(problem.assigned_to)) {
+      return true;
+    }
+
+    const assignments = await db.getAssignments(problem.id);
+    return assignments.some(
+      (a: Assignment) => !!a.assigned_to && userIds.has(a.assigned_to) && a.status !== AssignmentStatus.CANCELLED
+    );
+  }
   /**
    * Registers resolution evidence media and returns a secure presigned upload URL.
    * RBAC: Assigned Field Officer, Department Officer (matching dept), or Admin. Citizens receive 403.
@@ -50,15 +86,8 @@ export class ResolutionService {
 
     // Field Officer Scoping: must be explicitly assigned
     if (user.role === UserRole.FIELD_OFFICER) {
-      const isDirectlyAssigned = problem.assigned_to === user.id;
-      let hasActiveAssignment = isDirectlyAssigned;
-      if (!hasActiveAssignment) {
-        const assignments = await db.getAssignments(problemId);
-        hasActiveAssignment = assignments.some(
-          (a) => a.assigned_to === user.id && a.status !== AssignmentStatus.CANCELLED
-        );
-      }
-      if (!hasActiveAssignment) {
+      const isAssigned = await ResolutionService.isFieldOfficerAssigned(db, user, problem);
+      if (!isAssigned) {
         throw new AppError({
           statusCode: 403,
           code: ERROR_CODES.FORBIDDEN,
@@ -98,6 +127,31 @@ export class ResolutionService {
       }
     );
 
+    let linkedSignalId: string | null = null;
+    try {
+      const members = await db.getProblemClusterMembers(problem.id);
+      if (members && members.length > 0) {
+        linkedSignalId = members[0].signal_id;
+      }
+    } catch {
+      // Ignore
+    }
+
+    const now = new Date().toISOString();
+    const mediaItem: SignalMediaItem = {
+      id: evidenceMediaId,
+      signal_id: linkedSignalId || (null as any),
+      storage_path: uploadResult.storagePath,
+      media_type: 'IMAGE',
+      mime_type: input.mime_type,
+      file_size_bytes: input.file_size_bytes,
+      uploaded_by: user.id,
+      created_at: now,
+      analysis_status: 'NOT_ANALYZED'
+    };
+
+    await db.createSignalMedia(mediaItem);
+
     return {
       media_id: evidenceMediaId,
       upload_url: uploadResult.uploadUrl,
@@ -133,15 +187,8 @@ export class ResolutionService {
     }
 
     if (user.role === UserRole.FIELD_OFFICER) {
-      const isDirectlyAssigned = problem.assigned_to === user.id;
-      let hasActiveAssignment = isDirectlyAssigned;
-      if (!hasActiveAssignment) {
-        const assignments = await db.getAssignments(problemId);
-        hasActiveAssignment = assignments.some(
-          (a) => a.assigned_to === user.id && a.status !== AssignmentStatus.CANCELLED
-        );
-      }
-      if (!hasActiveAssignment) {
+      const isAssigned = await ResolutionService.isFieldOfficerAssigned(db, user, problem);
+      if (!isAssigned) {
         throw new AppError({
           statusCode: 403,
           code: ERROR_CODES.FORBIDDEN,
@@ -199,15 +246,8 @@ export class ResolutionService {
 
     // 2. Field Officer Scoping: must be explicitly assigned to this problem
     if (user.role === UserRole.FIELD_OFFICER) {
-      const isDirectlyAssigned = problem.assigned_to === user.id;
-      let hasActiveAssignment = isDirectlyAssigned;
-      if (!hasActiveAssignment) {
-        const assignments = await db.getAssignments(problemId);
-        hasActiveAssignment = assignments.some(
-          (a) => a.assigned_to === user.id && a.status !== AssignmentStatus.CANCELLED
-        );
-      }
-      if (!hasActiveAssignment) {
+      const isAssigned = await ResolutionService.isFieldOfficerAssigned(db, user, problem);
+      if (!isAssigned) {
         throw new AppError({
           statusCode: 403,
           code: ERROR_CODES.FORBIDDEN,
