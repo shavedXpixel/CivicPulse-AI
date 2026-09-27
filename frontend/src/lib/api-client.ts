@@ -86,8 +86,7 @@ async function request<T>(
 
   let token = '';
   const customAuth = customHeaders['Authorization']?.replace(/^Bearer\s+/i, '').trim();
-  const isJwt = customAuth && customAuth.split('.').length === 3;
-  if (isJwt) {
+  if (customAuth) {
     token = customAuth;
   } else {
     token = await getAuthTokenAsync();
@@ -150,9 +149,83 @@ async function request<T>(
   return res.json();
 }
 
+async function requestBlob(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<Blob> {
+  const customHeaders = (options.headers as Record<string, string>) || {};
+
+  let token = '';
+  const customAuth = customHeaders['Authorization']?.replace(/^Bearer\s+/i, '').trim();
+  if (customAuth) {
+    token = customAuth;
+  } else {
+    token = await getAuthTokenAsync();
+  }
+
+  if (token && token.startsWith('Bearer ')) {
+    token = token.substring(7).trim();
+  }
+
+  const { Authorization: _discardAuth, ...sanitizedCustomHeaders } = customHeaders;
+
+  const headers: Record<string, string> = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...sanitizedCustomHeaders
+  };
+
+  let url = endpoint;
+  if (!endpoint.startsWith('http')) {
+    const rawBase = process.env.NEXT_PUBLIC_API_URL?.trim();
+    if (rawBase) {
+      const baseNormalized = rawBase.replace(/\/+$/, '');
+      if (baseNormalized.endsWith('/api/v1') && endpoint.startsWith('/api/v1')) {
+        url = `${baseNormalized}${endpoint.substring(7)}`;
+      } else {
+        url = `${baseNormalized}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+      }
+    }
+  }
+
+  const res = await fetch(url, {
+    ...options,
+    headers
+  });
+
+  if (!res.ok) {
+    let errorData: ApiErrorResponse | null = null;
+    try {
+      errorData = await res.json();
+    } catch {
+      // Body not JSON
+    }
+
+    const message = errorData?.error?.message || `Media fetch failed with status ${res.status}`;
+    const code =
+      errorData?.error?.code ||
+      (res.status === 401 ? 'UNAUTHORIZED' : res.status === 403 ? 'FORBIDDEN' : 'UNKNOWN_ERROR');
+    const requestId = errorData?.error?.requestId || res.headers.get('x-request-id') || undefined;
+
+    throw new ApiError(res.status, code, message, requestId);
+  }
+
+  return res.blob();
+}
+
 export const apiClient = {
   get: <T>(endpoint: string, headers?: Record<string, string>) =>
     request<T>(endpoint, { method: 'GET', headers }),
+
+  getBlob: (endpoint: string, headers?: Record<string, string>) =>
+    requestBlob(endpoint, { method: 'GET', headers }),
+
+  getMediaBlob: (storagePath: string, headers?: Record<string, string>) =>
+    requestBlob(`/api/v1/storage/files?path=${encodeURIComponent(storagePath)}`, { method: 'GET', headers }),
+
+  getMediaBlobUrl: async (storagePath: string, headers?: Record<string, string>): Promise<string> => {
+    const blob = await apiClient.getMediaBlob(storagePath, headers);
+    return URL.createObjectURL(blob);
+  },
 
   post: <T>(endpoint: string, body?: any, headers?: Record<string, string>) =>
     request<T>(endpoint, {

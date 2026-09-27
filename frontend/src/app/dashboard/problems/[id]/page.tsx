@@ -44,7 +44,16 @@ export default function ProblemDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, getIdToken } = useAuth();
+  const [authToken, setAuthTokenState] = useState<string>('');
+
+  useEffect(() => {
+    if (getIdToken) {
+      getIdToken().then((t) => {
+        if (t) setAuthTokenState(t);
+      }).catch(() => {});
+    }
+  }, [getIdToken]);
 
   const [liveProblem, setLiveProblem] = useState<ProblemClusterDetail | null>(null);
   const [liveActions, setLiveActions] = useState<ProblemAction[]>([]);
@@ -768,7 +777,7 @@ export default function ProblemDetailPage({
               problemStatus={status}
               assignedTo={assignedTo}
               departmentId={department}
-              authToken=""
+              authToken={authToken}
               userRole={userProfile?.role || 'DEPARTMENT_OFFICER'}
               userName={userProfile?.display_name || user?.displayName || user?.email || 'Government Officer'}
               problemLocation={liveProblem?.location}

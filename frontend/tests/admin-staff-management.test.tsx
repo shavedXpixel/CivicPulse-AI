@@ -173,6 +173,7 @@ describe('Phase 15B.5.3.16 — Admin Government Staff Provisioning & Management 
           department_id: 'dept_roads',
           status: UserStatus.ACTIVE,
           created_at: '2026-09-01T00:00:00Z',
+          updated_at: '2026-09-01T00:00:00Z',
         },
       ];
       const html = renderToStaticMarkup(<AdminView initialUsers={sampleStaff} />);
@@ -195,6 +196,7 @@ describe('Phase 15B.5.3.16 — Admin Government Staff Provisioning & Management 
           department_id: 'dept_roads',
           status: UserStatus.INVITED,
           created_at: '2026-09-10T10:00:00Z',
+          updated_at: '2026-09-10T10:00:00Z',
         },
         {
           id: 'usr_2',
@@ -204,6 +206,7 @@ describe('Phase 15B.5.3.16 — Admin Government Staff Provisioning & Management 
           department_id: 'dept_roads',
           status: UserStatus.ACTIVE,
           created_at: '2026-09-08T10:00:00Z',
+          updated_at: '2026-09-08T10:00:00Z',
         },
         {
           id: 'usr_3',
@@ -213,6 +216,7 @@ describe('Phase 15B.5.3.16 — Admin Government Staff Provisioning & Management 
           department_id: 'dept_roads',
           status: UserStatus.INACTIVE,
           created_at: '2026-09-01T10:00:00Z',
+          updated_at: '2026-09-01T10:00:00Z',
         },
         {
           id: 'usr_4',
@@ -222,6 +226,7 @@ describe('Phase 15B.5.3.16 — Admin Government Staff Provisioning & Management 
           department_id: 'dept_roads',
           status: UserStatus.SUSPENDED,
           created_at: '2026-09-01T10:00:00Z',
+          updated_at: '2026-09-01T10:00:00Z',
         },
       ];
 

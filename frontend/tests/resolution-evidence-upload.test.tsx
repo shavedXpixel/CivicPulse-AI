@@ -2,7 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ResolutionWorkspace } from '../src/components/domain/ResolutionWorkspace';
-import { ProblemStatus, EvidenceType, BeforeOrAfter } from '@civicpulse/shared';
+import { ProblemStatus } from '@civicpulse/shared';
 
 // Mock next/navigation
 vi.mock('next/navigation', () => ({

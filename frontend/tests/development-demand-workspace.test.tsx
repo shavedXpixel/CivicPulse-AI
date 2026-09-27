@@ -221,7 +221,7 @@ vi.mock('../src/lib/api-client', () => ({
             intake_channels: ['WHATSAPP_MESSAGING'],
             sample_narratives: [{ content: 'Sample narrative', trust: 'untrusted_user_content' }],
           },
-          metrics: mockClusterDetail.opportunities[0].metrics,
+          metrics: (mockClusterDetail.opportunities as any)[0].metrics,
           evidence_citations: {
             signal_ids: ['dsig_w18_01'],
             indicator_sources: ['WATCO'],

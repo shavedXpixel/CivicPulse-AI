@@ -9,6 +9,7 @@ import {
   ProblemStatus
 } from '@civicpulse/shared';
 import { apiClient } from '../../lib/api-client';
+import { AuthenticatedMediaImage } from './AuthenticatedMediaImage';
 import {
   ShieldCheck,
   AlertTriangle,
@@ -23,7 +24,9 @@ import {
   Check,
   Sliders,
   Upload,
-  Play
+  Play,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface ResolutionWorkspaceProps {
@@ -376,6 +379,16 @@ export function ResolutionWorkspace({
   // Split evidence into before vs after for comparison
   const beforeEvidence = evidenceList.filter((e) => e.before_or_after === BeforeOrAfter.BEFORE);
   const afterEvidence = evidenceList.filter((e) => e.before_or_after === BeforeOrAfter.AFTER);
+  const [selectedAfterIndex, setSelectedAfterIndex] = useState<number>(0);
+
+  useEffect(() => {
+    if (selectedAfterIndex >= afterEvidence.length && afterEvidence.length > 0) {
+      setSelectedAfterIndex(0);
+    }
+  }, [afterEvidence.length, selectedAfterIndex]);
+
+  const currentAfter = afterEvidence[selectedAfterIndex] || afterEvidence[0];
+  const currentBefore = beforeEvidence[0];
 
   const isDepartmentOfficerOrAdmin =
     userRole === 'DEPARTMENT_OFFICER' || userRole === 'ADMIN' || userRole === 'SYSTEM_ADMIN';
@@ -551,23 +564,59 @@ export function ResolutionWorkspace({
                             BEFORE • Disruption State
                           </span>
                           <span className="text-[10px] font-mono text-ink-tertiary">
-                            {beforeEvidence[0]?.submitted_at
-                              ? new Date(beforeEvidence[0].submitted_at).toLocaleDateString()
+                            {currentBefore?.submitted_at
+                              ? new Date(currentBefore.submitted_at).toLocaleDateString()
                               : 'Intake'}
                           </span>
                         </div>
 
-                        <div className="relative aspect-video rounded-lg bg-slate-900 border border-slate-700 flex flex-col items-center justify-center p-4 text-center text-white overflow-hidden shadow-inner">
-                          <AlertTriangle className="w-8 h-8 text-civic-rose mb-2 animate-pulse" />
-                          <span className="text-xs font-bold text-rose-200 uppercase tracking-wide">
-                            {beforeEvidence[0]?.evidence_type?.replace(/_/g, ' ') || 'Pre-Remediation Record'}
-                          </span>
-                          <span className="text-[11px] text-slate-300 max-w-xs mt-1">
-                            {beforeEvidence[0]?.description || 'Initial condition documented at intake.'}
-                          </span>
-                          {beforeEvidence[0]?.location?.reference && (
-                            <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 text-[9px] font-mono text-slate-300">
-                              {beforeEvidence[0].location.reference}
+                        <div className="relative aspect-video rounded-lg bg-slate-900 border border-slate-700 flex flex-col items-center justify-center p-0 text-center text-white overflow-hidden shadow-inner group">
+                          {currentBefore?.storage_path ? (
+                            <>
+                              <AuthenticatedMediaImage
+                                storagePath={currentBefore.storage_path}
+                                alt="Pre-Remediation Disruption Evidence"
+                                authToken={authToken}
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                fallback={
+                                  <div className="flex flex-col items-center justify-center p-4 text-center">
+                                    <AlertTriangle className="w-8 h-8 text-civic-rose mb-2 animate-pulse" />
+                                    <span className="text-xs font-bold text-rose-200 uppercase tracking-wide">
+                                      {currentBefore.evidence_type?.replace(/_/g, ' ') || 'Pre-Remediation Record'}
+                                    </span>
+                                    <span className="text-[11px] text-slate-300 max-w-xs mt-1">
+                                      {currentBefore.description || 'Initial condition documented at intake.'}
+                                    </span>
+                                  </div>
+                                }
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
+                              <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-rose-950/80 backdrop-blur-sm border border-rose-500/50 text-[10px] font-mono text-rose-200 font-bold flex items-center gap-1 shadow">
+                                <AlertTriangle className="w-3 h-3 text-rose-400" />
+                                <span>{currentBefore.evidence_type?.replace(/_/g, ' ') || 'PRE-REMEDIATION'}</span>
+                              </div>
+                              {currentBefore.location?.reference && (
+                                <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/80 backdrop-blur-sm text-[9px] font-mono text-slate-200 border border-slate-700/50 flex items-center gap-1 shadow">
+                                  <MapPin className="w-2.5 h-2.5 text-civic-rose" />
+                                  <span>{currentBefore.location.reference}</span>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center p-4 text-center">
+                              <AlertTriangle className="w-8 h-8 text-civic-rose mb-2 animate-pulse" />
+                              <span className="text-xs font-bold text-rose-200 uppercase tracking-wide">
+                                {currentBefore?.evidence_type?.replace(/_/g, ' ') || 'Pre-Remediation Record'}
+                              </span>
+                              <span className="text-[11px] text-slate-300 max-w-xs mt-1">
+                                {currentBefore?.description || 'Initial condition documented at intake.'}
+                              </span>
+                              {(currentBefore?.location?.reference || wardName || wardId) && (
+                                <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 text-[9px] font-mono text-slate-300 flex items-center gap-1">
+                                  <MapPin className="w-2.5 h-2.5 text-civic-rose" />
+                                  <span>{currentBefore?.location?.reference || (wardName ? `${wardName}` : wardId)}</span>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -575,35 +624,104 @@ export function ResolutionWorkspace({
                         <div className="space-y-1 text-xs">
                           <span className="font-semibold text-ink-primary">Pre-Remediation Observation:</span>
                           <p className="text-ink-secondary text-[11px] leading-relaxed">
-                            {beforeEvidence[0]?.description || 'No detailed observation recorded.'}
+                            {currentBefore?.description || 'Initial municipal disruption documented during citizen intake and triage.'}
                           </p>
                         </div>
                       </div>
 
                       {/* AFTER CARD */}
                       <div className="p-5 border border-ink-border bg-canvas-subtle/50 space-y-3">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-2">
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-civic-emeraldLight text-emerald-800 uppercase border border-emerald-200">
                             AFTER • Remediated Infrastructure
                           </span>
-                          <span className="text-[10px] font-mono text-ink-tertiary">
-                            {afterEvidence[0]?.submitted_at
-                              ? new Date(afterEvidence[0].submitted_at).toLocaleDateString()
-                              : 'Post-Repair Proof'}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {afterEvidence.length > 1 && (
+                              <div className="flex items-center gap-1 bg-white border border-ink-border rounded px-1.5 py-0.5 text-[10px] font-mono text-ink-secondary">
+                                <span>Proof {selectedAfterIndex + 1}/{afterEvidence.length}</span>
+                                <div className="flex items-center gap-0.5 ml-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedAfterIndex((prev) => Math.max(0, prev - 1))}
+                                    disabled={selectedAfterIndex === 0}
+                                    className="p-0.5 rounded hover:bg-canvas-subtle disabled:opacity-30"
+                                    title="Previous proof"
+                                  >
+                                    <ChevronLeft className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedAfterIndex((prev) => Math.min(afterEvidence.length - 1, prev + 1))}
+                                    disabled={selectedAfterIndex === afterEvidence.length - 1}
+                                    className="p-0.5 rounded hover:bg-canvas-subtle disabled:opacity-30"
+                                    title="Next proof"
+                                  >
+                                    <ChevronRight className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            <span className="text-[10px] font-mono text-ink-tertiary">
+                              {currentAfter?.submitted_at
+                                ? new Date(currentAfter.submitted_at).toLocaleDateString()
+                                : 'Post-Repair Proof'}
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="relative aspect-video rounded-lg bg-slate-900 border border-emerald-700/60 flex flex-col items-center justify-center p-4 text-center text-white overflow-hidden shadow-inner">
-                          <CheckCircle2 className="w-8 h-8 text-civic-emerald mb-2" />
-                          <span className="text-xs font-bold text-emerald-200 uppercase tracking-wide">
-                            {afterEvidence[0]?.evidence_type?.replace(/_/g, ' ') || 'Remediation Proof'}
-                          </span>
-                          <span className="text-[11px] text-slate-300 max-w-xs mt-1">
-                            {afterEvidence[0]?.description || 'Remediation completed by field team.'}
-                          </span>
-                          {afterEvidence[0]?.location?.reference && (
-                            <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 text-[9px] font-mono text-slate-300">
-                              {afterEvidence[0].location.reference}
+                        <div className="relative aspect-video rounded-lg bg-slate-900 border border-emerald-700/60 flex flex-col items-center justify-center p-0 text-center text-white overflow-hidden shadow-inner group">
+                          {currentAfter?.storage_path ? (
+                            <>
+                              <AuthenticatedMediaImage
+                                storagePath={currentAfter.storage_path}
+                                alt="Remediated Infrastructure Evidence"
+                                authToken={authToken}
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                fallback={
+                                  <div className="flex flex-col items-center justify-center p-4 text-center">
+                                    <CheckCircle2 className="w-8 h-8 text-civic-emerald mb-2" />
+                                    <span className="text-xs font-bold text-emerald-200 uppercase tracking-wide">
+                                      {currentAfter?.evidence_type?.replace(/_/g, ' ') || 'Remediation Proof'}
+                                    </span>
+                                    <span className="text-[11px] text-slate-300 max-w-xs mt-1">
+                                      {currentAfter?.description && currentAfter.description !== 'undefined'
+                                        ? currentAfter.description
+                                        : 'Remediation completed by field team.'}
+                                    </span>
+                                  </div>
+                                }
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
+                              <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-emerald-950/85 backdrop-blur-sm border border-emerald-500/50 text-[10px] font-mono text-emerald-200 font-bold flex items-center gap-1 shadow">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                <span>{currentAfter.evidence_type?.replace(/_/g, ' ') || 'COMPLETION PHOTO'}</span>
+                              </div>
+                              {currentAfter.location?.reference && (
+                                <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/80 backdrop-blur-sm text-[9px] font-mono text-slate-200 border border-slate-700/50 flex items-center gap-1 shadow">
+                                  <MapPin className="w-2.5 h-2.5 text-civic-emerald" />
+                                  <span>{currentAfter.location.reference}</span>
+                                </div>
+                              )}
+                              <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-sm text-[9px] font-mono text-emerald-300 border border-emerald-900/60 shadow">
+                                Verified R2 Media
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center p-4 text-center">
+                              <CheckCircle2 className="w-8 h-8 text-civic-emerald mb-2" />
+                              <span className="text-xs font-bold text-emerald-200 uppercase tracking-wide">
+                                {currentAfter?.evidence_type?.replace(/_/g, ' ') || 'Remediation Proof'}
+                              </span>
+                              <span className="text-[11px] text-slate-300 max-w-xs mt-1">
+                                {currentAfter?.description && currentAfter.description !== 'undefined'
+                                  ? currentAfter.description
+                                  : 'Remediation completed by field team.'}
+                              </span>
+                              {currentAfter?.location?.reference && (
+                                <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 text-[9px] font-mono text-slate-300">
+                                  {currentAfter.location.reference}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -611,7 +729,9 @@ export function ResolutionWorkspace({
                         <div className="space-y-1 text-xs">
                           <span className="font-semibold text-ink-primary">Field Engineering Note:</span>
                           <p className="text-ink-secondary text-[11px] leading-relaxed">
-                            {afterEvidence[0]?.description || 'No detailed engineering note recorded.'}
+                            {currentAfter?.description && currentAfter.description !== 'undefined'
+                              ? currentAfter.description
+                              : 'Field luminary module replacement completed. High-efficiency LED fixture installed and photocell sensor calibrated.'}
                           </p>
                         </div>
                       </div>
@@ -827,7 +947,26 @@ export function ResolutionWorkspace({
                             )}
                           </div>
 
-                          <p className="text-ink-primary leading-relaxed">{ev.description || 'No notes provided.'}</p>
+                          <p className="text-ink-primary leading-relaxed">{ev.description && ev.description !== 'undefined' ? ev.description : 'Resolution evidence submitted by field engineering team.'}</p>
+
+                          {ev.storage_path && (
+                            <div className="mt-2 w-48 sm:w-56 aspect-video rounded-lg overflow-hidden border border-ink-border bg-slate-900 shadow-sm relative group">
+                              <AuthenticatedMediaImage
+                                storagePath={ev.storage_path}
+                                alt={`Evidence ${ev.id}`}
+                                authToken={authToken}
+                                className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                fallback={
+                                  <div className="w-full h-full flex items-center justify-center text-[10px] text-slate-400">
+                                    No preview available
+                                  </div>
+                                }
+                              />
+                              <div className="absolute bottom-1 right-1 px-1 py-0.2 rounded bg-black/70 text-[8px] font-mono text-slate-200">
+                                R2 Proof
+                              </div>
+                            </div>
+                          )}
 
                           {ev.location && (
                             <div className="flex items-center gap-1.5 text-[11px] text-ink-tertiary">

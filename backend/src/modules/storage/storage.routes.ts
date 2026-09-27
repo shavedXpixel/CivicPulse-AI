@@ -255,8 +255,20 @@ router.get('/files', async (req: Request, res: Response) => {
 
   // 2. RESOLUTION EVIDENCE AUTHORIZATION
   else if (storagePath.startsWith('evidence/')) {
-    const evidence = await db.getResolutionEvidenceByPath(storagePath);
+    let evidence = await db.getResolutionEvidenceByPath(storagePath);
+    let problemId = evidence?.problem_id;
+
     if (!evidence) {
+      const mediaItem = await db.getSignalMediaByPath(storagePath);
+      if (mediaItem && mediaItem.signal_id) {
+        const cluster = await db.getProblemCluster(mediaItem.signal_id);
+        if (cluster) {
+          problemId = cluster.id;
+        }
+      }
+    }
+
+    if (!evidence && !problemId) {
       res.status(404).json({
         error: {
           code: 'NOT_FOUND',
@@ -266,7 +278,7 @@ router.get('/files', async (req: Request, res: Response) => {
       return;
     }
 
-    const problem = await db.getProblemCluster(evidence.problem_id);
+    const problem = problemId ? await db.getProblemCluster(problemId) : null;
 
     // A. Citizen Scoping: Citizens can only view resolution evidence for problems they reported or are members of, OR when problem is public/resolved
     if (user.role === UserRole.CITIZEN) {
@@ -295,7 +307,10 @@ router.get('/files', async (req: Request, res: Response) => {
     }
     // B. Field Officer Scoping: Field officer must be assigned or belong to the problem's department
     else if (user.role === UserRole.FIELD_OFFICER) {
-      const isAssigned = problem?.assigned_to === user.id;
+      const isAssigned =
+        problem?.assigned_to === user.id ||
+        (user as any).legacy_firebase_uid === problem?.assigned_to ||
+        (user as any).auth_user_id === problem?.assigned_to;
       const isSameDept = Boolean(problem?.department_id && user.department_id && problem.department_id === user.department_id);
       if (!isAssigned && !isSameDept) {
         res.status(403).json({
