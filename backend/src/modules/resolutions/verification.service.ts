@@ -55,7 +55,12 @@ export class VerificationService {
 
     // 2. Field Officer Scoping: must be assigned
     if (user.role === UserRole.FIELD_OFFICER) {
-      if (!problem.assigned_to || problem.assigned_to !== user.id) {
+      const userIds = new Set<string>();
+      if (user.id) userIds.add(user.id);
+      if ((user as any).legacy_firebase_uid) userIds.add((user as any).legacy_firebase_uid);
+      if ((user as any).auth_user_id) userIds.add((user as any).auth_user_id);
+
+      if (!problem.assigned_to || !userIds.has(problem.assigned_to)) {
         throw new AppError({
           statusCode: 403,
           code: ERROR_CODES.FORBIDDEN,

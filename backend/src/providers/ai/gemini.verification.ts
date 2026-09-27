@@ -23,9 +23,9 @@ export class GeminiVerificationProvider implements IAIVerificationProvider {
   private apiKey: string;
   private model: string;
 
-  constructor() {
+  constructor(model?: string) {
     this.apiKey = env.GEMINI_API_KEY || '';
-    this.model = env.AI_MODEL_GENERAL || 'gemini-3.6-flash';
+    this.model = model || env.GEMINI_MODEL_VERIFICATION || process.env.GEMINI_MODEL_VERIFICATION || 'gemini-3.5-flash-lite';
   }
 
   public getModelName(): string {

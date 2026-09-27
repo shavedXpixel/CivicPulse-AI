@@ -16,6 +16,7 @@ const EnvSchema = z.object({
   GEMINI_PRIMARY_MODEL: z.string().optional(),
   GEMINI_FALLBACK_MODEL: z.string().optional().default('gemini-3.5-flash'),
   AI_MODEL_GENERAL: z.string().default('gemini-3.6-flash'),
+  GEMINI_MODEL_VERIFICATION: z.string().optional().default('gemini-3.5-flash-lite'),
   AI_MODEL_EMBEDDING: z.string().optional(),
   AI_EMBEDDING_MODEL: z.string().optional(),
   FIREBASE_PROJECT_ID: z.string().optional().default(''),
