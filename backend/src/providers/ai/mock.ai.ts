@@ -196,7 +196,7 @@ export class MockAIProvider implements IAIProvider {
     ) {
       category = 'streetlights';
       subcategory = 'circuit_blackout';
-      recommended_department = 'TPCODL';
+      recommended_department = 'WATCO';
       severity = 'MEDIUM';
       urgency = 'MEDIUM';
       normalized_summary = 'Municipal streetlights blackout corridor impairing nighttime pedestrian safety.';

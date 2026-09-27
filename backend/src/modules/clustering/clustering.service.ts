@@ -277,15 +277,15 @@ export class ClusteringService {
 
     const description = signal.normalized_text || signal.original_text || title;
 
-    // Authoritatively resolve and validate department foreign key
-    let validatedDeptId: string | undefined = undefined;
+    // Authoritatively resolve and validate department foreign key (WATCO single-department architecture)
+    let validatedDeptId: string = 'WATCO';
     const candidateDept = signal.department_id || signal.recommended_department;
     if (candidateDept) {
       try {
         const { getDatabaseProvider } = await import('../../providers');
         const db = getDatabaseProvider();
         const dept = await db.getDepartment(candidateDept);
-        if (dept) {
+        if (dept && dept.id === 'WATCO') {
           validatedDeptId = dept.id;
         }
       } catch {}

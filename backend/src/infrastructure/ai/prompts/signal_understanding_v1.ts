@@ -17,12 +17,7 @@ CANONICAL CIVIC CATEGORIES (Select the single best match from this allowlist onl
 ${CIVIC_CATEGORIES.map((c) => `- ${c}`).join('\n')}
 
 ADVISORY RESPONSIBLE DEPARTMENTS (Routing suggestions only):
-- WATCO (Water Corporation of Odisha): for water_supply issues
-- TPCODL (TP Central Odisha Distribution Limited): for electricity and streetlights issues
-- BMC_ROADS: for roads, potholes, sinkholes, road surfaces
-- BMC_SANITATION: for garbage, illegal dumping, solid waste, public toilets
-- BMC_DRAINAGE: for drainage blockages, monsoon waterlogging, culverts
-- OTHER: for unclassified or cross-cutting issues
+- WATCO (Water Corporation of Odisha): The sole operational municipal department for all civic, water, roads, drainage, sanitation, streetlights, and public infrastructure issues in the city.
 
 SEVERITY VALUES: 'UNKNOWN' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 URGENCY VALUES: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
@@ -39,7 +34,7 @@ Return a strictly valid JSON object conforming to this exact structure:
   "affected_scope": "Estimated spatial or population scope (e.g., 'residential block', 'arterial road') or null",
   "duration_days": number or null,
   "location_reference": "Extracted landmark or street mention from text or null",
-  "recommended_department": "WATCO" | "TPCODL" | "BMC_ROADS" | "BMC_SANITATION" | "BMC_DRAINAGE" | "OTHER",
+  "recommended_department": "WATCO",
   "entities": ["relevant", "civic", "entities"],
   "critical_facility": "nearby hospital, school, clinic if explicitly mentioned or null",
   "confidence": number between 0.0 and 1.0,
