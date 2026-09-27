@@ -67,3 +67,4 @@ dumps/
 !data/**/*.json
 !migration/auth/auth-account-classification.json
 !migration/auth/firebase-to-supabase-user-map.json
+antigravity-test-credentials.local.md

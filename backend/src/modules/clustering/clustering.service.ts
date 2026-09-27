@@ -277,12 +277,26 @@ export class ClusteringService {
 
     const description = signal.normalized_text || signal.original_text || title;
 
+    // Authoritatively resolve and validate department foreign key
+    let validatedDeptId: string | undefined = undefined;
+    const candidateDept = signal.department_id || signal.recommended_department;
+    if (candidateDept) {
+      try {
+        const { getDatabaseProvider } = await import('../../providers');
+        const db = getDatabaseProvider();
+        const dept = await db.getDepartment(candidateDept);
+        if (dept) {
+          validatedDeptId = dept.id;
+        }
+      } catch {}
+    }
+
     const draftCluster: ProblemCluster = {
       id: problemId,
       title,
       description,
       category: signal.category || 'general_infrastructure',
-      department_id: signal.recommended_department || undefined,
+      department_id: validatedDeptId,
       ward_id: signal.ward_id || undefined,
       location: signal.location || undefined,
       centroid_embedding: signalEmbedding.length > 0 ? signalEmbedding : undefined,
