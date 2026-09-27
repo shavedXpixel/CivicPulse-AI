@@ -8,15 +8,165 @@ import {
   EvidenceStatus,
   ResolutionEvidence,
   ProblemAction,
-  ERROR_CODES
+  AssignmentStatus,
+  ERROR_CODES,
+  MAX_MEDIA_FILE_SIZE_BYTES,
+  RegisterMediaInput,
+  RegisterMediaResponse
 } from '@civicpulse/shared';
-import { getDatabaseProvider } from '../../providers';
+import { getDatabaseProvider, getStorageProvider } from '../../providers';
 import { AppError } from '../../middleware/error.middleware';
 import { WorkflowService } from '../workflow/workflow.service';
 import { SubmitEvidenceInput, ResolutionReviewInput } from '@civicpulse/shared';
 import { env } from '../../config/env';
 
 export class ResolutionService {
+  /**
+   * Registers resolution evidence media and returns a secure presigned upload URL.
+   * RBAC: Assigned Field Officer, Department Officer (matching dept), or Admin. Citizens receive 403.
+   */
+  public static async registerEvidenceMedia(
+    user: UserProfile,
+    problemId: string,
+    input: RegisterMediaInput
+  ): Promise<RegisterMediaResponse> {
+    if (user.role === UserRole.CITIZEN) {
+      throw new AppError({
+        statusCode: 403,
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Citizens are not permitted to register resolution evidence media.'
+      });
+    }
+
+    const db = getDatabaseProvider();
+    const problem = await db.getProblemCluster(problemId);
+    if (!problem) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: `ProblemCluster ${problemId} not found.`
+      });
+    }
+
+    // Field Officer Scoping: must be explicitly assigned
+    if (user.role === UserRole.FIELD_OFFICER) {
+      const isDirectlyAssigned = problem.assigned_to === user.id;
+      let hasActiveAssignment = isDirectlyAssigned;
+      if (!hasActiveAssignment) {
+        const assignments = await db.getAssignments(problemId);
+        hasActiveAssignment = assignments.some(
+          (a) => a.assigned_to === user.id && a.status !== AssignmentStatus.CANCELLED
+        );
+      }
+      if (!hasActiveAssignment) {
+        throw new AppError({
+          statusCode: 403,
+          code: ERROR_CODES.FORBIDDEN,
+          message: `Field officer ${user.id} can only upload resolution evidence for explicitly assigned problems.`
+        });
+      }
+    }
+
+    // Department Officer Scoping: must belong to authorized department
+    if (user.role === UserRole.DEPARTMENT_OFFICER) {
+      if (problem.department_id && user.department_id && problem.department_id !== user.department_id) {
+        throw new AppError({
+          statusCode: 403,
+          code: ERROR_CODES.FORBIDDEN,
+          message: `Department officer from ${user.department_id} cannot upload evidence for ${problem.department_id}.`
+        });
+      }
+    }
+
+    if (input.file_size_bytes > MAX_MEDIA_FILE_SIZE_BYTES) {
+      throw new AppError({
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+        message: `File size exceeds canonical limit of ${MAX_MEDIA_FILE_SIZE_BYTES} bytes (10MB).`
+      });
+    }
+
+    const evidenceMediaId = `evd_med_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const storage = getStorageProvider();
+    const uploadResult = await storage.getSignedUploadUrl(
+      input.file_name,
+      input.mime_type,
+      input.file_size_bytes,
+      {
+        problemId: problem.id,
+        evidenceId: evidenceMediaId
+      }
+    );
+
+    return {
+      media_id: evidenceMediaId,
+      upload_url: uploadResult.uploadUrl,
+      storage_path: uploadResult.storagePath,
+      expires_at: uploadResult.expiresAt
+    };
+  }
+
+  /**
+   * Completes and confirms presigned media upload for problem evidence.
+   */
+  public static async completeEvidenceMedia(
+    user: UserProfile,
+    problemId: string,
+    mediaId: string
+  ): Promise<{ problem_id: string; media_id: string; status: string }> {
+    if (user.role === UserRole.CITIZEN) {
+      throw new AppError({
+        statusCode: 403,
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Citizens are not permitted to complete resolution evidence media.'
+      });
+    }
+
+    const db = getDatabaseProvider();
+    const problem = await db.getProblemCluster(problemId);
+    if (!problem) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: `ProblemCluster ${problemId} not found.`
+      });
+    }
+
+    if (user.role === UserRole.FIELD_OFFICER) {
+      const isDirectlyAssigned = problem.assigned_to === user.id;
+      let hasActiveAssignment = isDirectlyAssigned;
+      if (!hasActiveAssignment) {
+        const assignments = await db.getAssignments(problemId);
+        hasActiveAssignment = assignments.some(
+          (a) => a.assigned_to === user.id && a.status !== AssignmentStatus.CANCELLED
+        );
+      }
+      if (!hasActiveAssignment) {
+        throw new AppError({
+          statusCode: 403,
+          code: ERROR_CODES.FORBIDDEN,
+          message: `Field officer ${user.id} can only complete resolution evidence for explicitly assigned problems.`
+        });
+      }
+    }
+
+    if (user.role === UserRole.DEPARTMENT_OFFICER) {
+      if (problem.department_id && user.department_id && problem.department_id !== user.department_id) {
+        throw new AppError({
+          statusCode: 403,
+          code: ERROR_CODES.FORBIDDEN,
+          message: `Department officer from ${user.department_id} cannot complete evidence for ${problem.department_id}.`
+        });
+      }
+    }
+
+    return {
+      problem_id: problemId,
+      media_id: mediaId,
+      status: 'ATTACHED'
+    };
+  }
+
   /**
    * Submits resolution evidence for an active problem.
    * RBAC: Assigned Field Officer, Department Officer, Admin.
@@ -49,7 +199,15 @@ export class ResolutionService {
 
     // 2. Field Officer Scoping: must be explicitly assigned to this problem
     if (user.role === UserRole.FIELD_OFFICER) {
-      if (!problem.assigned_to || problem.assigned_to !== user.id) {
+      const isDirectlyAssigned = problem.assigned_to === user.id;
+      let hasActiveAssignment = isDirectlyAssigned;
+      if (!hasActiveAssignment) {
+        const assignments = await db.getAssignments(problemId);
+        hasActiveAssignment = assignments.some(
+          (a) => a.assigned_to === user.id && a.status !== AssignmentStatus.CANCELLED
+        );
+      }
+      if (!hasActiveAssignment) {
         throw new AppError({
           statusCode: 403,
           code: ERROR_CODES.FORBIDDEN,
@@ -66,6 +224,35 @@ export class ResolutionService {
           code: ERROR_CODES.FORBIDDEN,
           message: `Department officer from ${user.department_id} cannot submit evidence for ${problem.department_id}.`
         });
+      }
+    }
+
+    // Storage object verification (Requirement 8):
+    // Do not allow evidence to claim that an image exists unless upload actually succeeded.
+    if (input.evidence_type === EvidenceType.COMPLETION_PHOTO && !input.storage_path) {
+      throw new AppError({
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+        message: 'A valid uploaded photo is required for Completion Photo evidence.'
+      });
+    }
+
+    const isProductionRuntime =
+      !env.DEMO_MODE &&
+      env.STORAGE_PROVIDER === 'r2' &&
+      env.DATABASE_PROVIDER !== 'mock';
+
+    if (input.storage_path && isProductionRuntime) {
+      const storage = getStorageProvider();
+      if (storage.objectExists) {
+        const exists = await storage.objectExists(input.storage_path);
+        if (!exists) {
+          throw new AppError({
+            statusCode: 400,
+            code: ERROR_CODES.VALIDATION_ERROR,
+            message: `Resolution evidence media object not found in storage at "${input.storage_path}". The image must be successfully uploaded before submitting evidence.`
+          });
+        }
       }
     }
 

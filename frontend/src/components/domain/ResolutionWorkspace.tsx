@@ -21,7 +21,9 @@ import {
   Info,
   MapPin,
   Check,
-  Sliders
+  Sliders,
+  Upload,
+  Play
 } from 'lucide-react';
 
 interface ResolutionWorkspaceProps {
@@ -45,7 +47,7 @@ export function ResolutionWorkspace({
   problemTitle,
   problemCategory,
   problemStatus,
-  assignedTo,
+  assignedTo: _assignedTo,
   departmentId,
   authToken,
   userRole,
@@ -65,29 +67,36 @@ export function ResolutionWorkspace({
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Evidence Submission Modal State
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState<boolean>(false);
   const [submitEvidenceType, setSubmitEvidenceType] = useState<EvidenceType>(EvidenceType.COMPLETION_PHOTO);
   const [submitBeforeAfter, setSubmitBeforeAfter] = useState<BeforeOrAfter>(BeforeOrAfter.AFTER);
   const [submitDescription, setSubmitDescription] = useState<string>('');
   const [submitLocation, setSubmitLocation] = useState<string>(wardName || wardId || '');
   const [submitStoragePath, setSubmitStoragePath] = useState<string>('');
+  const [submitMediaIds, setSubmitMediaIds] = useState<string[]>([]);
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
+
+  // Real Photo Upload State
+  const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState<boolean>(false);
+  const [photoUploadProgress, setPhotoUploadProgress] = useState<string | null>(null);
+  const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
+  const [photoUploadSuccess, setPhotoUploadSuccess] = useState<boolean>(false);
+  const [startingWork, setStartingWork] = useState<boolean>(false);
 
   // Rejection Review Modal State
   const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
   const [rejectionNotes, setRejectionNotes] = useState<string>('');
 
   const fetchWorkspaceData = useCallback(async () => {
-    if (!authToken) return;
     setLoading(true);
     try {
+      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : undefined;
       const [evRes, verRes] = await Promise.allSettled([
-        apiClient.get<{ data: ResolutionEvidence[] }>(`/api/v1/problems/${problemId}/evidence`, {
-          Authorization: `Bearer ${authToken}`
-        }),
-        apiClient.get<{ data: VerificationResult | null }>(`/api/v1/problems/${problemId}/verification`, {
-          Authorization: `Bearer ${authToken}`
-        })
+        apiClient.get<{ data: ResolutionEvidence[] }>(`/api/v1/problems/${problemId}/evidence`, headers),
+        apiClient.get<{ data: VerificationResult | null }>(`/api/v1/problems/${problemId}/verification`, headers)
       ]);
 
       if (evRes.status === 'fulfilled' && evRes.value?.data) {
@@ -107,16 +116,142 @@ export function ResolutionWorkspace({
     fetchWorkspaceData();
   }, [fetchWorkspaceData]);
 
+  // Handle Opening Evidence Submission Modal
+  const openSubmitModal = () => {
+    const defaultLoc = wardName ? (wardId ? `${wardName} (${wardId})` : wardName) : (wardId || '');
+    setSubmitLocation(defaultLoc);
+    setSelectedPhotoFile(null);
+    setPhotoPreviewUrl(null);
+    setPhotoUploading(false);
+    setPhotoUploadProgress(null);
+    setPhotoUploadError(null);
+    setPhotoUploadSuccess(false);
+    setSubmitStoragePath('');
+    setSubmitMediaIds([]);
+    setSubmitDescription('');
+    setSubmitEvidenceType(EvidenceType.COMPLETION_PHOTO);
+    setSubmitBeforeAfter(BeforeOrAfter.AFTER);
+    setIsSubmitModalOpen(true);
+  };
+
+  // Handle Photo File Selection & Presigned Cloudflare R2 Upload
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setPhotoUploadError(null);
+    setPhotoUploadSuccess(false);
+
+    // 1. Client-side validation: format (JPG / PNG / WEBP)
+    const validMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    const fileNameLower = file.name.toLowerCase();
+    const hasValidExt =
+      fileNameLower.endsWith('.jpg') ||
+      fileNameLower.endsWith('.jpeg') ||
+      fileNameLower.endsWith('.png') ||
+      fileNameLower.endsWith('.webp');
+
+    if (!validMimes.includes(file.type) && !hasValidExt) {
+      setPhotoUploadError('Invalid file format. Only JPG and PNG images are accepted.');
+      return;
+    }
+
+    // 2. Client-side validation: size (<= 10MB)
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      setPhotoUploadError(`File size (${(file.size / (1024 * 1024)).toFixed(1)} MB) exceeds 10 MB limit.`);
+      return;
+    }
+
+    setSelectedPhotoFile(file);
+    const objectUrl = URL.createObjectURL(file);
+    setPhotoPreviewUrl(objectUrl);
+    setPhotoUploading(true);
+    setPhotoUploadProgress('Requesting secure Cloudflare R2 presigned upload URL...');
+
+    try {
+      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : undefined;
+      const mimeType = file.type || (fileNameLower.endsWith('.png') ? 'image/png' : 'image/jpeg');
+
+      // Request presigned URL from backend
+      const presignedRes = await apiClient.post<{
+        data: { media_id: string; upload_url: string; storage_path: string; expires_at: string };
+      }>(
+        `/api/v1/problems/${problemId}/media`,
+        {
+          file_name: file.name,
+          mime_type: mimeType,
+          file_size_bytes: file.size
+        },
+        headers
+      );
+
+      const { media_id, upload_url, storage_path } = presignedRes.data;
+
+      // Direct R2 upload (no credentials exposed to browser)
+      setPhotoUploadProgress('Uploading photo directly to Cloudflare R2 storage...');
+      await apiClient.uploadFile(upload_url, file, mimeType);
+
+      // Finalize and register media on backend
+      setPhotoUploadProgress('Finalizing and confirming media registration...');
+      await apiClient.post(
+        `/api/v1/problems/${problemId}/media/${media_id}/complete`,
+        {},
+        headers
+      );
+
+      setSubmitStoragePath(storage_path);
+      setSubmitMediaIds([media_id]);
+      setPhotoUploadSuccess(true);
+      setPhotoUploadProgress('Photo uploaded & verified successfully!');
+    } catch (err: any) {
+      console.error('Evidence photo upload failed:', err);
+      setPhotoUploadError(err.message || 'Photo upload failed. Please verify connection and retry.');
+      setSubmitStoragePath('');
+      setSubmitMediaIds([]);
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
+  // Handle Start Work (Transition ASSIGNED -> IN_PROGRESS)
+  const handleStartWork = async () => {
+    setStartingWork(true);
+    setActionSuccess(null);
+    setActionError(null);
+    try {
+      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : undefined;
+      await apiClient.patch(
+        `/api/v1/problems/${problemId}/status`,
+        {
+          status: ProblemStatus.IN_PROGRESS,
+          note: `Field engineering crew commenced site inspection and remediation.`
+        },
+        headers
+      );
+      setActionSuccess('Work marked as IN_PROGRESS. You may now submit resolution evidence.');
+      if (onStatusChange) {
+        await onStatusChange();
+      }
+      await fetchWorkspaceData();
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to transition to IN_PROGRESS');
+    } finally {
+      setStartingWork(false);
+    }
+  };
+
   // Handle Trigger AI Advisory Verification
   const handleTriggerVerification = async () => {
     setVerifying(true);
     setActionSuccess(null);
     setActionError(null);
     try {
+      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : undefined;
       const res = await apiClient.post<{ data: VerificationResult }>(
         `/api/v1/problems/${problemId}/verify`,
         {},
-        { Authorization: `Bearer ${authToken}` }
+        headers
       );
       if (res?.data) {
         setLatestVerification(res.data);
@@ -139,13 +274,23 @@ export function ResolutionWorkspace({
     setSubmitLoading(true);
     setActionSuccess(null);
     setActionError(null);
+
+    // Requirement: Completion photo requires an actual uploaded image
+    if (submitEvidenceType === EvidenceType.COMPLETION_PHOTO && !submitStoragePath) {
+      setActionError('Please select and upload a completion photo before submitting proof.');
+      setSubmitLoading(false);
+      return;
+    }
+
     try {
+      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : undefined;
       const res = await apiClient.post<{ data: { evidence: ResolutionEvidence; problem_status: ProblemStatus } }>(
         `/api/v1/problems/${problemId}/evidence`,
         {
           evidence_type: submitEvidenceType,
           before_or_after: submitBeforeAfter,
-          storage_path: submitStoragePath,
+          storage_path: submitStoragePath || undefined,
+          media_ids: submitMediaIds.length > 0 ? submitMediaIds : undefined,
           description: submitDescription,
           location: {
             lat: problemLocation?.lat ?? 20.2961,
@@ -153,7 +298,7 @@ export function ResolutionWorkspace({
             reference: submitLocation || undefined
           }
         },
-        { Authorization: `Bearer ${authToken}` }
+        headers
       );
 
       setIsSubmitModalOpen(false);
@@ -234,8 +379,7 @@ export function ResolutionWorkspace({
 
   const isDepartmentOfficerOrAdmin =
     userRole === 'DEPARTMENT_OFFICER' || userRole === 'ADMIN' || userRole === 'SYSTEM_ADMIN';
-  const isAssignedFieldOfficer =
-    userRole === 'FIELD_OFFICER' && (!assignedTo || assignedTo === 'usr_officer_01');
+  const isAssignedFieldOfficer = userRole === 'FIELD_OFFICER';
   const isCitizen = userRole === 'CITIZEN';
 
   return (
@@ -272,10 +416,10 @@ export function ResolutionWorkspace({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Submit Proof Button (Only active for assigned field officer, department officer, or admin) */}
+          {/* Submit Proof Button (Active for assigned field officer, department officer, or admin) */}
           {(isAssignedFieldOfficer || isDepartmentOfficerOrAdmin) && (
             <button
-              onClick={() => setIsSubmitModalOpen(true)}
+              onClick={openSubmitModal}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-civic-terracotta text-white hover:bg-civic-terracottaDark flex items-center gap-1.5 transition-colors"
             >
               <Camera className="w-3.5 h-3.5" />
@@ -296,6 +440,29 @@ export function ResolutionWorkspace({
           )}
         </div>
       </div>
+
+      {/* Start Work Banner if Incident is ASSIGNED */}
+      {problemStatus === ProblemStatus.ASSIGNED && (isAssignedFieldOfficer || isDepartmentOfficerOrAdmin) && (
+        <div className="mx-5 mt-4 p-3.5 rounded-xl bg-blue-50/80 border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-blue-950">
+          <div className="flex items-center gap-2">
+            <Play className="w-4 h-4 text-civic-blue shrink-0" />
+            <div>
+              <span className="font-bold">Incident Status: ASSIGNED</span>
+              <p className="text-[11px] text-blue-800">
+                Site intervention has not commenced. Mark as <strong>IN_PROGRESS</strong> to start field operations and enable resolution evidence submission.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleStartWork}
+            disabled={startingWork}
+            className="px-3.5 py-1.5 rounded-lg bg-civic-blue text-white font-semibold hover:bg-blue-700 shadow-subtle shrink-0 flex items-center gap-1.5 transition-colors disabled:opacity-60"
+          >
+            {startingWork ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+            <span>{startingWork ? 'Starting Work...' : 'Start Work (IN_PROGRESS)'}</span>
+          </button>
+        </div>
+      )}
 
       {/* Action Alerts */}
       {actionSuccess && (
@@ -800,15 +967,133 @@ export function ResolutionWorkspace({
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="font-semibold text-ink-primary">Storage Path / Media Reference</label>
+              {/* PHOTO UPLOADER CONTROL (Cloudflare R2 Presigned Direct Upload) */}
+              <div className="space-y-2 p-3.5 rounded-xl border border-ink-border bg-canvas-subtle">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-ink-primary flex items-center gap-1.5">
+                    <Camera className="w-3.5 h-3.5 text-civic-blue" />
+                    <span>Resolution Photo Attachment</span>
+                    {submitEvidenceType === EvidenceType.COMPLETION_PHOTO && (
+                      <span className="text-[10px] font-bold text-civic-rose">*Required</span>
+                    )}
+                  </label>
+                  {photoUploadSuccess && (
+                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      <span>R2 Storage Verified</span>
+                    </span>
+                  )}
+                </div>
+
+                {/* Hidden Native File Input */}
                 <input
-                  type="text"
-                  value={submitStoragePath}
-                  onChange={(e) => setSubmitStoragePath(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-ink-border bg-white text-ink-primary font-mono text-xs focus:ring-1 focus:ring-civic-blue"
-                  placeholder="e.g. evidence/prb_0819_after_repair.jpg"
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handlePhotoSelect}
+                  className="hidden"
+                  id="resolution-photo-input"
+                  disabled={photoUploading}
                 />
+
+                {!selectedPhotoFile ? (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const droppedFile = e.dataTransfer.files?.[0];
+                      if (droppedFile) {
+                        const fakeEvent = { target: { files: [droppedFile] } } as any;
+                        handlePhotoSelect(fakeEvent);
+                      }
+                    }}
+                    className="border-2 border-dashed border-ink-border hover:border-civic-blue/60 rounded-xl p-4 text-center cursor-pointer hover:bg-white transition-all space-y-2 bg-white/50"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-blue-50 text-civic-blue mx-auto flex items-center justify-center">
+                      <Upload className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-ink-primary text-xs">Choose Photo or Drag & Drop</p>
+                      <p className="text-[11px] text-ink-tertiary">Accepts real JPG or PNG from device (max 10 MB)</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="px-3 py-1.5 rounded-lg bg-white border border-ink-border hover:bg-canvas-subtle text-ink-primary text-xs font-semibold shadow-xs transition-colors"
+                    >
+                      Choose Photo from Laptop
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-white rounded-lg border border-ink-border space-y-2.5">
+                    <div className="flex items-center gap-3">
+                      {photoPreviewUrl && (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={photoPreviewUrl}
+                          alt="Evidence preview"
+                          className="w-14 h-14 object-cover rounded-lg border border-ink-border shrink-0 shadow-xs"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0 space-y-0.5 text-xs">
+                        <p className="font-semibold text-ink-primary truncate">{selectedPhotoFile.name}</p>
+                        <p className="text-[11px] text-ink-tertiary font-mono">
+                          {(selectedPhotoFile.size / (1024 * 1024)).toFixed(2)} MB • {selectedPhotoFile.type || 'image/jpeg'}
+                        </p>
+                        {photoUploading && (
+                          <p className="text-[11px] text-civic-blue flex items-center gap-1 font-medium animate-pulse">
+                            <RefreshCw className="w-3 h-3 animate-spin shrink-0" />
+                            <span>{photoUploadProgress || 'Uploading to Cloudflare R2...'}</span>
+                          </p>
+                        )}
+                        {photoUploadSuccess && (
+                          <p className="text-[11px] text-emerald-700 flex items-center gap-1 font-medium">
+                            <CheckCircle2 className="w-3 h-3 shrink-0" />
+                            <span>Presigned upload succeeded and registered</span>
+                          </p>
+                        )}
+                        {photoUploadError && (
+                          <p className="text-[11px] text-rose-700 flex items-center gap-1 font-medium">
+                            <AlertTriangle className="w-3 h-3 shrink-0" />
+                            <span>{photoUploadError}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedPhotoFile(null);
+                          if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+                          setPhotoPreviewUrl(null);
+                          setSubmitStoragePath('');
+                          setSubmitMediaIds([]);
+                          setPhotoUploadSuccess(false);
+                          setPhotoUploadError(null);
+                          if (fileInputRef.current) fileInputRef.current.value = '';
+                        }}
+                        disabled={photoUploading}
+                        className="text-xs text-ink-tertiary hover:text-rose-600 px-2 py-1 rounded hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors shrink-0"
+                      >
+                        Change
+                      </button>
+                    </div>
+
+                    {submitStoragePath && (
+                      <div className="pt-2 border-t border-ink-border text-[10px] font-mono text-ink-secondary truncate flex items-center gap-1">
+                        <span className="text-ink-tertiary shrink-0">Presigned Storage Key:</span>
+                        <span className="text-civic-blue truncate font-bold">{submitStoragePath}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {photoUploadError && (
+                  <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-[11px] text-rose-900 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{photoUploadError}</span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -833,18 +1118,33 @@ export function ResolutionWorkspace({
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-ink-border">
                 <button
                   type="button"
-                  onClick={() => setIsSubmitModalOpen(false)}
+                  onClick={() => {
+                    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+                    setIsSubmitModalOpen(false);
+                  }}
                   className="px-3 py-2 rounded-lg text-ink-secondary hover:bg-canvas-subtle"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={submitLoading}
-                  className="px-4 py-2 rounded-lg bg-civic-blue text-white font-semibold hover:bg-blue-700 disabled:opacity-60 flex items-center gap-1.5"
+                  disabled={submitLoading || photoUploading || (submitEvidenceType === EvidenceType.COMPLETION_PHOTO && !submitStoragePath)}
+                  className="px-4 py-2 rounded-lg bg-civic-blue text-white font-semibold hover:bg-blue-700 disabled:opacity-60 flex items-center gap-1.5 transition-colors"
                 >
-                  {submitLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
-                  <span>{submitLoading ? 'Submitting Proof...' : 'Submit Resolution Proof'}</span>
+                  {submitLoading ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : photoUploading ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="w-3.5 h-3.5" />
+                  )}
+                  <span>
+                    {submitLoading
+                      ? 'Submitting Proof...'
+                      : photoUploading
+                      ? 'Uploading Photo...'
+                      : 'Submit Resolution Proof'}
+                  </span>
                 </button>
               </div>
             </form>

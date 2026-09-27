@@ -102,6 +102,21 @@ router.patch(
 // PHASE 6: Resolution Evidence & AI Verification Endpoints
 // ==========================================
 
+// Request Presigned R2 Upload URL for Problem Resolution Evidence Media
+// CRITICAL GUARDRAIL: Citizens receive 403 Forbidden. Only authorized officers and admins may upload.
+router.post(
+  '/:id/media',
+  requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN, UserRole.DEPARTMENT_OFFICER, UserRole.FIELD_OFFICER),
+  ResolutionController.registerEvidenceMedia
+);
+
+// Complete Presigned R2 Upload for Problem Resolution Evidence Media
+router.post(
+  '/:id/media/:mediaId/complete',
+  requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN, UserRole.DEPARTMENT_OFFICER, UserRole.FIELD_OFFICER),
+  ResolutionController.completeEvidenceMedia
+);
+
 // Submit Resolution Evidence (Assigned Field Officer, Department Officer, Admin)
 // CRITICAL GUARDRAIL: Citizens receive 403 Forbidden.
 router.post(

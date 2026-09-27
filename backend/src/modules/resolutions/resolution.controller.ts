@@ -1,9 +1,61 @@
 import { Request, Response, NextFunction } from 'express';
-import { SubmitEvidenceSchema, ResolutionReviewSchema } from '@civicpulse/shared';
+import { SubmitEvidenceSchema, ResolutionReviewSchema, RegisterMediaSchema, ERROR_CODES } from '@civicpulse/shared';
 import { ResolutionService } from './resolution.service';
 import { VerificationService } from './verification.service';
+import { AppError } from '../../middleware/error.middleware';
 
 export class ResolutionController {
+  /**
+   * POST /api/v1/problems/:id/media
+   * Requests presigned R2 upload URL for resolution evidence photo.
+   */
+  public static async registerEvidenceMedia(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const user = (req as any).user;
+      const problemId = Array.isArray(req.params.id) ? req.params.id[0]! : req.params.id!;
+
+      const validation = RegisterMediaSchema.safeParse(req.body);
+      if (!validation.success) {
+        const message = validation.error.errors.map((e) => e.message).join(', ');
+        return next(
+          new AppError({
+            statusCode: 400,
+            code: ERROR_CODES.VALIDATION_ERROR,
+            message
+          })
+        );
+      }
+
+      const mediaResult = await ResolutionService.registerEvidenceMedia(user, problemId, validation.data);
+
+      res.status(201).json({
+        data: mediaResult
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /api/v1/problems/:id/media/:mediaId/complete
+   * Finalizes presigned R2 upload for resolution evidence.
+   */
+  public static async completeEvidenceMedia(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const user = (req as any).user;
+      const problemId = Array.isArray(req.params.id) ? req.params.id[0]! : req.params.id!;
+      const mediaId = Array.isArray(req.params.mediaId) ? req.params.mediaId[0]! : req.params.mediaId!;
+
+      const result = await ResolutionService.completeEvidenceMedia(user, problemId, mediaId);
+
+      res.status(200).json({
+        data: result
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   /**
    * POST /api/v1/problems/:id/evidence (and /problems/:id/resolution-evidence)
    * Submits resolution proof. Successful submission from IN_PROGRESS transitions to AWAITING_VERIFICATION.
