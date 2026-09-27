@@ -10,34 +10,6 @@ const CANONICAL_DEPARTMENTS = [
     short_name: 'WATCO',
     description: 'Urban drinking water supply and sewerage infrastructure for Bhubaneswar Municipal Corporation.',
     status: 'ACTIVE'
-  },
-  {
-    id: 'BMC_DRAINAGE',
-    name: 'BMC Drainage & Sewerage Division',
-    short_name: 'BMC Drainage',
-    description: 'Stormwater arterial drains, culvert desilting, local drainage channels, and municipal flood prevention.',
-    status: 'ACTIVE'
-  },
-  {
-    id: 'BMC_ROADS',
-    name: 'BMC Engineering & Works (Roads)',
-    short_name: 'BMC Roads',
-    description: 'Municipal roads, pavement restoration, pothole remediation, and pedestrian walkways across Bhubaneswar.',
-    status: 'ACTIVE'
-  },
-  {
-    id: 'BMC_SAN',
-    name: 'BMC Solid Waste Management & Sanitation',
-    short_name: 'BMC Sanitation',
-    description: 'Decentralized solid waste management, door-to-door collection, micro-composting centers (MCC), and street sweeping.',
-    status: 'ACTIVE'
-  },
-  {
-    id: 'TPCODL',
-    name: 'TP Central Odisha Distribution Limited',
-    short_name: 'TPCODL',
-    description: 'Power distribution, high/low tension transmission lines, streetlighting, and public transformer safety.',
-    status: 'ACTIVE'
   }
 ];
 
@@ -58,6 +30,9 @@ async function main() {
       );
       console.log(`✓ Department verified/seeded: ${d.id} (${d.name})`);
     }
+
+    const deleteRes = await pool.query(`DELETE FROM departments WHERE id != 'WATCO';`);
+    console.log(`✓ Purged ${deleteRes.rowCount} non-WATCO departments from database.`);
   } finally {
     await pool.end();
   }

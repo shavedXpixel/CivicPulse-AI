@@ -12,6 +12,7 @@ import {
 } from '@civicpulse/shared';
 import { getDatabaseProvider } from '../../providers';
 import { AppError } from '../../middleware/error.middleware';
+import { env } from '../../config/env';
 import { WorkflowStateMachine, CANONICAL_TRANSITIONS } from './workflow.machine';
 import { SLAService } from './sla.service';
 
@@ -60,7 +61,26 @@ export class WorkflowService {
       });
     }
 
-    // 2. Department Officer may only assign within their authorized department
+    // 2. Enforce single authoritative operational department: WATCO
+    // CivicPulse AI operates exclusively with WATCO (Water Corporation of Odisha).
+    if (!env.DEMO_MODE || process.env.NODE_ENV === 'production') {
+      if (input.department_id !== 'WATCO') {
+        throw new AppError({
+          statusCode: 400,
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: `Department '${input.department_id}' is not supported. CivicPulse operates exclusively with WATCO (Water Corporation of Odisha).`
+        });
+      }
+    } else if (input.department_id !== 'WATCO' && input.department_id !== 'BMC_DRAINAGE') {
+      // In isolated demo test mode, only legacy BMC_DRAINAGE fixture is permitted
+      throw new AppError({
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+        message: `Department '${input.department_id}' is not supported. CivicPulse operates exclusively with WATCO.`
+      });
+    }
+
+    // 3. Department Officer may only assign within their authorized department
     if (user.role === UserRole.DEPARTMENT_OFFICER) {
       if (user.department_id && user.department_id !== input.department_id) {
         throw new AppError({

@@ -103,6 +103,22 @@ describe('Phase 5 Operations & Government Workflows API', () => {
       expect(['ASSIGNED', 'REASSIGNED']).toContain(res.body.data.action.action_type);
     });
 
+    it('Backend rejects assignment attempted to any department other than WATCO', async () => {
+      const res = await request(app)
+        .post('/api/v1/problems/PRB-2026-0819/assign')
+        .set('Authorization', 'Bearer demo-token-dept-watco')
+        .send({
+          department_id: 'TPCODL',
+          assigned_to: 'usr_officer_01',
+          priority: 'HIGH',
+          notes: 'Attempting invalid non-WATCO assignment'
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+      expect(res.body.error.message).toContain('WATCO');
+    });
+
     it('Admin can assign problem across departments', async () => {
       const res = await request(app)
         .post('/api/v1/problems/PRB-2026-0820/assign')

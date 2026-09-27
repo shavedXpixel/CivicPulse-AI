@@ -57,9 +57,9 @@ export default function ProblemDetailPage({
   const [availableDepts, setAvailableDepts] = useState<{ id: string; name: string }[]>([]);
   const [deptOfficers, setDeptOfficers] = useState<{ id: string; display_name: string; email?: string }[]>([]);
   const [assignDept, setAssignDept] = useState<string>('WATCO');
-  const [assignOfficer, setAssignOfficer] = useState<string>('usr_officer_01');
+  const [assignOfficer, setAssignOfficer] = useState<string>('');
   const [assignPriority, setAssignPriority] = useState<string>('HIGH');
-  const [assignNotes, setAssignNotes] = useState<string>('Dispatched emergency engineering team for pipeline excavation and valve repair.');
+  const [assignNotes, setAssignNotes] = useState<string>('');
   
   // Action Logging State
   const [transitionNote, setTransitionNote] = useState<string>('');
@@ -103,12 +103,19 @@ export default function ProblemDetailPage({
     try {
       const res = await apiClient.get<{ data: any[] }>('/api/v1/departments');
       if (res?.data && res.data.length > 0) {
-        setAvailableDepts(res.data.map((d) => ({ id: d.id, name: d.name || d.id })));
+        const watcoOnly = res.data
+          .filter((d) => d.id === 'WATCO')
+          .map((d) => ({ id: d.id, name: d.name || d.id }));
+        setAvailableDepts(
+          watcoOnly.length > 0
+            ? watcoOnly
+            : [{ id: 'WATCO', name: 'Water Corporation of Odisha' }]
+        );
       } else {
-        setAvailableDepts([]);
+        setAvailableDepts([{ id: 'WATCO', name: 'Water Corporation of Odisha' }]);
       }
     } catch {
-      setAvailableDepts([]);
+      setAvailableDepts([{ id: 'WATCO', name: 'Water Corporation of Odisha' }]);
     }
   }, []);
 
@@ -712,7 +719,11 @@ export default function ProblemDetailPage({
                 </div>
                 <div className="pt-2">
                   <button
-                    onClick={() => setIsAssignModalOpen(true)}
+                    onClick={() => {
+                      setAssignDept('WATCO');
+                      setAssignNotes('');
+                      setIsAssignModalOpen(true);
+                    }}
                     className="w-full py-2 px-3 text-xs font-mono uppercase bg-canvas-card border border-ink-border text-ink-primary hover:border-civic-terracotta transition-colors flex items-center justify-center gap-1.5"
                   >
                     <UserPlus className="w-3.5 h-3.5 text-civic-terracotta" />
@@ -949,16 +960,22 @@ export default function ProblemDetailPage({
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase text-ink-muted">Responsible Department</label>
                   <select
-                    value={assignDept}
-                    onChange={(e) => setAssignDept(e.target.value)}
+                    value="WATCO"
+                    onChange={() => setAssignDept('WATCO')}
                     className="w-full p-2 border border-ink-border bg-canvas-card text-ink-primary focus:outline-none focus:border-civic-terracotta"
                   >
-                    {availableDepts.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
+                    {availableDepts
+                      .filter((d) => d.id === 'WATCO')
+                      .map((d) => (
+                        <option key={d.id} value="WATCO">
+                          {d.name.includes('WATCO') ? d.name : `WATCO — ${d.name}`}
+                        </option>
+                      ))}
+                    {availableDepts.filter((d) => d.id === 'WATCO').length === 0 && (
+                      <option value="WATCO">WATCO — Water Corporation of Odisha</option>
+                    )}
                   </select>
+                  <p className="text-[10px] text-ink-muted">CivicPulse operates with WATCO as the authoritative operational department.</p>
                 </div>
 
                 <div className="space-y-1">
@@ -968,11 +985,15 @@ export default function ProblemDetailPage({
                     onChange={(e) => setAssignOfficer(e.target.value)}
                     className="w-full p-2 border border-ink-border bg-canvas-card text-ink-primary focus:outline-none focus:border-civic-terracotta"
                   >
-                    {deptOfficers.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.id} — {o.display_name}
-                      </option>
-                    ))}
+                    {deptOfficers.length === 0 ? (
+                      <option value="">No field officers registered</option>
+                    ) : (
+                      deptOfficers.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.display_name ? `${o.display_name} (${o.email || o.id})` : o.id}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
