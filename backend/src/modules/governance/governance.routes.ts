@@ -55,3 +55,16 @@ governanceRouter.post(
   requireRole(UserRole.ADMIN, UserRole.SYSTEM_ADMIN, UserRole.DEPARTMENT_OFFICER),
   GovernanceController.analyzeDevelopmentDemand
 );
+
+// Real Citizen Development Demand Intake Pipeline (Phase 15B.5.3.21)
+governanceRouter.post(
+  '/development-demand/intake',
+  requireRole(
+    UserRole.CITIZEN,
+    UserRole.FIELD_OFFICER,
+    UserRole.DEPARTMENT_OFFICER,
+    UserRole.ADMIN,
+    UserRole.SYSTEM_ADMIN
+  ),
+  GovernanceController.submitDevelopmentDemand
+);

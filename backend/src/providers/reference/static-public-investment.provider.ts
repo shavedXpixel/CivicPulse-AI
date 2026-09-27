@@ -1,6 +1,15 @@
 import fs from 'fs';
+import path from 'path';
 import { IPublicInvestmentProvider, PublicInvestmentRecord } from '@civicpulse/shared';
 import { env } from '../../config/env';
+
+function resolveDataPath(relPath: string): string {
+  const direct = path.resolve(process.cwd(), relPath);
+  if (fs.existsSync(direct)) return direct;
+  const parent = path.resolve(process.cwd(), '..', relPath);
+  if (fs.existsSync(parent)) return parent;
+  return direct;
+}
 
 export interface StaticPublicInvestmentOptions {
   isDemo?: boolean;
@@ -11,10 +20,10 @@ export interface StaticPublicInvestmentOptions {
  *
  * Strict Production Invariant:
  * Zero fabricated government projects, budgets, or schemes.
- * Until verified public investment datasets exist in the project,
- * returns an explicit empty dataset rather than synthetic project records.
+ * Backed by verified official BMC and BSCL public disclosures:
+ * - data/reference/investment/bhubaneswar_public_investments.json
  *
- * Designed to cleanly load verified records from data or tests without interface changes.
+ * Returns verified official project records only, with explicit source URLs and provenance.
  */
 export class StaticPublicInvestmentProvider implements IPublicInvestmentProvider {
   private records: PublicInvestmentRecord[] = [];
@@ -29,20 +38,32 @@ export class StaticPublicInvestmentProvider implements IPublicInvestmentProvider
 
     if (customRecords) {
       this.records = [...customRecords];
-    } else if (customPath && fs.existsSync(customPath)) {
-      try {
-        const raw = fs.readFileSync(customPath, 'utf8');
-        const parsed = JSON.parse(raw);
-        this.records = Array.isArray(parsed) ? parsed : [];
-      } catch {
+    } else {
+      const targetPath =
+        customPath ||
+        resolveDataPath('data/reference/investment/bhubaneswar_public_investments.json');
+
+      if (fs.existsSync(targetPath)) {
+        try {
+          const raw = fs.readFileSync(targetPath, 'utf8');
+          const parsed = JSON.parse(raw);
+          this.records = Array.isArray(parsed) ? parsed : [];
+        } catch {
+          this.records = [];
+        }
+      } else {
         this.records = [];
       }
-    } else {
-      // Authoritative production behavior:
-      // No verified investment project dataset exists in the repository currently.
-      // Explicit empty dataset returned.
-      this.records = [];
     }
+  }
+
+  async getAllInvestments(): Promise<PublicInvestmentRecord[]> {
+    return this.records.filter((rec) => {
+      if (!this.isDemo && (rec.is_demo || rec.provenance?.is_demo)) {
+        return false;
+      }
+      return true;
+    });
   }
 
   async getInvestmentsByWard(wardId: string): Promise<PublicInvestmentRecord[]> {

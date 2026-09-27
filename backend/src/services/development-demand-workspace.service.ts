@@ -30,11 +30,12 @@ import {
   DevelopmentDemandInvestmentContextResponse,
   DemandCluster,
   DemandPriorityBand,
+  NormalizedDemandSignal,
   AppError,
   ERROR_CODES
 } from '@civicpulse/shared';
 import { DEMO_DEVELOPMENT_DEMAND_SCENARIOS, DemoDemandScenario } from '../providers/reference/demo-development-demand.data';
-import { getDevelopmentIndicatorProvider, getPublicInvestmentProvider } from '../providers';
+import { getDatabaseProvider, getDevelopmentIndicatorProvider, getPublicInvestmentProvider } from '../providers';
 import { env } from '../config/env';
 
 function resolveDataPath(relPath: string): string {
@@ -84,12 +85,59 @@ export class DevelopmentDemandWorkspaceService {
     const executedAt = new Date().toISOString();
 
     if (!isDemo) {
-      // REAL_MODE: Honest empty state when no production development demand records exist
+      const db = getDatabaseProvider();
+      const clusters = db.listDemandClusters ? await db.listDemandClusters({ is_demo: false }) : [];
+      const signals = db.listDemandSignals ? await db.listDemandSignals({ is_demo: false }) : [];
+
+      if (clusters.length === 0 && signals.length === 0) {
+        return {
+          total_active_demands: 0,
+          total_demand_signals: 0,
+          top_sectors: [],
+          ward_demand_summary: [],
+          is_demo: false,
+          generated_at: executedAt
+        };
+      }
+
+      const sectorMap = new Map<string, { count: number; sumIndex: number }>();
+      for (const cl of clusters) {
+        const existing = sectorMap.get(cl.category) || { count: 0, sumIndex: 0 };
+        existing.count += cl.signal_count;
+        existing.sumIndex += cl.composite_demand_index || 0;
+        sectorMap.set(cl.category, existing);
+      }
+
+      const topSectors = Array.from(sectorMap.entries())
+        .map(([cat, val]) => ({
+          category: cat,
+          count: val.count,
+          composite_index_avg: Math.round(
+            val.sumIndex / (clusters.filter((c) => c.category === cat).length || 1)
+          )
+        }))
+        .sort((a, b) => b.count - a.count);
+
+      const wardMap = new Map<string, { count: number; top_category: string }>();
+      for (const cl of clusters) {
+        for (const w of cl.ward_ids) {
+          const existing = wardMap.get(w) || { count: 0, top_category: cl.category };
+          existing.count += cl.signal_count;
+          wardMap.set(w, existing);
+        }
+      }
+
+      const wardSummary = Array.from(wardMap.entries()).map(([w, val]) => ({
+        ward_id: w,
+        demand_count: val.count,
+        top_category: val.top_category
+      }));
+
       return {
-        total_active_demands: 0,
-        total_demand_signals: 0,
-        top_sectors: [],
-        ward_demand_summary: [],
+        total_active_demands: clusters.length,
+        total_demand_signals: signals.length,
+        top_sectors: topSectors,
+        ward_demand_summary: wardSummary,
         is_demo: false,
         generated_at: executedAt
       };
@@ -147,10 +195,19 @@ export class DevelopmentDemandWorkspaceService {
     isDemo: boolean = env.DEMO_MODE
   ): Promise<DevelopmentDemandClustersResponse> {
     if (!isDemo) {
-      // REAL_MODE: Honest empty state when no production development demand records exist
+      const db = getDatabaseProvider();
+      const clusters = db.listDemandClusters
+        ? await db.listDemandClusters({
+            is_demo: false,
+            category: filters?.category,
+            ward_id: filters?.ward_id,
+            priority_band: filters?.priority_band
+          })
+        : [];
+
       return {
-        clusters: [],
-        total_count: 0,
+        clusters,
+        total_count: clusters.length,
         is_demo: false
       };
     }
@@ -190,11 +247,33 @@ export class DevelopmentDemandWorkspaceService {
     isDemo: boolean = env.DEMO_MODE
   ): Promise<DevelopmentDemandClusterDetailResponse> {
     if (!isDemo) {
-      throw new AppError({
-        statusCode: 404,
-        code: ERROR_CODES.NOT_FOUND,
-        message: `Demand cluster '${clusterId}' was not found in real records.`
-      });
+      const db = getDatabaseProvider();
+      const cluster = db.getDemandCluster ? await db.getDemandCluster(clusterId) : null;
+      if (!cluster || cluster.is_demo) {
+        throw new AppError({
+          statusCode: 404,
+          code: ERROR_CODES.NOT_FOUND,
+          message: `Demand cluster '${clusterId}' was not found in real records.`
+        });
+      }
+
+      const memberRefs = db.getDemandClusterMembers ? await db.getDemandClusterMembers(clusterId) : [];
+      const signals: NormalizedDemandSignal[] = [];
+      for (const m of memberRefs) {
+        if (db.getDemandSignal) {
+          const sig = await db.getDemandSignal(m.signal_id);
+          if (sig) {
+            signals.push(sig);
+          }
+        }
+      }
+
+      return {
+        cluster,
+        signals,
+        opportunities: [],
+        is_demo: false
+      };
     }
 
     const scenario = DEMO_DEVELOPMENT_DEMAND_SCENARIOS.find(
@@ -232,6 +311,7 @@ export class DevelopmentDemandWorkspaceService {
 
     // Map demand intensity per ward
     const wardIntensityMap = new Map<string, { intensity: number; category?: string; count: number }>();
+    let realClusters: DemandCluster[] = [];
 
     if (isDemo) {
       for (const sc of DEMO_DEVELOPMENT_DEMAND_SCENARIOS) {
@@ -241,6 +321,19 @@ export class DevelopmentDemandWorkspaceService {
             intensity: sc.metrics.composite_demand_index,
             category: sc.cluster.category,
             count: sc.cluster.signal_count
+          });
+        }
+      }
+    } else {
+      const db = getDatabaseProvider();
+      realClusters = db.listDemandClusters ? await db.listDemandClusters({ is_demo: false }) : [];
+      for (const cl of realClusters) {
+        for (const w of cl.ward_ids) {
+          const cleanW = w.replace(/^WARD-0*/i, '').replace(/^W0*/i, '').trim();
+          wardIntensityMap.set(cleanW, {
+            intensity: cl.composite_demand_index || 0,
+            category: cl.category,
+            count: cl.signal_count
           });
         }
       }
@@ -287,6 +380,26 @@ export class DevelopmentDemandWorkspaceService {
             ward_id: sc.cluster.ward_ids[0] || 'WARD-001',
             signal_count: sc.cluster.signal_count,
             is_demo: true
+          }
+        });
+      }
+    } else {
+      for (const cl of realClusters) {
+        if (!cl.centroid) continue;
+        features.push({
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [cl.centroid.lng, cl.centroid.lat]
+          },
+          properties: {
+            entity_id: cl.id,
+            entity_type: 'DEMAND_CLUSTER',
+            category: cl.category,
+            demand_intensity: cl.composite_demand_index || 0,
+            ward_id: cl.ward_ids[0] || 'WARD-001',
+            signal_count: cl.signal_count,
+            is_demo: false
           }
         });
       }
@@ -373,7 +486,9 @@ export class DevelopmentDemandWorkspaceService {
     const provider = getPublicInvestmentProvider();
     const records = wardId
       ? await provider.getInvestmentsByWard(wardId)
-      : (category ? await provider.getInvestmentsByCategory(category) : []);
+      : (category
+          ? await provider.getInvestmentsByCategory(category)
+          : (provider.getAllInvestments ? await provider.getAllInvestments() : []));
 
     const totalBudget = records.reduce((sum, inv) => sum + (inv.documented_budget || 0), 0);
 

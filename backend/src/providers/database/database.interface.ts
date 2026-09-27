@@ -13,7 +13,10 @@ import {
   ProblemStatus,
   UserRole,
   UserStatus,
-  AdminAuditRecord
+  AdminAuditRecord,
+  DemandSignal,
+  DemandCluster,
+  PublicInvestmentRecord
 } from '@civicpulse/shared';
 
 export interface SignalFilterCriteria {
@@ -144,6 +147,29 @@ export interface IDatabaseProvider {
   createVerificationResult(result: import('@civicpulse/shared').VerificationResult): Promise<import('@civicpulse/shared').VerificationResult>;
   getVerificationHistory(problemId: string): Promise<import('@civicpulse/shared').VerificationResult[]>;
   getLatestVerification(evidenceId: string): Promise<import('@civicpulse/shared').VerificationResult | null>;
+
+  // Development Demand Intelligence (Phase 15B Real Data Activation)
+  createDemandSignal?(signal: DemandSignal): Promise<DemandSignal>;
+  getDemandSignal?(id: string): Promise<DemandSignal | null>;
+  listDemandSignals?(filter?: { ward_id?: string; category?: string; is_demo?: boolean; limit?: number }): Promise<DemandSignal[]>;
+  updateDemandSignal?(id: string, updates: Partial<DemandSignal>): Promise<DemandSignal>;
+  createDemandCluster?(cluster: DemandCluster): Promise<DemandCluster>;
+  getDemandCluster?(id: string): Promise<DemandCluster | null>;
+  listDemandClusters?(filter?: { ward_id?: string; category?: string; priority_band?: string; is_demo?: boolean; limit?: number }): Promise<DemandCluster[]>;
+  updateDemandCluster?(id: string, updates: Partial<DemandCluster>): Promise<DemandCluster>;
+  addDemandClusterMember?(clusterId: string, signalId: string, similarityScore?: number): Promise<void>;
+  getDemandClusterMembers?(clusterId: string): Promise<{ signal_id: string; similarity_score?: number }[]>;
+  listPublicInvestments?(filter?: { ward_id?: string; category?: string; is_demo?: boolean }): Promise<PublicInvestmentRecord[]>;
+  recordDemandAnalysisRun?(run: {
+    id: string;
+    cluster_id: string;
+    executed_at?: string;
+    model_name: string;
+    prompt_version: string;
+    analysis_response: any;
+    is_demo: boolean;
+  }): Promise<void>;
+  getDemandAnalysisRuns?(clusterId: string): Promise<any[]>;
 }
 
 

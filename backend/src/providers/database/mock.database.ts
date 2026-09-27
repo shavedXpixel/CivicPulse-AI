@@ -29,7 +29,10 @@ import {
   BeforeOrAfter,
   EvidenceStatus,
   VerificationResultStatus,
-  AdminAuditRecord
+  AdminAuditRecord,
+  DemandSignal,
+  DemandCluster,
+  PublicInvestmentRecord
 } from '@civicpulse/shared';
 import { IDatabaseProvider, SignalFilterCriteria, ProblemFilterCriteria } from './database.interface';
 import { AppError } from '../../middleware/error.middleware';
@@ -48,6 +51,11 @@ export class MockDatabaseProvider implements IDatabaseProvider {
   private resolutionEvidence = new Map<string, ResolutionEvidence[]>();
   private verificationResults = new Map<string, VerificationResult[]>();
   private adminAuditLogs: AdminAuditRecord[] = [];
+  private demandSignals = new Map<string, DemandSignal>();
+  private demandClusters = new Map<string, DemandCluster>();
+  private demandClusterMembers = new Map<string, { signal_id: string; similarity_score?: number }[]>();
+  private publicInvestments: PublicInvestmentRecord[] = [];
+  private demandAnalysisRuns = new Map<string, any[]>();
 
   constructor() {
     this.seedMinimalFixtures();
@@ -1362,7 +1370,179 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     this.departments.clear();
     this.resolutionEvidence.clear();
     this.verificationResults.clear();
+    this.demandSignals.clear();
+    this.demandClusters.clear();
+    this.demandClusterMembers.clear();
+    this.publicInvestments = [];
     this.seedMinimalFixtures();
+  }
+
+  // ============================================================================
+  // Development Demand Intelligence (Phase 15B Real Data Activation)
+  // ============================================================================
+
+  async createDemandSignal(signal: DemandSignal): Promise<DemandSignal> {
+    this.demandSignals.set(signal.id, { ...signal });
+    return { ...signal };
+  }
+
+  async getDemandSignal(id: string): Promise<DemandSignal | null> {
+    const s = this.demandSignals.get(id);
+    return s ? { ...s } : null;
+  }
+
+  async listDemandSignals(filter?: {
+    ward_id?: string;
+    category?: string;
+    is_demo?: boolean;
+    limit?: number;
+  }): Promise<DemandSignal[]> {
+    let result = Array.from(this.demandSignals.values());
+
+    if (filter?.is_demo !== undefined) {
+      result = result.filter((s) => s.is_demo === filter.is_demo);
+    }
+    if (filter?.ward_id) {
+      result = result.filter((s) => s.ward_id === filter.ward_id);
+    }
+    if (filter?.category) {
+      result = result.filter((s) => s.detected_category === filter.category);
+    }
+
+    result.sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+
+    if (filter?.limit) {
+      result = result.slice(0, filter.limit);
+    }
+
+    return result.map((s) => ({ ...s }));
+  }
+
+  async updateDemandSignal(id: string, updates: Partial<DemandSignal>): Promise<DemandSignal> {
+    const s = this.demandSignals.get(id);
+    if (!s) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: `Demand signal '${id}' not found.`
+      });
+    }
+    const updated = { ...s, ...updates };
+    this.demandSignals.set(id, updated);
+    return { ...updated };
+  }
+
+  async createDemandCluster(cluster: DemandCluster): Promise<DemandCluster> {
+    this.demandClusters.set(cluster.id, { ...cluster });
+    return { ...cluster };
+  }
+
+  async getDemandCluster(id: string): Promise<DemandCluster | null> {
+    const c = this.demandClusters.get(id);
+    return c ? { ...c } : null;
+  }
+
+  async listDemandClusters(filter?: {
+    ward_id?: string;
+    category?: string;
+    priority_band?: string;
+    is_demo?: boolean;
+    limit?: number;
+  }): Promise<DemandCluster[]> {
+    let result = Array.from(this.demandClusters.values());
+
+    if (filter?.is_demo !== undefined) {
+      result = result.filter((c) => c.is_demo === filter.is_demo);
+    }
+    if (filter?.ward_id) {
+      result = result.filter((c) => c.ward_ids.includes(filter.ward_id!));
+    }
+    if (filter?.category) {
+      result = result.filter((c) => c.category === filter.category);
+    }
+    if (filter?.priority_band) {
+      result = result.filter((c) => c.priority_band === filter.priority_band);
+    }
+
+    result.sort((a, b) => (b.composite_demand_index || 0) - (a.composite_demand_index || 0));
+
+    if (filter?.limit) {
+      result = result.slice(0, filter.limit);
+    }
+
+    return result.map((c) => ({ ...c }));
+  }
+
+  async updateDemandCluster(id: string, updates: Partial<DemandCluster>): Promise<DemandCluster> {
+    const c = this.demandClusters.get(id);
+    if (!c) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: `Demand cluster '${id}' not found.`
+      });
+    }
+    const updated = { ...c, ...updates, updated_at: new Date().toISOString() };
+    this.demandClusters.set(id, updated);
+    return { ...updated };
+  }
+
+  async addDemandClusterMember(clusterId: string, signalId: string, similarityScore?: number): Promise<void> {
+    const members = this.demandClusterMembers.get(clusterId) || [];
+    const idx = members.findIndex((m) => m.signal_id === signalId);
+    if (idx >= 0) {
+      members[idx].similarity_score = similarityScore;
+    } else {
+      members.push({ signal_id: signalId, similarity_score: similarityScore });
+    }
+    this.demandClusterMembers.set(clusterId, members);
+
+    const sig = this.demandSignals.get(signalId);
+    if (sig) {
+      sig.demand_cluster_id = clusterId;
+    }
+  }
+
+  async getDemandClusterMembers(clusterId: string): Promise<{ signal_id: string; similarity_score?: number }[]> {
+    return (this.demandClusterMembers.get(clusterId) || []).map((m) => ({ ...m }));
+  }
+
+  async listPublicInvestments(filter?: {
+    ward_id?: string;
+    category?: string;
+    is_demo?: boolean;
+  }): Promise<PublicInvestmentRecord[]> {
+    let result = [...this.publicInvestments];
+
+    if (filter?.is_demo !== undefined) {
+      result = result.filter((r) => r.is_demo === filter.is_demo);
+    }
+    if (filter?.ward_id) {
+      result = result.filter((r) => r.ward_ids.includes(filter.ward_id!));
+    }
+    if (filter?.category) {
+      result = result.filter((r) => r.category.toLowerCase() === filter.category!.toLowerCase());
+    }
+
+    return result.map((r) => ({ ...r }));
+  }
+
+  async recordDemandAnalysisRun(run: {
+    id: string;
+    cluster_id: string;
+    executed_at?: string;
+    model_name: string;
+    prompt_version: string;
+    analysis_response: any;
+    is_demo: boolean;
+  }): Promise<void> {
+    const runs = this.demandAnalysisRuns.get(run.cluster_id) || [];
+    runs.push({ ...run, executed_at: run.executed_at || new Date().toISOString() });
+    this.demandAnalysisRuns.set(run.cluster_id, runs);
+  }
+
+  async getDemandAnalysisRuns(clusterId: string): Promise<any[]> {
+    return (this.demandAnalysisRuns.get(clusterId) || []).map((r) => ({ ...r }));
   }
 }
 

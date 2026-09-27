@@ -267,7 +267,8 @@ export const DevelopmentDemandAnalysisResponseSchema = z.object({
   uncertainty: z.object({
     confidence: DemandConfidenceSchema,
     limitations: z.array(z.string())
-  })
+  }),
+  is_demo: z.boolean().optional()
 });
 
 // ============================================================================

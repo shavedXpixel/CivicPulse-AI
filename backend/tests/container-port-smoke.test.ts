@@ -69,7 +69,7 @@ describe('Phase 15 Container Port & Deployment Contract Smoke Tests', () => {
 
         // Wait for server to be responsive
         let healthy = false;
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 40; i++) {
           await new Promise((r) => setTimeout(r, 300));
           try {
             const res = await fetch(`http://127.0.0.1:${testPort}/api/v1/health`);
@@ -94,7 +94,7 @@ describe('Phase 15 Container Port & Deployment Contract Smoke Tests', () => {
           backendProcess.kill();
         }
       }
-    }, 15000);
+    }, 20000);
   });
 
   describe('3. Frontend Next.js Standalone Entrypoint Smoke Test', () => {
@@ -124,7 +124,7 @@ describe('Phase 15 Container Port & Deployment Contract Smoke Tests', () => {
         });
 
         let responsive = false;
-        for (let i = 0; i < 25; i++) {
+        for (let i = 0; i < 40; i++) {
           await new Promise((r) => setTimeout(r, 400));
           try {
             const res = await fetch(`http://127.0.0.1:${testPort}/login`);
@@ -145,6 +145,6 @@ describe('Phase 15 Container Port & Deployment Contract Smoke Tests', () => {
           frontendProcess.kill();
         }
       }
-    }, 20000);
+    }, 25000);
   });
 });

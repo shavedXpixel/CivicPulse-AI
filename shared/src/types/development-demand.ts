@@ -54,6 +54,10 @@ export enum DemandPriorityBand {
 export interface DemandProvenance {
   is_demo: boolean;
   source: string;
+  source_agency?: string;
+  source_url?: string;
+  reference_date?: string;
+  document_name?: string;
   measurement_context?: string;
   confidence?: number;
 }
@@ -130,6 +134,8 @@ export interface NormalizedDemandSignal {
 }
 
 export interface DemandSignal extends NormalizedDemandSignal {
+  citizen_id?: string;
+  demand_cluster_id?: string;
   embedding?: number[]; // 1536-dimensional embedding via gemini-embedding-001
 }
 
@@ -149,6 +155,9 @@ export interface DemandCluster {
   first_signal_at: string;
   last_signal_at: string;
   duration_days: number;
+  composite_demand_index?: number;
+  priority_band?: DemandPriorityBand;
+  metrics?: DeterministicDemandMetrics;
   is_demo: boolean;
   created_at: string;
   updated_at?: string;
@@ -282,6 +291,7 @@ export interface DevelopmentDemandAnalysisResponse {
     confidence: number; // 0.00 to 1.00
     limitations: string[];
   };
+  is_demo?: boolean;
 }
 
 // ============================================================================
@@ -297,6 +307,7 @@ export interface IDevelopmentIndicatorProvider {
 export interface IPublicInvestmentProvider {
   getInvestmentsByWard(wardId: string): Promise<PublicInvestmentRecord[]>;
   getInvestmentsByCategory(category: string): Promise<PublicInvestmentRecord[]>;
+  getAllInvestments?(): Promise<PublicInvestmentRecord[]>;
 }
 
 // ============================================================================

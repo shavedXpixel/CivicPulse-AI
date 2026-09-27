@@ -458,7 +458,8 @@ export class DevelopmentDemandGovernanceService {
       uncertainty: {
         confidence,
         limitations: limitations.length > 0 ? limitations : ['Standard voluntary citizen intake margin of uncertainty.']
-      }
+      },
+      is_demo: isDemo
     };
 
     const validatedResponse = DevelopmentDemandAnalysisResponseSchema.parse(response);

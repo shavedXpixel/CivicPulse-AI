@@ -197,6 +197,27 @@ export default function CitizenHomePage() {
           </Link>
         </div>
 
+        {/* Development Demand Intelligence Proposal Desk */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-5 rounded-sm bg-amber-50/60 border border-amber-200 shadow-none">
+          <div className="space-y-1">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-amber-800 font-semibold block">
+              DEVELOPMENT DEMAND INTELLIGENCE
+            </span>
+            <h3 className="text-sm font-bold text-ink-primary flex items-center gap-1.5">
+              <Building2 className="w-4 h-4 text-amber-700" />
+              <span>Propose Neighborhood Infrastructure Development</span>
+            </h3>
+            <p className="text-xs text-ink-secondary leading-relaxed">
+              Submit public capital improvement proposals directly to the municipal demand intelligence pipeline.
+            </p>
+          </div>
+          <Link href="/citizen/demand" className="shrink-0">
+            <Button variant="secondary" size="sm" className="w-full sm:w-auto text-xs font-mono font-semibold border-amber-300 bg-white hover:bg-amber-100/50 text-amber-900">
+              Propose Infrastructure Need
+            </Button>
+          </Link>
+        </div>
+
         {/* Real Reports & Telemetry Section */}
         {isLoading ? (
           <div className="p-12 text-center text-ink-secondary space-y-3 bg-canvas-card rounded-sm border border-ink-border">

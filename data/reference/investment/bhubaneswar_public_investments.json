@@ -1,0 +1,122 @@
+[
+  {
+    "id": "inv_bscl_smart_janpath",
+    "project_id": "BSCL-ABD-JANPATH",
+    "plan_name": "Smart Janpath — Complete Street Infrastructure Redevelopment (Sishu Bhawan Sq to Vani Vihar)",
+    "category": "ROADS",
+    "ward_ids": ["WARD-030", "WARD-034", "WARD-035"],
+    "status": "COMPLETED",
+    "documented_budget": 804700000,
+    "currency": "INR",
+    "announcement_date": "2018-09-01",
+    "source_agency": "Bhubaneswar Smart City Limited (BSCL)",
+    "source_url": "https://www.smartcitybhubaneswar.gov.in/project-list",
+    "provenance": {
+      "source": "Bhubaneswar Smart City Limited Official Project Catalogue",
+      "source_agency": "Bhubaneswar Smart City Limited (BSCL)",
+      "source_url": "https://www.smartcitybhubaneswar.gov.in/project-list",
+      "reference_date": "2018-09-01",
+      "document_name": "BSCL Smart Janpath Project Brief & Execution Summary",
+      "measurement_context": "Smart Cities Mission Area Based Development EPC contract",
+      "confidence": 1.0,
+      "is_demo": false
+    },
+    "is_demo": false
+  },
+  {
+    "id": "inv_bscl_icomc_tower",
+    "project_id": "BSCL-PAN-ICOMC",
+    "plan_name": "BMC-ICOMC Tower — Integrated Command and Control Centre & Municipal Operations Center",
+    "category": "FACILITIES",
+    "ward_ids": ["WARD-030"],
+    "status": "COMPLETED",
+    "documented_budget": 740000000,
+    "currency": "INR",
+    "announcement_date": "2019-01-15",
+    "source_agency": "Bhubaneswar Smart City Limited (BSCL)",
+    "source_url": "https://www.smartcitybhubaneswar.gov.in/project-list",
+    "provenance": {
+      "source": "Bhubaneswar Smart City Limited Official Project Catalogue",
+      "source_agency": "Bhubaneswar Smart City Limited (BSCL)",
+      "source_url": "https://www.smartcitybhubaneswar.gov.in/project-list",
+      "reference_date": "2019-01-15",
+      "document_name": "ICOMC Pan-City Command and Control Tower Catalogue Entry",
+      "measurement_context": "Smart Cities Mission Pan-City Solutions",
+      "confidence": 1.0,
+      "is_demo": false
+    },
+    "is_demo": false
+  },
+  {
+    "id": "inv_watco_drink_from_tap_zone5",
+    "project_id": "WATCO-DFT-ZONE05",
+    "plan_name": "WATCO 24x7 Drink from Tap Mission Water Supply Augmentation (Rasulgarh / Zone 5)",
+    "category": "WATER",
+    "ward_ids": ["WARD-018"],
+    "status": "COMPLETED",
+    "documented_budget": 320000000,
+    "currency": "INR",
+    "announcement_date": "2021-10-14",
+    "source_agency": "Water Corporation of Odisha (WATCO)",
+    "source_url": "https://watcoodisha.in",
+    "provenance": {
+      "source": "Water Corporation of Odisha (WATCO) Official Project Disclosures",
+      "source_agency": "Water Corporation of Odisha (WATCO)",
+      "source_url": "https://watcoodisha.in",
+      "reference_date": "2021-10-14",
+      "document_name": "Sujal Drink From Tap Mission Zone 5 Operational Disclosure",
+      "measurement_context": "Sujal Drink from Tap Mission Quality & Distribution Expansion",
+      "confidence": 0.95,
+      "is_demo": false
+    },
+    "is_demo": false
+  },
+  {
+    "id": "inv_bmc_works_stormwater_2024",
+    "project_id": "BMC-PW-SWD-2024",
+    "plan_name": "BMC Annual Public Works — Primary Drainage Channel Desilting & Masonry Lining",
+    "category": "DRAINAGE",
+    "ward_ids": [],
+    "status": "IN_PROGRESS",
+    "documented_budget": 1250000000,
+    "currency": "INR",
+    "announcement_date": "2024-03-31",
+    "source_agency": "Bhubaneswar Municipal Corporation (BMC)",
+    "source_url": "https://www.bmc.gov.in/public-disclosure",
+    "provenance": {
+      "source": "Bhubaneswar Municipal Corporation Public Disclosure Section",
+      "source_agency": "Bhubaneswar Municipal Corporation (BMC)",
+      "source_url": "https://www.bmc.gov.in/public-disclosure",
+      "reference_date": "2024-03-31",
+      "document_name": "BMC Annual Budget Estimates & Standing Committee on Public Works Disclosure",
+      "measurement_context": "BMC Annual Budget Estimates & Standing Committee on Public Works",
+      "confidence": 0.95,
+      "is_demo": false
+    },
+    "is_demo": false
+  },
+  {
+    "id": "inv_bmc_swm_mcc_network",
+    "project_id": "BMC-SWM-MCC-NET",
+    "plan_name": "Decentralized Micro Composting Centers (MCC) & Material Recovery Facilities (MRF) Network",
+    "category": "SANITATION",
+    "ward_ids": [],
+    "status": "COMPLETED",
+    "documented_budget": 450000000,
+    "currency": "INR",
+    "announcement_date": "2020-08-15",
+    "source_agency": "Bhubaneswar Municipal Corporation (BMC)",
+    "source_url": "https://www.bmc.gov.in/public-disclosure",
+    "provenance": {
+      "source": "Bhubaneswar Municipal Corporation Public Disclosure Section",
+      "source_agency": "Bhubaneswar Municipal Corporation (BMC)",
+      "source_url": "https://www.bmc.gov.in/public-disclosure",
+      "reference_date": "2020-08-15",
+      "document_name": "BMC Solid Waste Management Public Disclosure Section",
+      "measurement_context": "Swachh Bharat Mission (Urban) Capital Works",
+      "confidence": 0.95,
+      "is_demo": false
+    },
+    "is_demo": false
+  }
+]

@@ -20,7 +20,10 @@ import {
   UserRole,
   UserStatus,
   AdminAuditRecord,
-  SignalStatus
+  SignalStatus,
+  DemandSignal,
+  DemandCluster,
+  PublicInvestmentRecord
 } from '@civicpulse/shared';
 import {
   IDatabaseProvider,
@@ -2035,6 +2038,430 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       model: r.model,
       prompt_version: r.prompt_version,
       created_at: r.created_at?.toISOString ? r.created_at.toISOString() : r.created_at
+    };
+  }
+
+  // ============================================================================
+  // Development Demand Intelligence (Phase 15B Real Data Activation)
+  // ============================================================================
+
+  async createDemandSignal(signal: DemandSignal): Promise<DemandSignal> {
+    const embeddingStr = signal.embedding && signal.embedding.length > 0
+      ? `[${signal.embedding.join(',')}]`
+      : null;
+
+    const rows = await this.query(
+      `INSERT INTO demand_signals (
+        id, citizen_id, source_channel, original_language, original_text,
+        normalized_language, normalized_text, normalization_confidence,
+        detected_category, detected_urgency, ward_id, locality_name,
+        embedding, demand_cluster_id, is_demo, submitted_at, ingested_at,
+        created_at, updated_at
+      ) VALUES (
+        $1, $2, $3, $4, $5,
+        $6, $7, $8,
+        $9, $10, $11, $12,
+        $13, $14, $15, $16, $17,
+        NOW(), NOW()
+      )
+      RETURNING *;`,
+      [
+        signal.id,
+        signal.citizen_id || null,
+        signal.source_channel,
+        signal.original_language,
+        signal.original_text,
+        signal.normalized_language,
+        signal.normalized_text,
+        signal.normalization_confidence,
+        signal.detected_category,
+        signal.detected_urgency,
+        signal.ward_id,
+        signal.locality_name || null,
+        embeddingStr,
+        signal.demand_cluster_id || null,
+        signal.is_demo ?? false,
+        signal.submitted_at || new Date().toISOString(),
+        signal.ingested_at || new Date().toISOString()
+      ]
+    );
+
+    return this.mapDemandSignal(rows[0]);
+  }
+
+  async getDemandSignal(id: string): Promise<DemandSignal | null> {
+    const rows = await this.query(`SELECT * FROM demand_signals WHERE id = $1;`, [id]);
+    if (rows.length === 0) return null;
+    return this.mapDemandSignal(rows[0]);
+  }
+
+  async listDemandSignals(filter?: {
+    ward_id?: string;
+    category?: string;
+    is_demo?: boolean;
+    limit?: number;
+  }): Promise<DemandSignal[]> {
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+
+    if (filter?.is_demo !== undefined) {
+      conditions.push(`is_demo = $${idx++}`);
+      params.push(filter.is_demo);
+    }
+    if (filter?.ward_id) {
+      conditions.push(`ward_id = $${idx++}`);
+      params.push(filter.ward_id);
+    }
+    if (filter?.category) {
+      conditions.push(`detected_category = $${idx++}`);
+      params.push(filter.category);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const limitClause = filter?.limit ? `LIMIT ${filter.limit}` : '';
+
+    const rows = await this.query(
+      `SELECT * FROM demand_signals ${whereClause} ORDER BY submitted_at DESC ${limitClause};`,
+      params
+    );
+
+    return rows.map((r: any) => this.mapDemandSignal(r));
+  }
+
+  async updateDemandSignal(id: string, updates: Partial<DemandSignal>): Promise<DemandSignal> {
+    const fields: string[] = [];
+    const params: any[] = [id];
+    let idx = 2;
+
+    if (updates.demand_cluster_id !== undefined) {
+      fields.push(`demand_cluster_id = $${idx++}`);
+      params.push(updates.demand_cluster_id);
+    }
+    if (updates.detected_category !== undefined) {
+      fields.push(`detected_category = $${idx++}`);
+      params.push(updates.detected_category);
+    }
+    if (updates.detected_urgency !== undefined) {
+      fields.push(`detected_urgency = $${idx++}`);
+      params.push(updates.detected_urgency);
+    }
+    if (updates.embedding !== undefined) {
+      fields.push(`embedding = $${idx++}`);
+      params.push(updates.embedding ? `[${updates.embedding.join(',')}]` : null);
+    }
+
+    fields.push(`updated_at = NOW()`);
+
+    const rows = await this.query(
+      `UPDATE demand_signals SET ${fields.join(', ')} WHERE id = $1 RETURNING *;`,
+      params
+    );
+
+    if (rows.length === 0) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: `Demand signal '${id}' not found.`
+      });
+    }
+
+    return this.mapDemandSignal(rows[0]);
+  }
+
+  async createDemandCluster(cluster: DemandCluster): Promise<DemandCluster> {
+    const rows = await this.query(
+      `INSERT INTO demand_clusters (
+        id, title, category, subcategory, ward_ids, locality_names,
+        centroid_lat, centroid_lng, signal_count, first_signal_at,
+        last_signal_at, duration_days, composite_demand_index,
+        priority_band, metrics, is_demo, created_at, updated_at
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6,
+        $7, $8, $9, $10,
+        $11, $12, $13,
+        $14, $15, $16, NOW(), NOW()
+      )
+      RETURNING *;`,
+      [
+        cluster.id,
+        cluster.title,
+        cluster.category,
+        cluster.subcategory || null,
+        cluster.ward_ids || [],
+        cluster.locality_names || [],
+        cluster.centroid?.lat || null,
+        cluster.centroid?.lng || null,
+        cluster.signal_count || 1,
+        cluster.first_signal_at,
+        cluster.last_signal_at,
+        cluster.duration_days || 1,
+        cluster.composite_demand_index || 0,
+        cluster.priority_band || 'MEDIUM',
+        cluster.metrics ? JSON.stringify(cluster.metrics) : null,
+        cluster.is_demo ?? false
+      ]
+    );
+
+    return this.mapDemandCluster(rows[0]);
+  }
+
+  async getDemandCluster(id: string): Promise<DemandCluster | null> {
+    const rows = await this.query(`SELECT * FROM demand_clusters WHERE id = $1;`, [id]);
+    if (rows.length === 0) return null;
+    return this.mapDemandCluster(rows[0]);
+  }
+
+  async listDemandClusters(filter?: {
+    ward_id?: string;
+    category?: string;
+    priority_band?: string;
+    is_demo?: boolean;
+    limit?: number;
+  }): Promise<DemandCluster[]> {
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+
+    if (filter?.is_demo !== undefined) {
+      conditions.push(`is_demo = $${idx++}`);
+      params.push(filter.is_demo);
+    }
+    if (filter?.ward_id) {
+      conditions.push(`$${idx++} = ANY(ward_ids)`);
+      params.push(filter.ward_id);
+    }
+    if (filter?.category) {
+      conditions.push(`category = $${idx++}`);
+      params.push(filter.category);
+    }
+    if (filter?.priority_band) {
+      conditions.push(`priority_band = $${idx++}`);
+      params.push(filter.priority_band);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const limitClause = filter?.limit ? `LIMIT ${filter.limit}` : '';
+
+    const rows = await this.query(
+      `SELECT * FROM demand_clusters ${whereClause} ORDER BY composite_demand_index DESC, created_at DESC ${limitClause};`,
+      params
+    );
+
+    return rows.map((r: any) => this.mapDemandCluster(r));
+  }
+
+  async updateDemandCluster(id: string, updates: Partial<DemandCluster>): Promise<DemandCluster> {
+    const fields: string[] = [];
+    const params: any[] = [id];
+    let idx = 2;
+
+    if (updates.title !== undefined) {
+      fields.push(`title = $${idx++}`);
+      params.push(updates.title);
+    }
+    if (updates.signal_count !== undefined) {
+      fields.push(`signal_count = $${idx++}`);
+      params.push(updates.signal_count);
+    }
+    if (updates.ward_ids !== undefined) {
+      fields.push(`ward_ids = $${idx++}`);
+      params.push(updates.ward_ids);
+    }
+    if (updates.last_signal_at !== undefined) {
+      fields.push(`last_signal_at = $${idx++}`);
+      params.push(updates.last_signal_at);
+    }
+    if (updates.duration_days !== undefined) {
+      fields.push(`duration_days = $${idx++}`);
+      params.push(updates.duration_days);
+    }
+    if (updates.composite_demand_index !== undefined) {
+      fields.push(`composite_demand_index = $${idx++}`);
+      params.push(updates.composite_demand_index);
+    }
+    if (updates.priority_band !== undefined) {
+      fields.push(`priority_band = $${idx++}`);
+      params.push(updates.priority_band);
+    }
+    if (updates.metrics !== undefined) {
+      fields.push(`metrics = $${idx++}`);
+      params.push(JSON.stringify(updates.metrics));
+    }
+
+    fields.push(`updated_at = NOW()`);
+
+    const rows = await this.query(
+      `UPDATE demand_clusters SET ${fields.join(', ')} WHERE id = $1 RETURNING *;`,
+      params
+    );
+
+    if (rows.length === 0) {
+      throw new AppError({
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+        message: `Demand cluster '${id}' not found.`
+      });
+    }
+
+    return this.mapDemandCluster(rows[0]);
+  }
+
+  async addDemandClusterMember(clusterId: string, signalId: string, similarityScore?: number): Promise<void> {
+    await this.query(
+      `INSERT INTO demand_cluster_members (cluster_id, signal_id, similarity_score, joined_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (cluster_id, signal_id) DO UPDATE SET
+         similarity_score = EXCLUDED.similarity_score;`,
+      [clusterId, signalId, similarityScore || null]
+    );
+
+    await this.query(
+      `UPDATE demand_signals SET demand_cluster_id = $1, updated_at = NOW() WHERE id = $2;`,
+      [clusterId, signalId]
+    );
+  }
+
+  async getDemandClusterMembers(clusterId: string): Promise<{ signal_id: string; similarity_score?: number }[]> {
+    const rows = await this.query(
+      `SELECT signal_id, similarity_score FROM demand_cluster_members WHERE cluster_id = $1 ORDER BY joined_at ASC;`,
+      [clusterId]
+    );
+    return rows.map((r: any) => ({
+      signal_id: r.signal_id,
+      similarity_score: r.similarity_score !== null ? Number(r.similarity_score) : undefined
+    }));
+  }
+
+  async listPublicInvestments(filter?: {
+    ward_id?: string;
+    category?: string;
+    is_demo?: boolean;
+  }): Promise<PublicInvestmentRecord[]> {
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+
+    if (filter?.is_demo !== undefined) {
+      conditions.push(`is_demo = $${idx++}`);
+      params.push(filter.is_demo);
+    }
+    if (filter?.ward_id) {
+      conditions.push(`$${idx++} = ANY(ward_ids)`);
+      params.push(filter.ward_id);
+    }
+    if (filter?.category) {
+      conditions.push(`LOWER(category) = LOWER($${idx++})`);
+      params.push(filter.category);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const rows = await this.query(
+      `SELECT * FROM public_investment_projects ${whereClause} ORDER BY documented_budget DESC;`,
+      params
+    );
+
+    return rows.map((r: any) => ({
+      id: r.id,
+      project_id: r.project_id,
+      plan_name: r.plan_name,
+      category: r.category,
+      ward_ids: r.ward_ids || [],
+      status: r.status,
+      documented_budget: Number(r.documented_budget),
+      currency: r.currency,
+      announcement_date: r.announcement_date,
+      source_agency: r.source_agency,
+      source_url: r.source_url,
+      provenance: r.provenance || {},
+      is_demo: r.is_demo
+    }));
+  }
+
+  async recordDemandAnalysisRun(run: {
+    id: string;
+    cluster_id: string;
+    executed_at?: string;
+    model_name: string;
+    prompt_version: string;
+    analysis_response: any;
+    is_demo: boolean;
+  }): Promise<void> {
+    await this.query(
+      `INSERT INTO demand_analysis_runs (
+        id, cluster_id, executed_at, model_name, prompt_version, analysis_response, is_demo
+      ) VALUES ($1, $2, COALESCE($3, NOW()), $4, $5, $6, $7);`,
+      [
+        run.id,
+        run.cluster_id,
+        run.executed_at || null,
+        run.model_name,
+        run.prompt_version,
+        JSON.stringify(run.analysis_response),
+        run.is_demo
+      ]
+    );
+  }
+
+  async getDemandAnalysisRuns(clusterId: string): Promise<any[]> {
+    const rows = await this.query(
+      `SELECT * FROM demand_analysis_runs WHERE cluster_id = $1 ORDER BY executed_at DESC;`,
+      [clusterId]
+    );
+    return rows.map((r: any) => ({
+      id: r.id,
+      cluster_id: r.cluster_id,
+      executed_at: r.executed_at?.toISOString ? r.executed_at.toISOString() : r.executed_at,
+      model_name: r.model_name,
+      prompt_version: r.prompt_version,
+      analysis_response: r.analysis_response,
+      is_demo: r.is_demo
+    }));
+  }
+
+  private mapDemandSignal(r: any): DemandSignal {
+    return {
+      id: r.id,
+      citizen_id: r.citizen_id || undefined,
+      demand_cluster_id: r.demand_cluster_id || undefined,
+      source_channel: r.source_channel,
+      original_language: r.original_language,
+      original_text: r.original_text,
+      normalized_language: r.normalized_language,
+      normalized_text: r.normalized_text,
+      normalization_confidence: Number(r.normalization_confidence),
+      detected_category: r.detected_category,
+      detected_urgency: r.detected_urgency,
+      ward_id: r.ward_id,
+      locality_name: r.locality_name || undefined,
+      is_demo: r.is_demo,
+      submitted_at: r.submitted_at?.toISOString ? r.submitted_at.toISOString() : r.submitted_at,
+      ingested_at: r.ingested_at?.toISOString ? r.ingested_at.toISOString() : r.ingested_at
+    };
+  }
+
+  private mapDemandCluster(r: any): DemandCluster {
+    return {
+      id: r.id,
+      title: r.title,
+      category: r.category,
+      subcategory: r.subcategory || undefined,
+      ward_ids: r.ward_ids || [],
+      locality_names: r.locality_names || [],
+      centroid: r.centroid_lat && r.centroid_lng
+        ? { lat: Number(r.centroid_lat), lng: Number(r.centroid_lng) }
+        : undefined,
+      signal_count: Number(r.signal_count),
+      first_signal_at: r.first_signal_at?.toISOString ? r.first_signal_at.toISOString() : r.first_signal_at,
+      last_signal_at: r.last_signal_at?.toISOString ? r.last_signal_at.toISOString() : r.last_signal_at,
+      duration_days: Number(r.duration_days),
+      composite_demand_index: r.composite_demand_index !== null ? Number(r.composite_demand_index) : undefined,
+      priority_band: r.priority_band || undefined,
+      metrics: r.metrics || undefined,
+      is_demo: r.is_demo,
+      created_at: r.created_at?.toISOString ? r.created_at.toISOString() : r.created_at,
+      updated_at: r.updated_at?.toISOString ? r.updated_at.toISOString() : r.updated_at
     };
   }
 }

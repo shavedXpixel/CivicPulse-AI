@@ -185,13 +185,13 @@ export function DevelopmentDemandWorkspace({
     return clusters.find((c) => c.id === selectedClusterId) || clusterDetail?.cluster || null;
   }, [clusters, selectedClusterId, clusterDetail]);
 
-  // Deterministic Metrics (from opportunities in cluster detail)
+  // Deterministic Metrics (from opportunities or cluster metrics in cluster detail)
   const currentMetrics: DeterministicDemandMetrics | null = useMemo(() => {
     if (clusterDetail?.opportunities && clusterDetail.opportunities.length > 0) {
       return clusterDetail.opportunities[0]?.metrics ?? null;
     }
-    return null;
-  }, [clusterDetail]);
+    return (clusterDetail?.cluster as any)?.metrics ?? (selectedCluster as any)?.metrics ?? null;
+  }, [clusterDetail, selectedCluster]);
 
 
   const isDemo = overview?.is_demo ?? false;
