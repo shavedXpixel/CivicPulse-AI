@@ -65,20 +65,23 @@ export const AssignProblemSchema = z.object({
   assigned_to: z.string().optional(),
   priority: z.nativeEnum(AssignmentPriority).default(AssignmentPriority.HIGH),
   due_at: z.string().optional(),
-  notes: z.string().max(1000).optional()
+  notes: z.string().max(1000).optional(),
+  expected_status: z.nativeEnum(ProblemStatus).optional()
 });
 export const CreateAssignmentSchema = AssignProblemSchema;
 
 export const UpdateProblemStatusSchema = z.object({
   status: z.nativeEnum(ProblemStatus),
-  note: z.string().max(2000).optional()
+  note: z.string().max(2000).optional(),
+  expected_status: z.nativeEnum(ProblemStatus).optional()
 });
 
 export const ProblemActionInputSchema = z.object({
   action: z.nativeEnum(ActionType),
   note: z.string().max(5000).optional(),
   target_officer_id: z.string().optional(),
-  metadata: z.record(z.unknown()).optional()
+  metadata: z.record(z.unknown()).optional(),
+  expected_status: z.nativeEnum(ProblemStatus).optional()
 });
 export const ProblemActionSchema = ProblemActionInputSchema;
 

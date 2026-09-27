@@ -40,13 +40,13 @@ export const CANONICAL_TRANSITIONS: TransitionRule[] = [
     from: ProblemStatus.AWAITING_VERIFICATION,
     to: ProblemStatus.RESOLVED,
     allowedRoles: [UserRole.DEPARTMENT_OFFICER, UserRole.ADMIN, UserRole.SYSTEM_ADMIN],
-    allowedActions: [ActionType.RESOLVED]
+    allowedActions: [ActionType.RESOLVED, ActionType.RESOLUTION_ACCEPTED]
   },
   {
     from: ProblemStatus.AWAITING_VERIFICATION,
     to: ProblemStatus.IN_PROGRESS,
     allowedRoles: [UserRole.DEPARTMENT_OFFICER, UserRole.ADMIN, UserRole.SYSTEM_ADMIN],
-    allowedActions: [ActionType.REOPENED, ActionType.STARTED_WORK]
+    allowedActions: [ActionType.RESOLUTION_REJECTED, ActionType.REOPENED, ActionType.STARTED_WORK]
   },
   {
     from: ProblemStatus.RESOLVED,
@@ -77,7 +77,8 @@ export class WorkflowStateMachine {
     problem: ProblemCluster,
     targetStatus: ProblemStatus,
     action: ActionType,
-    user: UserProfile
+    user: UserProfile,
+    evidenceSubmitterIds?: string[]
   ): TransitionRule {
     // 1. Citizen is strictly forbidden from government lifecycle operations
     if (user.role === UserRole.CITIZEN) {
@@ -139,13 +140,37 @@ export class WorkflowStateMachine {
     }
 
     // 6. Scoping rule for DEPARTMENT_OFFICER:
-    // Must belong to authorized department scope (unless problem is unassigned/new or admin)
+    // Must belong to authorized department scope (WATCO)
     if (user.role === UserRole.DEPARTMENT_OFFICER) {
       if (problem.department_id && user.department_id && problem.department_id !== user.department_id) {
         throw new AppError({
           statusCode: 403,
           code: ERROR_CODES.FORBIDDEN,
           message: `Department officer from ${user.department_id} cannot modify problem assigned to ${problem.department_id}.`
+        });
+      }
+    }
+
+    // 7. Four-Eyes Control: An actor cannot approve/resolve work if assigned or if they submitted resolution evidence
+    if (targetStatus === ProblemStatus.RESOLVED || action === ActionType.RESOLVED || action === ActionType.RESOLUTION_ACCEPTED) {
+      const userIds = new Set<string>();
+      if (user.id) userIds.add(user.id);
+      if ((user as any).legacy_firebase_uid) userIds.add((user as any).legacy_firebase_uid);
+      if ((user as any).auth_user_id) userIds.add((user as any).auth_user_id);
+
+      if (problem.assigned_to && userIds.has(problem.assigned_to)) {
+        throw new AppError({
+          statusCode: 403,
+          code: ERROR_CODES.FORBIDDEN,
+          message: 'Self-approval is strictly forbidden. Assigned officer cannot approve resolution.'
+        });
+      }
+
+      if (evidenceSubmitterIds && evidenceSubmitterIds.some((submitterId) => userIds.has(submitterId))) {
+        throw new AppError({
+          statusCode: 403,
+          code: ERROR_CODES.FORBIDDEN,
+          message: 'Self-approval is strictly forbidden. Evidence submitter cannot approve resolution.'
         });
       }
     }

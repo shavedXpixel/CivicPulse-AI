@@ -235,7 +235,7 @@ export class ProblemService {
       title: input.title,
       description: input.description,
       category: input.category,
-      department_id: input.department_id, // Pre-seeded reference metadata if provided
+      department_id: 'WATCO', // CivicPulse operates exclusively with WATCO
       ward_id: input.ward_id,
       location: input.location,
       status: ProblemStatus.TRIAGED,

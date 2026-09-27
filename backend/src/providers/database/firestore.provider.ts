@@ -582,7 +582,8 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
     assignment: Assignment,
     nextStatus: ProblemStatus,
     action: ProblemAction,
-    expectedCurrentStatus?: ProblemStatus
+    expectedCurrentStatus?: ProblemStatus,
+    supersededAssignmentIds?: string[]
   ): Promise<{ problem: ProblemCluster; assignment: Assignment; action: ProblemAction }> {
     const problemRef = this.db.collection('problem_clusters').doc(problemId);
     const assignmentRef = this.db.collection('assignments').doc(assignment.id);
@@ -609,6 +610,20 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
         });
       }
 
+      // Read any superseded assignments in the transaction (all reads must be before writes)
+      const supersededDocs: { ref: any; data: Assignment }[] = [];
+      if (supersededAssignmentIds && supersededAssignmentIds.length > 0) {
+        for (const supId of supersededAssignmentIds) {
+          if (supId !== assignment.id) {
+            const supRef = this.db.collection('assignments').doc(supId);
+            const supSnap = await transaction.get(supRef);
+            if (supSnap.exists) {
+              supersededDocs.push({ ref: supRef, data: supSnap.data() as Assignment });
+            }
+          }
+        }
+      }
+
       const now = new Date().toISOString();
       const updatedProblem: ProblemCluster = {
         ...existing,
@@ -618,6 +633,24 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
         status: nextStatus,
         updated_at: now
       };
+
+      // Supersede prior active assignments
+      for (const supDoc of supersededDocs) {
+        transaction.set(
+          supDoc.ref,
+          {
+            ...supDoc.data,
+            status: AssignmentStatus.CANCELLED,
+            completed_at: now,
+            ended_at: now,
+            updated_at: now,
+            notes: supDoc.data.notes
+              ? `${supDoc.data.notes} [Superseded by assignment ${assignment.id}]`
+              : `Superseded by assignment ${assignment.id}`
+          },
+          { merge: true }
+        );
+      }
 
       transaction.set(problemRef, updatedProblem, { merge: true });
       transaction.set(assignmentRef, assignment);
@@ -747,8 +780,8 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
       const existing = snap.data() as ProblemCluster;
       if (existing.status !== expectedCurrentStatus) {
         throw new AppError({
-          statusCode: 400,
-          code: ERROR_CODES.INVALID_STATE_TRANSITION,
+          statusCode: 409,
+          code: ERROR_CODES.CONFLICT,
           message: `State transition conflict: expected current state is ${expectedCurrentStatus}, but persisted state is ${existing.status}.`
         });
       }

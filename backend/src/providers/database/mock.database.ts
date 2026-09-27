@@ -161,7 +161,7 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     };
     this.users.set(fieldOfficerDrainage.id, fieldOfficerDrainage);
 
-    // 4c. Municipal Departments Directory
+    // 4c. Municipal Departments Directory — ONLY WATCO exists canonically
     const depts: Department[] = [
       {
         id: 'WATCO',
@@ -171,46 +171,6 @@ export class MockDatabaseProvider implements IDatabaseProvider {
         lead_officer: 'Er. Subrat Jena (Superintending Engineer)',
         contact_phone: '+91 674 254 1234',
         contact_email: 'operations@watco.odisha.gov.in',
-        jurisdiction_wards: [1, 2, 3, 4, 18, 19, 20, 21, 22, 23, 24, 25]
-      },
-      {
-        id: 'BMC_DRAINAGE',
-        name: 'BMC Drainage & Sewerage Division',
-        short_name: 'BMC Drainage',
-        description: 'Stormwater arterial drains, culvert desilting, local drainage channels, and municipal flood prevention.',
-        lead_officer: 'Er. Alok Nayak (Executive Engineer)',
-        contact_phone: '+91 674 254 5678',
-        contact_email: 'drainage@bmc.gov.in',
-        jurisdiction_wards: [1, 2, 3, 4, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
-      },
-      {
-        id: 'BMC_ROADS',
-        name: 'BMC Engineering & Works (Roads)',
-        short_name: 'BMC Roads',
-        description: 'Municipal roads, pavement restoration, pothole remediation, and pedestrian walkways across Bhubaneswar.',
-        lead_officer: 'Er. Rashmi Ranjan Ray',
-        contact_phone: '+91 674 254 9900',
-        contact_email: 'works@bmc.gov.in',
-        jurisdiction_wards: [1, 2, 3, 4, 18, 19, 20, 21]
-      },
-      {
-        id: 'BMC_SAN',
-        name: 'BMC Solid Waste Management & Sanitation',
-        short_name: 'BMC Sanitation',
-        description: 'Decentralized solid waste management, door-to-door collection, micro-composting centers (MCC), and street sweeping.',
-        lead_officer: 'Dr. Sibananda Mishra',
-        contact_phone: '+91 674 254 3322',
-        contact_email: 'sanitation@bmc.gov.in',
-        jurisdiction_wards: [1, 2, 3, 4, 18, 19, 20, 21, 22, 23]
-      },
-      {
-        id: 'TPCODL',
-        name: 'TP Central Odisha Distribution Limited',
-        short_name: 'TPCODL',
-        description: 'Power distribution, high/low tension transmission lines, streetlighting, and public transformer safety.',
-        lead_officer: 'Er. Niranjan Das',
-        contact_phone: '+91 674 254 7788',
-        contact_email: 'customercare@tpcentralodisha.com',
         jurisdiction_wards: [1, 2, 3, 4, 18, 19, 20, 21, 22, 23, 24, 25]
       }
     ];
@@ -832,9 +792,9 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     const problem = this.problemClusters.get(id);
     if (!problem) return null;
     const copy = { ...problem };
-    if (!copy.assigned_to) {
+    if (!copy.assigned_to && copy.status !== ProblemStatus.REOPENED && copy.status !== ProblemStatus.NEW && copy.status !== ProblemStatus.TRIAGED) {
       const asgns = this.assignments.get(id) || [];
-      const active = asgns.filter((a) => a.status !== 'CANCELLED');
+      const active = asgns.filter((a) => a.status === AssignmentStatus.ASSIGNED || a.status === AssignmentStatus.ACCEPTED);
       if (active.length > 0) {
         const latest = active[active.length - 1];
         if (latest.assigned_to) {
@@ -1095,7 +1055,8 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     assignment: Assignment,
     nextStatus: ProblemStatus,
     action: ProblemAction,
-    expectedCurrentStatus?: ProblemStatus
+    expectedCurrentStatus?: ProblemStatus,
+    supersededAssignmentIds?: string[]
   ): Promise<{ problem: ProblemCluster; assignment: Assignment; action: ProblemAction }> {
     const existing = this.problemClusters.get(problemId);
     if (!existing) {
@@ -1125,6 +1086,18 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     };
 
     this.problemClusters.set(problemId, updatedProblem);
+
+    // Supersede previous active assignments for this problem
+    const list = this.assignments.get(problemId) || [];
+    for (const a of list) {
+      if (a.id !== assignment.id && (a.status === AssignmentStatus.ASSIGNED || a.status === AssignmentStatus.ACCEPTED)) {
+        a.status = AssignmentStatus.CANCELLED;
+        a.completed_at = now;
+        a.ended_at = now;
+        a.updated_at = now;
+      }
+    }
+
     const createdAssignment = await this.createAssignment(assignment);
     const createdAction = await this.createAction(action);
 
@@ -1229,8 +1202,8 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     // Atomic pre-mutation check: Prevent stale concurrent transitions
     if (existing.status !== expectedCurrentStatus) {
       throw new AppError({
-        statusCode: 400,
-        code: ERROR_CODES.INVALID_STATE_TRANSITION,
+        statusCode: 409,
+        code: ERROR_CODES.CONFLICT,
         message: `State transition conflict: expected current state is ${expectedCurrentStatus}, but persisted state is ${existing.status}.`
       });
     }
@@ -1249,14 +1222,28 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     if (nextStatus === ProblemStatus.CLOSED && !updatedProblem.closed_at) {
       updatedProblem.closed_at = now;
     }
+    if (nextStatus === ProblemStatus.REOPENED) {
+      updatedProblem.assigned_to = undefined;
+      updatedProblem.assigned_at = undefined;
+
+      // Invalidate active assignments
+      const list = this.assignments.get(problemId) || [];
+      for (const a of list) {
+        if (a.status === AssignmentStatus.ASSIGNED || a.status === AssignmentStatus.ACCEPTED) {
+          a.status = AssignmentStatus.CANCELLED;
+          a.completed_at = now;
+          a.updated_at = now;
+        }
+      }
+    }
 
     this.problemClusters.set(problemId, updatedProblem);
     const createdAction = await this.createAction(action);
 
     const returnedProblem = { ...updatedProblem };
-    if (!returnedProblem.assigned_to) {
+    if (!returnedProblem.assigned_to && nextStatus !== ProblemStatus.REOPENED && nextStatus !== ProblemStatus.NEW && nextStatus !== ProblemStatus.TRIAGED) {
       const asgns = this.assignments.get(problemId) || [];
-      const active = asgns.filter((a) => a.status !== 'CANCELLED');
+      const active = asgns.filter((a) => a.status === AssignmentStatus.ASSIGNED || a.status === AssignmentStatus.ACCEPTED);
       if (active.length > 0) {
         const latest = active[active.length - 1];
         if (latest.assigned_to) {

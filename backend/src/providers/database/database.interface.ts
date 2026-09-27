@@ -107,7 +107,8 @@ export interface IDatabaseProvider {
     assignment: Assignment,
     nextStatus: ProblemStatus,
     action: ProblemAction,
-    expectedCurrentStatus?: ProblemStatus
+    expectedCurrentStatus?: ProblemStatus,
+    supersededAssignmentIds?: string[]
   ): Promise<{ problem: ProblemCluster; assignment: Assignment; action: ProblemAction }>;
 
   atomicTransitionStatus(

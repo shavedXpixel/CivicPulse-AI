@@ -519,8 +519,13 @@ export class ResolutionService {
     const evidenceList = await db.getResolutionEvidence(problemId);
 
     // Four-Eyes Control: Supervisor cannot review work they were assigned to or evidence they submitted
-    const isAssignedToCaller = Boolean(problem.assigned_to && problem.assigned_to === user.id);
-    const submittedEvidenceByCaller = evidenceList.some((ev) => ev.submitted_by === user.id);
+    const callerIds = new Set<string>();
+    if (user.id) callerIds.add(user.id);
+    if ((user as any).legacy_firebase_uid) callerIds.add((user as any).legacy_firebase_uid);
+    if ((user as any).auth_user_id) callerIds.add((user as any).auth_user_id);
+
+    const isAssignedToCaller = Boolean(problem.assigned_to && callerIds.has(problem.assigned_to));
+    const submittedEvidenceByCaller = evidenceList.some((ev) => ev.submitted_by && callerIds.has(ev.submitted_by));
     if (isAssignedToCaller || submittedEvidenceByCaller) {
       throw new AppError({
         statusCode: 403,
@@ -529,15 +534,21 @@ export class ResolutionService {
       });
     }
 
+    if (input.decision === 'REJECT' && (!input.notes || !input.notes.trim())) {
+      throw new AppError({
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+        message: 'A specific rejection note explaining required remediation is required when rejecting resolution evidence.'
+      });
+    }
+
     const now = new Date().toISOString();
     const actionId = `act_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    const actionType = input.decision === 'ACCEPT' ? ActionType.RESOLVED : ActionType.REOPENED;
+    const actionType = input.decision === 'ACCEPT' ? ActionType.RESOLVED : ActionType.RESOLUTION_REJECTED;
     const targetStatus = input.decision === 'ACCEPT' ? ProblemStatus.RESOLVED : ProblemStatus.IN_PROGRESS;
     const note = input.decision === 'ACCEPT'
       ? (input.notes || `Resolution officially validated and accepted by supervisor ${user.display_name}.`)
-      : (input.notes
-          ? `Resolution rejected by ${user.display_name}: ${input.notes}`
-          : `Resolution evidence rejected by supervisor ${user.display_name}. Resumed IN_PROGRESS for rework.`);
+      : `Resolution evidence rejected by supervisor ${user.display_name}: ${input.notes}. Resumed IN_PROGRESS for rework.`;
 
     const action: ProblemAction = {
       id: actionId,

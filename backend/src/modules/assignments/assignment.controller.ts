@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getDatabaseProvider } from '../../providers';
 import { AppError } from '../../middleware/error.middleware';
-import { ERROR_CODES, UserRole, Assignment } from '@civicpulse/shared';
+import { ERROR_CODES, UserRole, Assignment, AssignmentStatus, ProblemStatus } from '@civicpulse/shared';
 import { SLAService } from '../workflow/sla.service';
 
 export interface HydratedAssignment extends Assignment {
@@ -100,8 +100,70 @@ export class AssignmentController {
         })
       );
 
+      // For Field Officers, the queue represents active assigned work orders.
+      // Enforce:
+      // 1. Only active assignments (ASSIGNED or ACCEPTED), unless a specific status is explicitly requested in query
+      // 2. The underlying problem must currently be assigned to this field officer (not reassigned or unassigned)
+      // 3. The underlying problem must be in an active operational state (not CLOSED or RESOLVED)
+      // 4. Strict deduplication by problem_id: At most ONE active assignment per problem is returned
+      let activeList = hydrated;
+
+      if (user.role === UserRole.FIELD_OFFICER && !req.query.status) {
+        const userIds = new Set<string>();
+        if (user.id) userIds.add(user.id);
+        if ((user as any).legacy_firebase_uid) userIds.add((user as any).legacy_firebase_uid);
+        if ((user as any).auth_user_id) userIds.add((user as any).auth_user_id);
+
+        activeList = activeList.filter((asgn) => {
+          // Must have active assignment status
+          if (asgn.status !== AssignmentStatus.ASSIGNED && asgn.status !== AssignmentStatus.ACCEPTED) {
+            return false;
+          }
+
+          // If hydrated problem exists, verify current ownership and active status
+          if (asgn.problem) {
+            // If problem is no longer assigned to this officer, this assignment is historical
+            if (!asgn.problem.assigned_to || !userIds.has(asgn.problem.assigned_to)) {
+              return false;
+            }
+
+            // Only operational active states (ASSIGNED, IN_PROGRESS, AWAITING_VERIFICATION) appear as active work orders.
+            // CLOSED, RESOLVED, NEW, and REOPENED (awaiting re-triage) are not active field work orders.
+            const activeOperationalStates = [
+              ProblemStatus.ASSIGNED,
+              ProblemStatus.IN_PROGRESS,
+              ProblemStatus.AWAITING_VERIFICATION
+            ];
+            if (!activeOperationalStates.includes(asgn.problem.status)) {
+              return false;
+            }
+          }
+          return true;
+        });
+      }
+
+      // Deduplicate by problem_id: ensure at most ONE active assignment per problem is returned
+      const deduplicatedMap = new Map<string, HydratedAssignment>();
+      for (const asgn of activeList) {
+        const pid = asgn.problem_id;
+        if (!pid) continue;
+        if (!deduplicatedMap.has(pid)) {
+          deduplicatedMap.set(pid, asgn);
+        } else {
+          // Keep the newer active record
+          const existing = deduplicatedMap.get(pid)!;
+          const existingTime = new Date(existing.created_at).getTime();
+          const asgnTime = new Date(asgn.created_at).getTime();
+          if (asgnTime > existingTime) {
+            deduplicatedMap.set(pid, asgn);
+          }
+        }
+      }
+
+      const finalAssignments = Array.from(deduplicatedMap.values());
+
       res.status(200).json({
-        data: hydrated
+        data: finalAssignments
       });
     } catch (err) {
       next(err);

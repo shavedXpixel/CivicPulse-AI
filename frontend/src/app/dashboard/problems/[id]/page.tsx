@@ -16,6 +16,7 @@ import {
   ProblemClusterMember,
   ProblemStatus,
   ProblemAction,
+  UserRole,
 } from '@civicpulse/shared';
 import {
   MapPin,
@@ -29,13 +30,13 @@ import {
   ArrowRight,
   UserPlus,
   Play,
-  Check,
   RotateCcw,
   XCircle,
   AlertTriangle,
   MessageSquare,
   ShieldCheck,
   Sliders,
+  Camera,
 } from 'lucide-react';
 
 export default function ProblemDetailPage({
@@ -46,6 +47,11 @@ export default function ProblemDetailPage({
   const { id } = use(params);
   const { user, userProfile, getIdToken } = useAuth();
   const [authToken, setAuthTokenState] = useState<string>('');
+
+  const currentUserRole = userProfile?.role;
+  const isCitizen = currentUserRole === UserRole.CITIZEN;
+  const isFieldOfficer = currentUserRole === UserRole.FIELD_OFFICER;
+  const isSupervisor = currentUserRole === UserRole.DEPARTMENT_OFFICER || currentUserRole === UserRole.ADMIN || currentUserRole === UserRole.SYSTEM_ADMIN;
 
   useEffect(() => {
     if (getIdToken) {
@@ -199,6 +205,7 @@ export default function ProblemDetailPage({
           assigned_to: assignOfficer,
           priority: assignPriority,
           notes: assignNotes,
+          expected_status: status,
         }
       );
       if (res?.data) {
@@ -228,6 +235,7 @@ export default function ProblemDetailPage({
         {
           action: newStatus,
           note: transitionNote.trim() || defaultNote,
+          expected_status: status,
         }
       );
       if (res?.data) {
@@ -748,25 +756,27 @@ export default function ProblemDetailPage({
                 <div className="text-sm font-semibold text-ink-primary font-sans">
                   {assignedTo ? `Assigned Engineer: ${assignedTo}` : 'Pending Official Officer Assignment'}
                 </div>
-                <div className="pt-2">
-                  <button
-                    onClick={() => {
-                      setAssignDept('WATCO');
-                      setAssignNotes('');
-                      setIsAssignModalOpen(true);
-                    }}
-                    className="w-full py-2 px-3 text-xs font-mono uppercase bg-canvas-card border border-ink-border text-ink-primary hover:border-civic-terracotta transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <UserPlus className="w-3.5 h-3.5 text-civic-terracotta" />
-                    <span>{assignedTo ? 'Reassign Department & Officer' : 'Assign Department & Officer'}</span>
-                  </button>
-                </div>
+                {isSupervisor && (
+                  <div className="pt-2">
+                    <button
+                      onClick={() => {
+                        setAssignDept('WATCO');
+                        setAssignNotes('');
+                        setIsAssignModalOpen(true);
+                      }}
+                      className="w-full py-2 px-3 text-xs font-mono uppercase bg-canvas-card border border-ink-border text-ink-primary hover:border-civic-terracotta transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <UserPlus className="w-3.5 h-3.5 text-civic-terracotta" />
+                      <span>{assignedTo ? 'Reassign Department & Officer' : 'Assign Department & Officer'}</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </section>
 
           {/* SECTION 5: EVIDENCE & VERIFICATION WORKSPACE */}
-          <section className="p-6 sm:p-8 space-y-4">
+          <section id="evidence-workspace" className="p-6 sm:p-8 space-y-4">
             <div className="text-[10px] font-mono uppercase tracking-widest text-civic-terracotta">
               05 // RESOLUTION EVIDENCE & AI ADVISORY VERIFICATION
             </div>
@@ -816,81 +826,114 @@ export default function ProblemDetailPage({
                 </div>
 
                 <div className="space-y-2 pt-2">
-                  {status === ProblemStatus.NEW && (
-                    <button
-                      onClick={() => handleStatusTransition(ProblemStatus.TRIAGED, 'Problem triaged by department dispatcher.')}
-                      disabled={workflowLoading}
-                      className="w-full py-2.5 px-4 text-xs font-mono uppercase bg-civic-terracotta text-white hover:bg-civic-terracottaDark transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                    >
-                      <ArrowRight className="w-3.5 h-3.5" />
-                      <span>Triage Problem (Mark TRIAGED)</span>
-                    </button>
+                  {isCitizen && (
+                    <div className="p-3 border border-ink-border bg-canvas-subtle text-[11px] font-mono text-ink-muted">
+                      Citizen accounts have view-only access. Government lifecycle operations are restricted to authorized personnel.
+                    </div>
                   )}
 
-                  {status === ProblemStatus.ASSIGNED && (
-                    <button
-                      onClick={() => handleStatusTransition(ProblemStatus.IN_PROGRESS, 'Field crew dispatched and commenced site intervention.')}
-                      disabled={workflowLoading}
-                      className="w-full py-2.5 px-4 text-xs font-mono uppercase bg-civic-terracotta text-white hover:bg-civic-terracottaDark transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                    >
-                      <Play className="w-3.5 h-3.5" />
-                      <span>Start Work (IN PROGRESS)</span>
-                    </button>
+                  {isFieldOfficer && (
+                    <>
+                      {status === ProblemStatus.ASSIGNED && (
+                        <button
+                          onClick={() => handleStatusTransition(ProblemStatus.IN_PROGRESS, 'Field crew dispatched and commenced site intervention.')}
+                          disabled={workflowLoading}
+                          className="w-full py-2.5 px-4 text-xs font-mono uppercase bg-civic-terracotta text-white hover:bg-civic-terracottaDark transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        >
+                          <Play className="w-3.5 h-3.5" />
+                          <span>Start Work (IN PROGRESS)</span>
+                        </button>
+                      )}
+
+                      {status === ProblemStatus.IN_PROGRESS && (
+                        <a
+                          href="#evidence-workspace"
+                          className="w-full py-2.5 px-4 text-xs font-mono uppercase bg-civic-terracotta text-white hover:bg-civic-terracottaDark transition-colors flex items-center justify-center gap-1.5 text-center"
+                        >
+                          <Camera className="w-3.5 h-3.5" />
+                          <span>Submit Resolution Evidence (Section 05)</span>
+                        </a>
+                      )}
+
+                      {status !== ProblemStatus.ASSIGNED && status !== ProblemStatus.IN_PROGRESS && (
+                        <div className="p-3 border border-ink-border bg-canvas-subtle text-[11px] font-mono text-ink-muted">
+                          No field actions required for incident in current status ({status}).
+                        </div>
+                      )}
+                    </>
                   )}
 
-                  {status === ProblemStatus.IN_PROGRESS && (
-                    <button
-                      onClick={() => handleStatusTransition(ProblemStatus.AWAITING_VERIFICATION, 'Field repairs completed. Requesting supervisory inspection.')}
-                      disabled={workflowLoading}
-                      className="w-full py-2.5 px-4 text-xs font-mono uppercase bg-amber-600 text-white hover:bg-amber-700 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Submit for Verification</span>
-                    </button>
-                  )}
+                  {isSupervisor && (
+                    <>
+                      {status === ProblemStatus.NEW && (
+                        <button
+                          onClick={() => handleStatusTransition(ProblemStatus.TRIAGED, 'Problem triaged by department dispatcher.')}
+                          disabled={workflowLoading}
+                          className="w-full py-2.5 px-4 text-xs font-mono uppercase bg-civic-terracotta text-white hover:bg-civic-terracottaDark transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        >
+                          <ArrowRight className="w-3.5 h-3.5" />
+                          <span>Triage Problem (Mark TRIAGED)</span>
+                        </button>
+                      )}
 
-                  {status === ProblemStatus.AWAITING_VERIFICATION && (
-                    <button
-                      onClick={() => handleStatusTransition(ProblemStatus.RESOLVED, 'Repairs inspected and officially validated by supervisor.')}
-                      disabled={workflowLoading}
-                      className="w-full py-2.5 px-4 text-xs font-mono uppercase bg-emerald-700 text-white hover:bg-emerald-800 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Verify & Resolve (RESOLVED)</span>
-                    </button>
-                  )}
+                      {(status === ProblemStatus.TRIAGED || status === ProblemStatus.NEW) && (
+                        <button
+                          onClick={() => {
+                            setAssignDept('WATCO');
+                            setAssignNotes('');
+                            setIsAssignModalOpen(true);
+                          }}
+                          disabled={workflowLoading}
+                          className="w-full py-2.5 px-4 text-xs font-mono uppercase bg-canvas-card border border-ink-border text-ink-primary hover:border-civic-terracotta transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        >
+                          <UserPlus className="w-3.5 h-3.5 text-civic-terracotta" />
+                          <span>{assignedTo ? 'Reassign Field Officer' : 'Assign Field Officer'}</span>
+                        </button>
+                      )}
 
-                  {status === ProblemStatus.RESOLVED && (
-                    <button
-                      onClick={() => handleStatusTransition(ProblemStatus.CLOSED, 'Incident administrative audit complete. Case closed.')}
-                      disabled={workflowLoading}
-                      className="w-full py-2.5 px-4 text-xs font-mono uppercase bg-ink-primary text-canvas-card hover:bg-ink-secondary transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                    >
-                      <XCircle className="w-3.5 h-3.5" />
-                      <span>Close Case (CLOSED)</span>
-                    </button>
-                  )}
+                      {status === ProblemStatus.AWAITING_VERIFICATION && (
+                        <a
+                          href="#evidence-workspace"
+                          className="w-full py-2.5 px-4 text-xs font-mono uppercase bg-emerald-700 text-white hover:bg-emerald-800 transition-colors flex items-center justify-center gap-1.5 text-center"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Review & Accept Evidence (Section 05)</span>
+                        </a>
+                      )}
 
-                  {status === ProblemStatus.CLOSED && (
-                    <button
-                      onClick={() => handleStatusTransition(ProblemStatus.REOPENED, 'Recurring failure reported. Problem reopened for investigation.')}
-                      disabled={workflowLoading}
-                      className="w-full py-2.5 px-4 text-xs font-mono uppercase border border-civic-terracotta text-civic-terracotta hover:bg-canvas-subtle transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Reopen Incident (REOPENED)</span>
-                    </button>
-                  )}
+                      {status === ProblemStatus.RESOLVED && (
+                        <button
+                          onClick={() => handleStatusTransition(ProblemStatus.CLOSED, 'Incident administrative audit complete. Case closed.')}
+                          disabled={workflowLoading}
+                          className="w-full py-2.5 px-4 text-xs font-mono uppercase bg-ink-primary text-canvas-card hover:bg-ink-secondary transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span>Close Case (CLOSED)</span>
+                        </button>
+                      )}
 
-                  {status === ProblemStatus.REOPENED && (
-                    <button
-                      onClick={() => handleStatusTransition(ProblemStatus.TRIAGED, 'Reopened problem triaged for remediation.')}
-                      disabled={workflowLoading}
-                      className="w-full py-2.5 px-4 text-xs font-mono uppercase bg-civic-terracotta text-white hover:bg-civic-terracottaDark transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                    >
-                      <ArrowRight className="w-3.5 h-3.5" />
-                      <span>Re-triage Incident</span>
-                    </button>
+                      {status === ProblemStatus.CLOSED && (
+                        <button
+                          onClick={() => handleStatusTransition(ProblemStatus.REOPENED, 'Recurring failure reported. Problem reopened for investigation.')}
+                          disabled={workflowLoading}
+                          className="w-full py-2.5 px-4 text-xs font-mono uppercase border border-civic-terracotta text-civic-terracotta hover:bg-canvas-subtle transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Reopen Incident (REOPENED)</span>
+                        </button>
+                      )}
+
+                      {status === ProblemStatus.REOPENED && (
+                        <button
+                          onClick={() => handleStatusTransition(ProblemStatus.TRIAGED, 'Reopened problem triaged for remediation.')}
+                          disabled={workflowLoading}
+                          className="w-full py-2.5 px-4 text-xs font-mono uppercase bg-civic-terracotta text-white hover:bg-civic-terracottaDark transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        >
+                          <ArrowRight className="w-3.5 h-3.5" />
+                          <span>Re-triage Incident (Mark TRIAGED)</span>
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

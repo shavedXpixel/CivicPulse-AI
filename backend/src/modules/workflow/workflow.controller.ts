@@ -151,7 +151,9 @@ export class WorkflowController {
         req.user,
         problemId,
         parsed.data.status,
-        parsed.data.note
+        parsed.data.note,
+        undefined,
+        parsed.data.expected_status
       );
 
       res.status(200).json({

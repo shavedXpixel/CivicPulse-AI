@@ -41,19 +41,18 @@ export class GovernanceClassifier {
       extracted_entities.ward_id = 'WARD-004';
     }
 
-    // Check for Department
+    // Check for Department and Categories (WATCO is the sole authoritative operational department)
+    extracted_entities.department_id = 'WATCO';
     if (q.includes('watco') || q.includes('water')) {
-      extracted_entities.department_id = 'WATCO';
       extracted_entities.category = 'water_supply';
-    } else if (q.includes('drainage') || q.includes('bmc drainage')) {
-      extracted_entities.department_id = 'BMC_DRAINAGE';
+    } else if (q.includes('drainage')) {
       extracted_entities.category = 'drainage';
     } else if (q.includes('road')) {
-      extracted_entities.department_id = 'BMC_ROADS';
       extracted_entities.category = 'roads';
     } else if (q.includes('sanitation') || q.includes('waste')) {
-      extracted_entities.department_id = 'BMC_SAN';
       extracted_entities.category = 'sanitation';
+    } else if (q.includes('light') || q.includes('street')) {
+      extracted_entities.category = 'streetlights';
     }
 
     // 2. Out of domain / unsupported detection

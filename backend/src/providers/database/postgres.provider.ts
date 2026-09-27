@@ -1491,7 +1491,8 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     assignment: Assignment,
     nextStatus: ProblemStatus,
     action: ProblemAction,
-    expectedCurrentStatus?: ProblemStatus
+    expectedCurrentStatus?: ProblemStatus,
+    supersededAssignmentIds?: string[]
   ): Promise<{ problem: ProblemCluster; assignment: Assignment; action: ProblemAction }> {
     return this.withTransaction(async (client) => {
       // Row lock
@@ -1529,10 +1530,22 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
         [nextStatus, assignment.department_id, assignedToUuid, assignedAt, problemId]
       );
 
-      // 2. Insert assignment
+      // 2. Atomically supersede any existing active assignments for this problem
+      await client.query(
+        `UPDATE assignments 
+         SET status = 'CANCELLED', 
+             completed_at = NOW(), 
+             updated_at = NOW() 
+         WHERE problem_id = $1 
+           AND id != $2 
+           AND status IN ('ASSIGNED', 'ACCEPTED');`,
+        [problemId, assignment.id]
+      );
+
+      // 3. Insert assignment
       await this.createAssignment(assignment, client);
 
-      // 3. Insert action
+      // 4. Insert action
       await this.createAction(action, client);
 
       const updatedProblem = (updatedRes.rows && updatedRes.rows.length > 0)
@@ -1574,10 +1587,50 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
         });
       }
 
-      const updatedRes = await client.query(
-        `UPDATE problem_clusters SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *;`,
-        [nextStatus, problemId]
-      );
+      const setClauses: string[] = ['status = $1', 'updated_at = NOW()'];
+      const params: any[] = [nextStatus, problemId];
+      let pIdx = 3;
+
+      if (updates) {
+        if ('resolved_at' in updates) {
+          setClauses.push(`resolved_at = $${pIdx++}`);
+          params.splice(params.length - 1, 0, updates.resolved_at || null);
+        }
+        if ('closed_at' in updates) {
+          setClauses.push(`closed_at = $${pIdx++}`);
+          params.splice(params.length - 1, 0, updates.closed_at || null);
+        }
+        if ('assigned_to' in updates) {
+          setClauses.push(`assigned_to = $${pIdx++}`);
+          params.splice(params.length - 1, 0, updates.assigned_to || null);
+        }
+        if ('assigned_at' in updates) {
+          setClauses.push(`assigned_at = $${pIdx++}`);
+          params.splice(params.length - 1, 0, updates.assigned_at || null);
+        }
+      }
+
+      if (nextStatus === ProblemStatus.REOPENED) {
+        if (!updates || !('assigned_to' in updates)) {
+          setClauses.push(`assigned_to = NULL`);
+        }
+        if (!updates || !('assigned_at' in updates)) {
+          setClauses.push(`assigned_at = NULL`);
+        }
+      }
+
+      const updateSql = `UPDATE problem_clusters SET ${setClauses.join(', ')} WHERE id = $${params.length} RETURNING *;`;
+      const updatedRes = await client.query(updateSql, params);
+
+      // If nextStatus is REOPENED, cancel all active assignments for this problem
+      if (nextStatus === ProblemStatus.REOPENED) {
+        await client.query(
+          `UPDATE assignments 
+           SET status = 'CANCELLED', completed_at = NOW(), updated_at = NOW() 
+           WHERE problem_id = $1 AND status IN ('ASSIGNED', 'ACCEPTED');`,
+          [problemId]
+        );
+      }
 
       await this.createAction(action, client);
       const updatedProblem = (updatedRes.rows && updatedRes.rows.length > 0)
@@ -1587,23 +1640,6 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
             status: nextStatus,
             updated_at: new Date().toISOString()
           };
-
-      // Backward-compatibility fallback: if assigned_to is not populated on problem_clusters,
-      // resolve from the latest active assignment record for this problem read-only.
-      if (!updatedProblem.assigned_to) {
-        const asgnRows = await client.query(
-          `SELECT assigned_to, assigned_at FROM assignments WHERE problem_id = $1 AND status != 'CANCELLED' ORDER BY created_at DESC LIMIT 1;`,
-          [problemId]
-        );
-        if (asgnRows.rows.length > 0 && asgnRows.rows[0].assigned_to) {
-          updatedProblem.assigned_to = asgnRows.rows[0].assigned_to;
-          if (!updatedProblem.assigned_at && asgnRows.rows[0].assigned_at) {
-            updatedProblem.assigned_at = asgnRows.rows[0].assigned_at?.toISOString
-              ? asgnRows.rows[0].assigned_at.toISOString()
-              : asgnRows.rows[0].assigned_at;
-          }
-        }
-      }
 
       return {
         problem: updatedProblem,
@@ -1651,13 +1687,35 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       const current = pRes.rows[0];
 
       const nextStatus: ProblemStatus = decision === 'ACCEPT' ? ProblemStatus.RESOLVED : ProblemStatus.IN_PROGRESS;
-      const updatedRes = await client.query(`UPDATE problem_clusters SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *;`, [nextStatus, problemId]);
+      let updatedRes;
+      if (decision === 'ACCEPT') {
+        updatedRes = await client.query(
+          `UPDATE problem_clusters SET status = $1, resolved_at = NOW(), updated_at = NOW() WHERE id = $2 RETURNING *;`,
+          [nextStatus, problemId]
+        );
+      } else {
+        updatedRes = await client.query(
+          `UPDATE problem_clusters SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *;`,
+          [nextStatus, problemId]
+        );
+      }
+
+      // Update resolution evidence records
+      if (evidenceIds.length > 0) {
+        const nextEvidenceStatus = decision === 'ACCEPT' ? 'ACCEPTED' : 'REJECTED';
+        await client.query(
+          `UPDATE resolution_evidence SET status = $1, updated_at = NOW() WHERE problem_id = $2 AND id = ANY($3::text[]);`,
+          [nextEvidenceStatus, problemId, evidenceIds]
+        );
+      }
+
       await this.createAction(action, client);
       const updatedProblem = (updatedRes.rows && updatedRes.rows.length > 0)
         ? this.mapProblemRow(updatedRes.rows[0])
         : {
             ...this.mapProblemRow(current),
             status: nextStatus,
+            resolved_at: decision === 'ACCEPT' ? new Date().toISOString() : current.resolved_at,
             updated_at: new Date().toISOString()
           };
       return {

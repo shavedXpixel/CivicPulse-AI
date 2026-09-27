@@ -22,6 +22,7 @@ export interface AssignProblemInput {
   priority?: AssignmentPriority;
   due_at?: string;
   notes?: string;
+  expected_status?: ProblemStatus;
 }
 
 export interface ProblemActionInput {
@@ -31,13 +32,14 @@ export interface ProblemActionInput {
   metadata?: Record<string, unknown>;
   actor_id?: string;
   actor_role?: string;
+  expected_status?: ProblemStatus;
 }
 
 export class WorkflowService {
   /**
    * Authoritatively assigns or reassigns a problem to a department and optional officer.
    * Atomic mutation: updates problem department, assigned officer, status to ASSIGNED,
-   * creates an Assignment record, and appends an immutable ProblemAction audit entry.
+   * creates an Assignment record, ends prior active assignments, and appends an immutable ProblemAction audit entry.
    */
   public static async assignProblem(
     user: UserProfile,
@@ -63,20 +65,11 @@ export class WorkflowService {
 
     // 2. Enforce single authoritative operational department: WATCO
     // CivicPulse AI operates exclusively with WATCO (Water Corporation of Odisha).
-    if (!env.DEMO_MODE || process.env.NODE_ENV === 'production') {
-      if (input.department_id !== 'WATCO') {
-        throw new AppError({
-          statusCode: 400,
-          code: ERROR_CODES.VALIDATION_ERROR,
-          message: `Department '${input.department_id}' is not supported. CivicPulse operates exclusively with WATCO (Water Corporation of Odisha).`
-        });
-      }
-    } else if (input.department_id !== 'WATCO' && input.department_id !== 'BMC_DRAINAGE') {
-      // In isolated demo test mode, only legacy BMC_DRAINAGE fixture is permitted
+    if (input.department_id !== 'WATCO') {
       throw new AppError({
         statusCode: 400,
         code: ERROR_CODES.VALIDATION_ERROR,
-        message: `Department '${input.department_id}' is not supported. CivicPulse operates exclusively with WATCO.`
+        message: `Department '${input.department_id}' is not supported. CivicPulse operates exclusively with WATCO (Water Corporation of Odisha).`
       });
     }
 
@@ -101,7 +94,16 @@ export class WorkflowService {
       });
     }
 
-    // If department officer, problem must belong to their department OR be NEW/unassigned
+    // Concurrency check: If expected_status provided, verify before proceeding
+    if (input.expected_status && problem.status !== input.expected_status) {
+      throw new AppError({
+        statusCode: 409,
+        code: ERROR_CODES.CONFLICT,
+        message: `Assignment concurrency conflict: expected problem status is ${input.expected_status}, but current status is ${problem.status}.`
+      });
+    }
+
+    // If department officer, problem must belong to their department OR be unassigned
     if (user.role === UserRole.DEPARTMENT_OFFICER && user.department_id) {
       if (problem.department_id && problem.department_id !== user.department_id) {
         throw new AppError({
@@ -112,7 +114,7 @@ export class WorkflowService {
       }
     }
 
-    // 3. Determine target status & validate transition
+    // 4. Determine target status & validate transition
     let targetStatus = ProblemStatus.ASSIGNED;
     let actionType = ActionType.ASSIGNED;
 
@@ -128,13 +130,61 @@ export class WorkflowService {
       targetStatus = ProblemStatus.IN_PROGRESS;
       actionType = ActionType.REASSIGNED;
     } else {
-      // For any other status (e.g. NEW), validate against canonical state machine (rejects invalid)
+      // For any other status (e.g. REOPENED, NEW), validate against canonical state machine (rejects invalid jumps)
       WorkflowStateMachine.validateTransition(problem, targetStatus, actionType, user);
     }
 
-    // 4. Calculate deterministic SLA
     const now = new Date();
     const nowIso = now.toISOString();
+
+    // 5. Idempotency & Duplicate Prevention Guard:
+    // Check existing active assignments for this problem
+    const existingAssignments = await db.getAssignments(problemId);
+    const activeAssignments = existingAssignments.filter(
+      (a) => a.status === AssignmentStatus.ASSIGNED || a.status === AssignmentStatus.ACCEPTED
+    );
+
+    const matchingActiveAssignment = activeAssignments.find((a) => {
+      const sameDept = a.department_id === input.department_id;
+      const sameOfficer = (a.assigned_to || null) === (input.assigned_to || null);
+      return sameDept && sameOfficer;
+    });
+
+    if (matchingActiveAssignment) {
+      // Problem is already actively assigned to this department & officer.
+      // Return existing assignment idempotently without creating a second active record.
+      const liveSla = SLAService.computeSLAState(problem);
+      return {
+        problem: {
+          ...problem,
+          sla_state: liveSla
+        },
+        assignment: {
+          ...matchingActiveAssignment,
+          sla_state: liveSla
+        },
+        action: {
+          id: `act_${Date.now()}_noop`,
+          problem_id: problem.id,
+          actor_id: user.id,
+          actor_role: user.role,
+          action_type: actionType,
+          previous_state: problem.status,
+          new_state: problem.status,
+          target_department_id: input.department_id,
+          target_officer_id: input.assigned_to,
+          note: `Assignment confirmed for ${input.department_id}${
+            input.assigned_to ? ` (Officer: ${input.assigned_to})` : ''
+          }. Active assignment preserved.`,
+          created_at: nowIso
+        }
+      };
+    }
+
+    // Collect superseded active assignments so they are atomically ended/cancelled
+    const supersededAssignmentIds = activeAssignments.map((a) => a.id);
+
+    // 6. Calculate deterministic SLA
     const targetHours = SLAService.getTargetHours(problem.impact_level);
     const dueAtIso = input.due_at || new Date(now.getTime() + targetHours * 3600000).toISOString();
 
@@ -174,8 +224,15 @@ export class WorkflowService {
       created_at: nowIso
     };
 
-    // 5. Execute atomic assignment mutation with precondition check
-    const result = await db.atomicAssignProblem(problem.id, assignment, targetStatus, action, problem.status);
+    // 7. Execute atomic assignment mutation with precondition check and superseded IDs
+    const result = await db.atomicAssignProblem(
+      problem.id,
+      assignment,
+      targetStatus,
+      action,
+      problem.status,
+      supersededAssignmentIds
+    );
 
     // Compute live SLA on returned problem
     result.problem.sla_state = SLAService.computeSLAState(result.problem);
@@ -194,7 +251,8 @@ export class WorkflowService {
     problemId: string,
     targetStatus: ProblemStatus,
     note?: string,
-    requestedAction?: ActionType
+    requestedAction?: ActionType,
+    expectedStatus?: ProblemStatus
   ): Promise<{ problem: ProblemCluster; action: ProblemAction }> {
     const db = getDatabaseProvider();
     const problem = await db.getProblemCluster(problemId);
@@ -203,6 +261,15 @@ export class WorkflowService {
         statusCode: 404,
         code: ERROR_CODES.NOT_FOUND,
         message: `ProblemCluster ${problemId} not found.`
+      });
+    }
+
+    // Optimistic Concurrency Precondition Check
+    if (expectedStatus && problem.status !== expectedStatus) {
+      throw new AppError({
+        statusCode: 409,
+        code: ERROR_CODES.CONFLICT,
+        message: `Stale state transition conflict: expected current state is ${expectedStatus}, but persisted state is ${problem.status}.`
       });
     }
 
@@ -222,8 +289,15 @@ export class WorkflowService {
       actionType = matchingTransition.allowedActions[0];
     }
 
-    // Validate state machine rules and actor permissions
-    WorkflowStateMachine.validateTransition(problem, targetStatus, actionType, user);
+    // If targetStatus is RESOLVED, retrieve evidence submitters for Four-Eyes check
+    let evidenceSubmitterIds: string[] = [];
+    if (targetStatus === ProblemStatus.RESOLVED || actionType === ActionType.RESOLVED || actionType === ActionType.RESOLUTION_ACCEPTED) {
+      const evidenceList = await db.getResolutionEvidence(problem.id);
+      evidenceSubmitterIds = evidenceList.map((e) => e.submitted_by).filter(Boolean) as string[];
+    }
+
+    // Validate state machine rules, actor permissions, and Four-Eyes controls
+    WorkflowStateMachine.validateTransition(problem, targetStatus, actionType, user, evidenceSubmitterIds);
 
     const now = new Date();
     const nowIso = now.toISOString();
@@ -248,6 +322,9 @@ export class WorkflowService {
       updates.resolved_at = nowIso;
     } else if (targetStatus === ProblemStatus.CLOSED) {
       updates.closed_at = nowIso;
+    } else if (targetStatus === ProblemStatus.REOPENED) {
+      updates.assigned_to = null as any;
+      updates.assigned_at = null as any;
     }
 
     // Recompute SLA state incorporating resolution time and historical breach flag
@@ -261,7 +338,7 @@ export class WorkflowService {
     // Execute atomic transition with pre-mutation verification
     const result = await db.atomicTransitionStatus(
       problem.id,
-      problem.status,
+      expectedStatus || problem.status,
       targetStatus,
       action,
       updates
@@ -274,7 +351,7 @@ export class WorkflowService {
   /**
    * Records an official authorized officer action on a problem.
    * If the action corresponds to a canonical status transition, invokes transitionStatus.
-   * Otherwise records an informational action (e.g. REQUESTED_INFO, ESCALATED).
+   * Otherwise records an informational action (e.g. REQUESTED_INFO, ESCALATED, VERIFICATION_REQUESTED).
    */
   public static async recordAction(
     user: UserProfile,
@@ -290,6 +367,36 @@ export class WorkflowService {
       });
     }
 
+    // 2. Strict Role Permissions: Field Officer is prohibited from supervisory actions
+    if (user.role === UserRole.FIELD_OFFICER) {
+      const forbiddenForField = [
+        ActionType.CLOSED,
+        ActionType.REOPENED,
+        ActionType.TRIAGED,
+        ActionType.ASSIGNED,
+        ActionType.REASSIGNED,
+        ActionType.RESOLVED,
+        ActionType.RESOLUTION_ACCEPTED,
+        ActionType.RESOLUTION_REJECTED
+      ];
+      if (forbiddenForField.includes(input.action)) {
+        throw new AppError({
+          statusCode: 403,
+          code: ERROR_CODES.FORBIDDEN,
+          message: `Field officers are not authorized to perform action ${input.action}.`
+        });
+      }
+    }
+
+    // Evidence submission must go through the dedicated evidence endpoint
+    if (input.action === ActionType.RESOLUTION_SUBMITTED) {
+      throw new AppError({
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+        message: 'Resolution evidence must be submitted through the official evidence submission endpoint (POST /api/v1/problems/:id/evidence).'
+      });
+    }
+
     const db = getDatabaseProvider();
     const problem = await db.getProblemCluster(problemId);
     if (!problem) {
@@ -300,9 +407,23 @@ export class WorkflowService {
       });
     }
 
-    // 2. Enforce scope: Field Officer must be explicitly assigned
+    // Optimistic Concurrency Precondition Check
+    if (input.expected_status && problem.status !== input.expected_status) {
+      throw new AppError({
+        statusCode: 409,
+        code: ERROR_CODES.CONFLICT,
+        message: `Stale action conflict: expected problem status is ${input.expected_status}, but persisted status is ${problem.status}.`
+      });
+    }
+
+    // 3. Enforce scope: Field Officer must be explicitly assigned
     if (user.role === UserRole.FIELD_OFFICER) {
-      if (!problem.assigned_to || problem.assigned_to !== user.id) {
+      const userIds = new Set<string>();
+      if (user.id) userIds.add(user.id);
+      if ((user as any).legacy_firebase_uid) userIds.add((user as any).legacy_firebase_uid);
+      if ((user as any).auth_user_id) userIds.add((user as any).auth_user_id);
+
+      if (!problem.assigned_to || !userIds.has(problem.assigned_to)) {
         throw new AppError({
           statusCode: 403,
           code: ERROR_CODES.FORBIDDEN,
@@ -322,9 +443,9 @@ export class WorkflowService {
       }
     }
 
-    // 3. If action triggers a canonical lifecycle transition, route through transitionStatus
+    // 4. Map lifecycle transition actions to target states
     let targetStatus: ProblemStatus | null = null;
-    if (input.action === ActionType.TRIAGED && problem.status === ProblemStatus.NEW) {
+    if (input.action === ActionType.TRIAGED && (problem.status === ProblemStatus.NEW || problem.status === ProblemStatus.REOPENED)) {
       targetStatus = ProblemStatus.TRIAGED;
     } else if (
       (input.action === ActionType.STARTED_WORK || input.action === ActionType.ACCEPTED) &&
@@ -332,13 +453,15 @@ export class WorkflowService {
     ) {
       targetStatus = ProblemStatus.IN_PROGRESS;
     } else if (
-      (input.action === ActionType.VERIFICATION_REQUESTED ||
-        input.action === ActionType.RESOLUTION_SUBMITTED) &&
-      problem.status === ProblemStatus.IN_PROGRESS
+      (input.action === ActionType.RESOLVED || input.action === ActionType.RESOLUTION_ACCEPTED) &&
+      problem.status === ProblemStatus.AWAITING_VERIFICATION
     ) {
-      targetStatus = ProblemStatus.AWAITING_VERIFICATION;
-    } else if (input.action === ActionType.RESOLVED && problem.status === ProblemStatus.AWAITING_VERIFICATION) {
       targetStatus = ProblemStatus.RESOLVED;
+    } else if (
+      input.action === ActionType.RESOLUTION_REJECTED &&
+      problem.status === ProblemStatus.AWAITING_VERIFICATION
+    ) {
+      targetStatus = ProblemStatus.IN_PROGRESS;
     } else if (input.action === ActionType.CLOSED && problem.status === ProblemStatus.RESOLVED) {
       targetStatus = ProblemStatus.CLOSED;
     } else if (input.action === ActionType.REOPENED && problem.status === ProblemStatus.CLOSED) {
@@ -351,19 +474,41 @@ export class WorkflowService {
         problem.id,
         targetStatus,
         input.note,
-        input.action
+        input.action,
+        input.expected_status
       );
       return { action: transitionResult.action, problem: transitionResult.problem };
     }
 
-    // 4. Non-transition action: persist immutable ProblemAction record
+    // If the action is a lifecycle action but the current status doesn't match, validate against state machine
+    const lifecycleActions = [
+      ActionType.TRIAGED,
+      ActionType.STARTED_WORK,
+      ActionType.ACCEPTED,
+      ActionType.RESOLVED,
+      ActionType.RESOLUTION_ACCEPTED,
+      ActionType.RESOLUTION_REJECTED,
+      ActionType.CLOSED,
+      ActionType.REOPENED
+    ];
+    if (lifecycleActions.includes(input.action)) {
+      throw new AppError({
+        statusCode: 400,
+        code: ERROR_CODES.INVALID_STATE_TRANSITION,
+        message: `Action ${input.action} is not valid for problem in status ${problem.status}.`
+      });
+    }
+
+    // 5. Non-transition action (e.g. REQUESTED_INFO, ESCALATED, VERIFICATION_REQUESTED, VERIFICATION_COMPLETED): persist immutable ProblemAction record
     const nowIso = new Date().toISOString();
     const actionId = `act_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const isSystemAttribution = input.actor_id === 'civicpulse_ai_advisory' && input.actor_role === 'SYSTEM';
+
     const action: ProblemAction = {
       id: actionId,
       problem_id: problem.id,
-      actor_id: input.actor_id || user.id,
-      actor_role: input.actor_role || user.role,
+      actor_id: isSystemAttribution ? 'civicpulse_ai_advisory' : user.id,
+      actor_role: isSystemAttribution ? 'SYSTEM' : user.role,
       action_type: input.action,
       previous_state: problem.status,
       new_state: problem.status,

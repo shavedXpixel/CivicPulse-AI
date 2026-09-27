@@ -68,6 +68,7 @@ export interface Assignment {
   assigned_at: string;
   due_at?: string;
   completed_at?: string;
+  ended_at?: string;
   notes?: string;
   sla_state?: SLAState;
   created_at: string;
@@ -88,6 +89,8 @@ export enum ActionType {
   VERIFICATION_REQUESTED = 'VERIFICATION_REQUESTED',
   VERIFICATION_COMPLETED = 'VERIFICATION_COMPLETED',
   RESOLVED = 'RESOLVED',
+  RESOLUTION_ACCEPTED = 'RESOLUTION_ACCEPTED',
+  RESOLUTION_REJECTED = 'RESOLUTION_REJECTED',
   REOPENED = 'REOPENED',
   CLOSED = 'CLOSED'
 }
