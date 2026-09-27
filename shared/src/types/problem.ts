@@ -45,6 +45,8 @@ export interface ProblemCluster extends ImpactComponents {
   subcategory?: string;
   department_id?: string;
   ward_id?: string;
+  ward_name?: string;
+  ward_centroid?: GeoCoordinates;
   location?: GeoCoordinates;
   status: ProblemStatus;
   signal_count: number;

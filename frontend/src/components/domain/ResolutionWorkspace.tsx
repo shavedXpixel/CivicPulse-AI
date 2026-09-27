@@ -34,6 +34,9 @@ interface ResolutionWorkspaceProps {
   authToken: string;
   userRole: string;
   userName: string;
+  problemLocation?: { lat: number; lng: number };
+  wardId?: string;
+  wardName?: string;
   onStatusChange?: () => Promise<void>;
 }
 
@@ -47,12 +50,15 @@ export function ResolutionWorkspace({
   authToken,
   userRole,
   userName,
+  problemLocation,
+  wardId,
+  wardName,
   onStatusChange
 }: ResolutionWorkspaceProps) {
   const [evidenceList, setEvidenceList] = useState<ResolutionEvidence[]>([]);
   const [latestVerification, setLatestVerification] = useState<VerificationResult | null>(null);
   const [activeTab, setActiveTab] = useState<'timeline' | 'comparison' | 'ai_analysis'>('comparison');
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [verifying, setVerifying] = useState<boolean>(false);
   const [reviewing, setReviewing] = useState<boolean>(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -62,20 +68,18 @@ export function ResolutionWorkspace({
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState<boolean>(false);
   const [submitEvidenceType, setSubmitEvidenceType] = useState<EvidenceType>(EvidenceType.COMPLETION_PHOTO);
   const [submitBeforeAfter, setSubmitBeforeAfter] = useState<BeforeOrAfter>(BeforeOrAfter.AFTER);
-  const [submitDescription, setSubmitDescription] = useState<string>(
-    'Emergency excavation completed. High-pressure 250mm DI flange pipe joint replaced, bolted, and hydrostatic pressure tested at 3.8 bar. Trench backfilled and asphalt road surface cleared of standing water.'
-  );
-  const [submitLocation, setSubmitLocation] = useState<string>('Nayapalli Junction, Ward 18, VIP Road');
-  const [submitStoragePath, setSubmitStoragePath] = useState<string>('evidence/prb_0819_after_repair.jpg');
+  const [submitDescription, setSubmitDescription] = useState<string>('');
+  const [submitLocation, setSubmitLocation] = useState<string>(wardName || wardId || '');
+  const [submitStoragePath, setSubmitStoragePath] = useState<string>('');
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
 
   // Rejection Review Modal State
   const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
-  const [rejectionNotes, setRejectionNotes] = useState<string>(
-    'Photo indicates incomplete asphalt compaction. Residual road depression requires additional hot-mix rolling.'
-  );
+  const [rejectionNotes, setRejectionNotes] = useState<string>('');
 
   const fetchWorkspaceData = useCallback(async () => {
+    if (!authToken) return;
+    setLoading(true);
     try {
       const [evRes, verRes] = await Promise.allSettled([
         apiClient.get<{ data: ResolutionEvidence[] }>(`/api/v1/problems/${problemId}/evidence`, {
@@ -144,9 +148,9 @@ export function ResolutionWorkspace({
           storage_path: submitStoragePath,
           description: submitDescription,
           location: {
-            lat: 20.2961,
-            lng: 85.8245,
-            reference: submitLocation
+            lat: problemLocation?.lat ?? 20.2961,
+            lng: problemLocation?.lng ?? 85.8245,
+            reference: submitLocation || undefined
           }
         },
         { Authorization: `Bearer ${authToken}` }
@@ -358,106 +362,119 @@ export function ResolutionWorkspace({
             {/* 1. BEFORE / AFTER COMPARISON VIEW */}
             {activeTab === 'comparison' && (
               <div className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* BEFORE CARD */}
-                  <div className="p-5 border border-ink-border bg-canvas-subtle/50 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-civic-roseLight text-civic-rose uppercase border border-rose-200">
-                        BEFORE • Disruption State
-                      </span>
-                      <span className="text-[10px] font-mono text-ink-tertiary">
-                        {beforeEvidence[0]?.submitted_at
-                          ? new Date(beforeEvidence[0].submitted_at).toLocaleDateString()
-                          : 'Report Intake'}
-                      </span>
+                {beforeEvidence.length === 0 && afterEvidence.length === 0 ? (
+                  <div className="p-8 border border-dashed border-ink-border bg-canvas-subtle/40 text-center space-y-3">
+                    <div className="w-10 h-10 mx-auto rounded-full bg-canvas-card border border-ink-border flex items-center justify-center text-ink-muted">
+                      <Camera className="w-5 h-5 text-civic-terracotta" />
                     </div>
-
-                    {/* Before Photo Simulation Container */}
-                    <div className="relative aspect-video rounded-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 border border-slate-700 flex flex-col items-center justify-center p-4 text-center text-white overflow-hidden shadow-inner">
-                      <div className="absolute inset-0 bg-radial from-rose-500/10 via-transparent to-black/60 pointer-events-none" />
-                      <AlertTriangle className="w-8 h-8 text-civic-rose mb-2 animate-pulse" />
-                      <span className="text-xs font-bold text-rose-200 uppercase tracking-wide">
-                        Visible Pipeline Rupture & Surface Flood
-                      </span>
-                      <span className="text-[11px] text-slate-300 max-w-xs mt-1">
-                        High-pressure potable line crack; ~15cm water covering Nayapalli roadway corridor.
-                      </span>
-                      <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 text-[9px] font-mono text-slate-300">
-                        Geo: 20.2961° N, 85.8245° E (Ward 18)
-                      </div>
-                    </div>
-
-                    <div className="space-y-1 text-xs">
-                      <span className="font-semibold text-ink-primary">Pre-Remediation Observation:</span>
-                      <p className="text-ink-secondary text-[11px] leading-relaxed">
-                        {beforeEvidence[0]?.description ||
-                          'Gushing surface flooding from ruptured main transmission line; subterranean erosion risking road collapse.'}
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-semibold text-ink-primary font-serif">No Resolution Evidence Submitted</h4>
+                      <p className="text-xs text-ink-secondary max-w-md mx-auto leading-relaxed">
+                        Pre-remediation inspection photos and post-repair completion proofs will appear here once submitted by field engineering teams.
                       </p>
                     </div>
                   </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* BEFORE CARD */}
+                      <div className="p-5 border border-ink-border bg-canvas-subtle/50 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-civic-roseLight text-civic-rose uppercase border border-rose-200">
+                            BEFORE • Disruption State
+                          </span>
+                          <span className="text-[10px] font-mono text-ink-tertiary">
+                            {beforeEvidence[0]?.submitted_at
+                              ? new Date(beforeEvidence[0].submitted_at).toLocaleDateString()
+                              : 'Intake'}
+                          </span>
+                        </div>
 
-                  {/* AFTER CARD */}
-                  <div className="p-5 border border-ink-border bg-canvas-subtle/50 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-civic-emeraldLight text-emerald-800 uppercase border border-emerald-200">
-                        AFTER • Remediated Infrastructure
-                      </span>
-                      <span className="text-[10px] font-mono text-ink-tertiary">
-                        {afterEvidence[0]?.submitted_at
-                          ? new Date(afterEvidence[0].submitted_at).toLocaleDateString()
-                          : 'Post-Repair Proof'}
-                      </span>
-                    </div>
+                        <div className="relative aspect-video rounded-lg bg-slate-900 border border-slate-700 flex flex-col items-center justify-center p-4 text-center text-white overflow-hidden shadow-inner">
+                          <AlertTriangle className="w-8 h-8 text-civic-rose mb-2 animate-pulse" />
+                          <span className="text-xs font-bold text-rose-200 uppercase tracking-wide">
+                            {beforeEvidence[0]?.evidence_type?.replace(/_/g, ' ') || 'Pre-Remediation Record'}
+                          </span>
+                          <span className="text-[11px] text-slate-300 max-w-xs mt-1">
+                            {beforeEvidence[0]?.description || 'Initial condition documented at intake.'}
+                          </span>
+                          {beforeEvidence[0]?.location?.reference && (
+                            <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 text-[9px] font-mono text-slate-300">
+                              {beforeEvidence[0].location.reference}
+                            </div>
+                          )}
+                        </div>
 
-                    {/* After Photo Simulation Container */}
-                    <div className="relative aspect-video rounded-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 border border-emerald-700/60 flex flex-col items-center justify-center p-4 text-center text-white overflow-hidden shadow-inner">
-                      <div className="absolute inset-0 bg-radial from-emerald-500/10 via-transparent to-black/60 pointer-events-none" />
-                      <CheckCircle2 className="w-8 h-8 text-civic-emerald mb-2" />
-                      <span className="text-xs font-bold text-emerald-200 uppercase tracking-wide">
-                        Flanged Pipe Replaced & Surface Cleared
-                      </span>
-                      <span className="text-[11px] text-slate-300 max-w-xs mt-1">
-                        Excavation backfilled; 3.8 bar pressure restored; asphalt surface dry and operational.
-                      </span>
-                      <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 text-[9px] font-mono text-slate-300">
-                        Proof: DI Flange Joint Assembly (3.8 bar)
+                        <div className="space-y-1 text-xs">
+                          <span className="font-semibold text-ink-primary">Pre-Remediation Observation:</span>
+                          <p className="text-ink-secondary text-[11px] leading-relaxed">
+                            {beforeEvidence[0]?.description || 'No detailed observation recorded.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* AFTER CARD */}
+                      <div className="p-5 border border-ink-border bg-canvas-subtle/50 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-civic-emeraldLight text-emerald-800 uppercase border border-emerald-200">
+                            AFTER • Remediated Infrastructure
+                          </span>
+                          <span className="text-[10px] font-mono text-ink-tertiary">
+                            {afterEvidence[0]?.submitted_at
+                              ? new Date(afterEvidence[0].submitted_at).toLocaleDateString()
+                              : 'Post-Repair Proof'}
+                          </span>
+                        </div>
+
+                        <div className="relative aspect-video rounded-lg bg-slate-900 border border-emerald-700/60 flex flex-col items-center justify-center p-4 text-center text-white overflow-hidden shadow-inner">
+                          <CheckCircle2 className="w-8 h-8 text-civic-emerald mb-2" />
+                          <span className="text-xs font-bold text-emerald-200 uppercase tracking-wide">
+                            {afterEvidence[0]?.evidence_type?.replace(/_/g, ' ') || 'Remediation Proof'}
+                          </span>
+                          <span className="text-[11px] text-slate-300 max-w-xs mt-1">
+                            {afterEvidence[0]?.description || 'Remediation completed by field team.'}
+                          </span>
+                          {afterEvidence[0]?.location?.reference && (
+                            <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 text-[9px] font-mono text-slate-300">
+                              {afterEvidence[0].location.reference}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-1 text-xs">
+                          <span className="font-semibold text-ink-primary">Field Engineering Note:</span>
+                          <p className="text-ink-secondary text-[11px] leading-relaxed">
+                            {afterEvidence[0]?.description || 'No detailed engineering note recorded.'}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="space-y-1 text-xs">
-                      <span className="font-semibold text-ink-primary">Field Engineering Note:</span>
-                      <p className="text-ink-secondary text-[11px] leading-relaxed">
-                        {afterEvidence[0]?.description ||
-                          'Emergency excavation completed. High-pressure 250mm DI flange pipe joint replaced and pressure tested.'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Comparative Observations Grid */}
-                <div className="p-5 border-t border-ink-border bg-canvas-card space-y-3 text-xs">
-                  <span className="font-bold text-ink-primary uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-civic-amber" />
-                    <span>Observable Visual Deltas (AI & Telemetry Analysis)</span>
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="p-3 rounded-lg bg-white border border-ink-border space-y-1">
-                      <span className="text-[10px] text-ink-tertiary uppercase font-mono">Surface Water</span>
-                      <p className="font-semibold text-ink-primary">Eliminated (0cm standing water)</p>
-                      <span className="text-[10px] text-civic-emerald font-bold">100% Volume Cleared</span>
-                    </div>
-                    <div className="p-3 rounded-lg bg-white border border-ink-border space-y-1">
-                      <span className="text-[10px] text-ink-tertiary uppercase font-mono">Pipeline Assembly</span>
-                      <p className="font-semibold text-ink-primary">Ductile Iron Flanged Joint</p>
-                      <span className="text-[10px] text-civic-emerald font-bold">Pressure verified: 3.8 bar</span>
-                    </div>
-                    <div className="p-3 rounded-lg bg-white border border-ink-border space-y-1">
-                      <span className="text-[10px] text-ink-tertiary uppercase font-mono">Corridor Access</span>
-                      <p className="font-semibold text-ink-primary">VIP Road Nayapalli Reopened</p>
-                      <span className="text-[10px] text-civic-emerald font-bold">Normal Transit Resumed</span>
-                    </div>
-                  </div>
-                </div>
+                    {latestVerification && (
+                      <div className="p-5 border-t border-ink-border bg-canvas-card space-y-3 text-xs">
+                        <span className="font-bold text-ink-primary uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-civic-amber" />
+                          <span>Observable Visual Deltas (AI & Telemetry Analysis)</span>
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="p-3 rounded-lg bg-white border border-ink-border space-y-1">
+                            <span className="text-[10px] text-ink-tertiary uppercase font-mono">Verification Status</span>
+                            <p className="font-semibold text-ink-primary">{latestVerification.verification_result || 'PENDING'}</p>
+                            <span className="text-[10px] text-civic-emerald font-bold">
+                              Confidence: {((latestVerification.confidence || 0) * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                          <div className="p-3 rounded-lg bg-white border border-ink-border space-y-1">
+                            <span className="text-[10px] text-ink-tertiary uppercase font-mono">Analysis</span>
+                            <p className="text-xs text-ink-secondary leading-snug">
+                              {latestVerification.explanation || latestVerification.evidence_summary || 'Automated verification analysis complete.'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
 

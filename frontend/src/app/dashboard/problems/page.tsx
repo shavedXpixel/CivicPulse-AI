@@ -35,11 +35,12 @@ function ProblemsContent() {
         };
 
         const mapped = res.data.map((p) => {
-          const wardName = p.ward_id
-            ? (WARD_LABELS[p.ward_id] || `Ward ${p.ward_id.replace(/\D/g, '') || p.ward_id}`)
-            : 'Bhubaneswar Municipal Area';
+          const wardName = p.ward_name
+            || (p.ward_id
+              ? (WARD_LABELS[p.ward_id] || `Ward ${p.ward_id.replace(/\D/g, '') || p.ward_id}`)
+              : 'Bhubaneswar Municipal Area');
 
-          const locationAddress = p.ward_id && WARD_LABELS[p.ward_id] ? WARD_LABELS[p.ward_id] : 'Bhubaneswar';
+          const locationAddress = p.ward_name || (p.ward_id && WARD_LABELS[p.ward_id] ? WARD_LABELS[p.ward_id] : 'Bhubaneswar');
 
           return {
             id: p.id,

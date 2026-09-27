@@ -242,7 +242,9 @@ export default function ProblemDetailPage({
   const status = (liveProblem?.status || ProblemStatus.NEW) as ProblemStatus;
   const department = liveProblem?.department_id || 'Unassigned';
   const assignedTo = liveProblem?.assigned_to;
-  const wardName = liveProblem?.ward_id ? `Ward ${liveProblem.ward_id.replace(/\D/g, '') || '18'} (Nayapalli, Bhubaneswar)` : 'Ward 18 (Nayapalli, Bhubaneswar)';
+  const wardDisplayName = liveProblem?.ward_name
+    || (liveProblem?.ward_id ? `Ward ${liveProblem.ward_id.replace(/\D/g, '') || liveProblem.ward_id}` : 'Bhubaneswar Municipal Area');
+  const wardName = wardDisplayName;
   const signalCount = liveProblem?.signal_count || 0;
   const supportingMediaCount = liveProblem?.supporting_media_count ?? 0;
   const impactScore = liveProblem?.impact_score ?? 0;
@@ -586,25 +588,39 @@ export default function ProblemDetailPage({
                   <MapPin className="w-4 h-4 text-civic-terracotta shrink-0 mt-0.5" />
                   <div>
                     <h3 className="text-base font-serif font-bold text-ink-primary">
-                      {wardName}
+                      {wardDisplayName}
                     </h3>
                     <p className="text-xs text-ink-secondary font-mono mt-0.5">
-                      Territorial Corridor: Nayapalli — Bhubaneswar Municipal Corporation
+                      {liveProblem?.ward_name
+                        ? `Territorial Jurisdiction: ${liveProblem.ward_name} — Bhubaneswar Municipal Corporation`
+                        : 'Territorial Jurisdiction: Bhubaneswar Municipal Corporation (Locality: Unknown / Unverified)'}
                     </p>
                   </div>
                 </div>
-                <div className="p-3 border border-ink-border bg-canvas-subtle text-xs font-mono space-y-1">
+                <div className="p-3 border border-ink-border bg-canvas-subtle text-xs font-mono space-y-1.5">
                   <div className="flex justify-between">
-                    <span className="text-ink-muted uppercase">Centroid Coordinates:</span>
-                    <span className="text-ink-primary font-semibold">20.2961° N, 85.8245° E</span>
+                    <span className="text-ink-muted uppercase">Report Source Coordinates:</span>
+                    <span className="text-ink-primary font-semibold">
+                      {liveProblem?.location
+                        ? `${liveProblem.location.lat.toFixed(4)}° N, ${liveProblem.location.lng.toFixed(4)}° E`
+                        : 'Not Available'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-ink-muted uppercase">Derived Ward Centroid:</span>
+                    <span className="text-ink-primary font-semibold">
+                      {liveProblem?.ward_centroid
+                        ? `${liveProblem.ward_centroid.lat.toFixed(4)}° N, ${liveProblem.ward_centroid.lng.toFixed(4)}° E (Administrative Ref)`
+                        : 'Not Available'}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-ink-muted uppercase">GIS Ward Identifier:</span>
-                    <span className="text-ink-primary font-semibold">{liveProblem?.ward_id || 'WARD-018'}</span>
+                    <span className="text-ink-primary font-semibold">{liveProblem?.ward_id || 'Unknown / Unverified'}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-ink-muted uppercase">Geospatial Provenance:</span>
-                    {getProvenanceBadge(provenance?.geography)}
+                    {getProvenanceBadge(provenance?.geography || (liveProblem?.ward_id ? 'REAL' : 'UNKNOWN'))}
                   </div>
                 </div>
               </div>
@@ -612,11 +628,17 @@ export default function ProblemDetailPage({
               <div className="md:col-span-5 h-36 border border-ink-border bg-canvas-subtle p-4 flex flex-col justify-between font-mono text-xs">
                 <div className="flex items-center justify-between text-[10px] text-ink-muted uppercase">
                   <span>Cartographic Grid Ref</span>
-                  <span className="text-civic-terracotta">Zone BMC-04</span>
+                  <span className="text-civic-terracotta">{liveProblem?.ward_id || 'BMC GRID'}</span>
                 </div>
                 <div className="text-center space-y-1">
-                  <div className="text-base font-serif font-bold text-ink-primary">VIP Road Corridor</div>
-                  <div className="text-[10px] text-ink-muted">High-density public transit artery</div>
+                  <div className="text-base font-serif font-bold text-ink-primary">
+                    {liveProblem?.ward_name || (liveProblem?.ward_id ? `Ward ${liveProblem.ward_id.replace(/\D/g, '')}` : 'Bhubaneswar Urban Area')}
+                  </div>
+                  <div className="text-[10px] text-ink-muted">
+                    {liveProblem?.location
+                      ? `Source Point: ${liveProblem.location.lat.toFixed(4)}° N, ${liveProblem.location.lng.toFixed(4)}° E`
+                      : 'Locality: Unknown / Unverified'}
+                  </div>
                 </div>
                 <div className="text-[10px] text-ink-muted text-right">
                   Projection: EPSG:4326 (WGS84)
@@ -749,6 +771,9 @@ export default function ProblemDetailPage({
               authToken=""
               userRole={userProfile?.role || 'DEPARTMENT_OFFICER'}
               userName={userProfile?.display_name || user?.displayName || user?.email || 'Government Officer'}
+              problemLocation={liveProblem?.location}
+              wardId={liveProblem?.ward_id}
+              wardName={wardDisplayName}
               onStatusChange={async () => {
                 await Promise.all([fetchDetails(), fetchActions()]);
               }}

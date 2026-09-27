@@ -18,6 +18,7 @@ import { SignalRepository } from '../signals/signal.repository';
 import { impactService } from '../impact/impact.service';
 import { clusteringService } from '../clustering/clustering.service';
 import { calculateSignalRelationship } from '../clustering/similarity.math';
+import { getGeographyProvider } from '../../providers';
 
 export class ProblemService {
   constructor(
@@ -38,7 +39,36 @@ export class ProblemService {
     } else if (_user.role === UserRole.FIELD_OFFICER && effectiveQuery.assigned_to) {
       effectiveQuery.assigned_to = _user.id;
     }
-    return this.problemRepo.list(effectiveQuery);
+    const result = await this.problemRepo.list(effectiveQuery);
+    const geo = getGeographyProvider();
+    const enrichedData = await Promise.all(
+      result.data.map(async (p) => {
+        if (!p.ward_name && (p.ward_id || p.location)) {
+          try {
+            let wardInfo = null;
+            if (p.ward_id) {
+              wardInfo = await geo.getWardById(p.ward_id);
+            }
+            if (!wardInfo && p.location?.lat && p.location?.lng) {
+              wardInfo = await geo.getWardByCoordinates(p.location.lat, p.location.lng);
+            }
+            if (wardInfo) {
+              return {
+                ...p,
+                ward_name: wardInfo.ward_name,
+                ward_centroid: wardInfo.centroid
+              };
+            }
+          } catch {}
+        }
+        return p;
+      })
+    );
+
+    return {
+      data: enrichedData,
+      nextCursor: result.nextCursor
+    };
   }
 
   async getProblem(_user: UserProfile, id: string): Promise<ProblemCluster> {
@@ -59,6 +89,23 @@ export class ProblemService {
           message: `Department officer from ${_user.department_id} cannot view problem belonging to ${problem.department_id}.`
         });
       }
+    }
+
+    if (!problem.ward_name && (problem.ward_id || problem.location)) {
+      try {
+        const geo = getGeographyProvider();
+        let wardInfo = null;
+        if (problem.ward_id) {
+          wardInfo = await geo.getWardById(problem.ward_id);
+        }
+        if (!wardInfo && problem.location?.lat && problem.location?.lng) {
+          wardInfo = await geo.getWardByCoordinates(problem.location.lat, problem.location.lng);
+        }
+        if (wardInfo) {
+          problem.ward_name = wardInfo.ward_name;
+          problem.ward_centroid = wardInfo.centroid;
+        }
+      } catch {}
     }
 
     return problem;
