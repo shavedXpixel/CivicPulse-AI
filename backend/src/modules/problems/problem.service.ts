@@ -405,6 +405,21 @@ export class ProblemService {
     }
 
     const problem = await this.getProblem(user, problemId);
+
+    // Strict completed problem isolation: cannot attach signals to completed or historical problems
+    const completedStatuses: ProblemStatus[] = [
+      ProblemStatus.RESOLVED,
+      ProblemStatus.CLOSED,
+      ProblemStatus.REOPENED
+    ];
+    if (completedStatuses.includes(problem.status) || problem.resolved_at || problem.closed_at) {
+      throw new AppError({
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+        message: `Cannot attach signal to ${problem.status} problem. Completed or historical problems are immutable.`
+      });
+    }
+
     const signal = await this.signalRepo.findById(signalId);
     if (!signal) {
       throw new AppError({

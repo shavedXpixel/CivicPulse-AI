@@ -7,12 +7,13 @@ import {
   ProblemClusterMember,
   ClusterRelationshipType,
   ProblemStatus,
-  ImpactLevel
+  ImpactLevel,
+  RELATIONSHIP_THRESHOLDS
 } from '@civicpulse/shared';
 import { getAIProvider } from '../../providers';
 import { ProblemRepository } from '../problems/problem.repository';
 import { SignalRepository } from '../signals/signal.repository';
-import { calculateSignalRelationship, cosineSimilarity } from './similarity.math';
+import { calculateSignalRelationship, cosineSimilarity, haversineDistanceKm } from './similarity.math';
 import { impactService } from '../impact/impact.service';
 import { env } from '../../config/env';
 import { AppError } from '../../middleware/error.middleware';
@@ -80,22 +81,36 @@ export class ClusteringService {
       signalEmbedding = [];
     }
 
-    // 2. Filter-first candidate search: retrieve active problems matching category or ward
-    const candidateProblems = await this.problemRepo.list({
-      category: signal.category || undefined,
-      ward_id: signal.ward_id || undefined,
-      limit: 20
+    // 2. Filter-first candidate search: retrieve active problems matching category AND ward strictly
+    // STRICT PROBLEM ISOLATION: A signal can only correlate with an active problem in the exact same ward and category.
+    // Under NO circumstances do we query across all wards or arbitrary problems.
+    let rawCandidates: ProblemCluster[] = [];
+    if (signal.category && signal.ward_id) {
+      const candidateProblems = await this.problemRepo.list({
+        category: signal.category,
+        ward_id: signal.ward_id,
+        limit: 20
+      });
+      rawCandidates = candidateProblems.data;
+    }
+
+    // STRICT ACTIVE ISOLATION: Never correlate incoming new signals into RESOLVED, CLOSED, or REOPENED problems.
+    // Also reject any problem that has resolved_at or closed_at set (historical completed incidents).
+    const ALLOWED_ACTIVE_STATUSES = new Set<ProblemStatus>([
+      ProblemStatus.NEW,
+      ProblemStatus.TRIAGED,
+      ProblemStatus.ASSIGNED,
+      ProblemStatus.IN_PROGRESS
+    ]);
+
+    const candidates = rawCandidates.filter((p) => {
+      if (!ALLOWED_ACTIVE_STATUSES.has(p.status)) return false;
+      if (p.resolved_at || p.closed_at) return false;
+      if (p.status === ProblemStatus.RESOLVED || p.status === ProblemStatus.CLOSED || p.status === ProblemStatus.REOPENED) return false;
+      if (signal.category && p.category && p.category.toLowerCase() !== signal.category.toLowerCase()) return false;
+      if (signal.ward_id && p.ward_id && p.ward_id !== signal.ward_id) return false;
+      return true;
     });
-
-    // If no exact category/ward candidates, look across recent active clusters
-    const rawCandidates = candidateProblems.data.length > 0
-      ? candidateProblems.data
-      : (await this.problemRepo.list({ limit: 10 })).data;
-
-    // ACTIVE clusters only: never correlate incoming new signals into RESOLVED or CLOSED problems
-    const candidates = rawCandidates.filter(
-      (p) => p.status !== ProblemStatus.RESOLVED && p.status !== ProblemStatus.CLOSED
-    );
 
     let bestMatch: {
       problem: ProblemCluster;
@@ -105,6 +120,24 @@ export class ClusteringService {
     } | null = null;
 
     for (const candidate of candidates) {
+      // INVARIANT: Two signals can represent the SAME active physical incident ONLY IF
+      // their geographic coordinates are within 150 meters (0.150 km) of each other.
+      // If either lacks coordinates or distance > 150m, prefer creating a separate new problem.
+      if (!signal.location || !candidate.location) {
+        continue;
+      }
+
+      const distKm = haversineDistanceKm(
+        signal.location.lat,
+        signal.location.lng,
+        candidate.location.lat,
+        candidate.location.lng
+      );
+
+      if (distKm > 0.150) {
+        continue; // Different physical location (> 150m away) -> strictly separate problem
+      }
+
       const members = await this.problemRepo.getMembers(candidate.id);
       
       // Compare against problem centroid if available, or representative member signals
@@ -118,7 +151,13 @@ export class ClusteringService {
           location: candidate.location
         };
         const rel = calculateSignalRelationship(signal, dummyRefSignal, cosSim);
-        if (rel.is_match && (!bestMatch || rel.relationship_score > bestMatch.score)) {
+        // STRICT ACTIVE CORRELATION: ONLY strong DUPLICATE (score >= 0.85) can attach to an existing active problem
+        if (
+          rel.is_match &&
+          rel.relationship === ClusterRelationshipType.DUPLICATE &&
+          rel.relationship_score >= RELATIONSHIP_THRESHOLDS.STRONG_DUPLICATE &&
+          (!bestMatch || rel.relationship_score > bestMatch.score)
+        ) {
           bestMatch = {
             problem: candidate,
             relationship: rel.relationship,
@@ -138,6 +177,18 @@ export class ClusteringService {
         }
 
         if (memSignal) {
+          if (memSignal.location && signal.location) {
+            const memDistKm = haversineDistanceKm(
+              signal.location.lat,
+              signal.location.lng,
+              memSignal.location.lat,
+              memSignal.location.lng
+            );
+            if (memDistKm > 0.150) {
+              continue;
+            }
+          }
+
           let memEmbedding: number[] = [];
           try {
             memEmbedding = await this.aiProvider.generateEmbedding(
@@ -152,7 +203,13 @@ export class ClusteringService {
             : 0.6; // Baseline if no embeddings
 
           const rel = calculateSignalRelationship(signal, memSignal, cosSim);
-          if (rel.is_match && (!bestMatch || rel.relationship_score > bestMatch.score)) {
+          // STRICT ACTIVE CORRELATION: ONLY strong DUPLICATE (score >= 0.85) can attach to an existing active problem
+          if (
+            rel.is_match &&
+            rel.relationship === ClusterRelationshipType.DUPLICATE &&
+            rel.relationship_score >= RELATIONSHIP_THRESHOLDS.STRONG_DUPLICATE &&
+            (!bestMatch || rel.relationship_score > bestMatch.score)
+          ) {
             bestMatch = {
               problem: candidate,
               relationship: rel.relationship,
@@ -164,7 +221,7 @@ export class ClusteringService {
       }
     }
 
-    // If no candidate reached the relationship threshold (>= 0.70)
+    // If no candidate reached the DUPLICATE threshold (>= 0.85 within 150m)
     if (!bestMatch) {
       if (options?.autoCreate) {
         const { problem, member } = await this.createClusterFromSignal(signalId, {
@@ -177,13 +234,13 @@ export class ClusteringService {
           member,
           relationship: ClusterRelationshipType.DUPLICATE,
           score: 1.0,
-          reason: 'Created new problem cluster as no existing problem cluster met relationship threshold (>= 0.70).'
+          reason: 'Created new problem cluster as no existing active problem cluster matched as the same physical operational incident.'
         };
       }
 
       return {
         matched: false,
-        reason: 'No existing problem cluster met the relationship threshold (score >= 0.70).'
+        reason: 'No existing active problem cluster represents the same physical operational incident.'
       };
     }
 
@@ -399,6 +456,15 @@ export class ClusteringService {
 
   /**
    * Preview candidate matches for a signal without attaching or modifying database records.
+   * DISCOVERY ONLY: Strictly read-only preview for supervisor/system inspection.
+   * This method NEVER writes to the database, NEVER adds cluster members,
+   * NEVER updates signal status, and CANNOT cause problem lifecycle mutations.
+   *
+   * STRICT ISOLATION INVARIANTS ENFORCED:
+   * - Requires exact same category AND exact same ward (returns [] if either is absent).
+   * - Only active statuses (NEW, TRIAGED, ASSIGNED, IN_PROGRESS) are eligible.
+   * - Excludes RESOLVED, CLOSED, REOPENED, and any problem with resolved_at or closed_at set.
+   * - Requires physical proximity <= 150 meters (0.150 km) when coordinates are present.
    */
   async findCandidatesForSignal(signal: Signal): Promise<Array<{
     problem: ProblemCluster;
@@ -406,18 +472,40 @@ export class ClusteringService {
     score: number;
     reason: string;
   }>> {
+    // Invariant: Must strictly match both category AND ward. No cross-ward or cross-category candidates.
+    if (!signal.category || !signal.ward_id) {
+      return [];
+    }
+
     let signalEmbedding: number[] = [];
     try {
       signalEmbedding = await this.aiProvider.generateEmbedding(
-        `${signal.category || ''}: ${signal.original_text}`
+        `${signal.category}: ${signal.original_text}`
       );
     } catch {
       signalEmbedding = [];
     }
 
     const candidateProblems = await this.problemRepo.list({
-      category: signal.category || undefined,
+      category: signal.category,
+      ward_id: signal.ward_id,
       limit: 10
+    });
+
+    const ALLOWED_ACTIVE_STATUSES = new Set<ProblemStatus>([
+      ProblemStatus.NEW,
+      ProblemStatus.TRIAGED,
+      ProblemStatus.ASSIGNED,
+      ProblemStatus.IN_PROGRESS
+    ]);
+
+    const activeCandidates = candidateProblems.data.filter((p) => {
+      if (!ALLOWED_ACTIVE_STATUSES.has(p.status)) return false;
+      if (p.resolved_at || p.closed_at) return false;
+      if (p.status === ProblemStatus.RESOLVED || p.status === ProblemStatus.CLOSED || p.status === ProblemStatus.REOPENED) return false;
+      if (p.category && p.category.toLowerCase() !== signal.category!.toLowerCase()) return false;
+      if (p.ward_id && p.ward_id !== signal.ward_id) return false;
+      return true;
     });
 
     const matches: Array<{
@@ -427,7 +515,21 @@ export class ClusteringService {
       reason: string;
     }> = [];
 
-    for (const candidate of candidateProblems.data) {
+    for (const candidate of activeCandidates) {
+      // 150-meter physical separation invariant:
+      // If coordinates are present, candidate must be within 150 meters.
+      if (signal.location && candidate.location) {
+        const distKm = haversineDistanceKm(
+          signal.location.lat,
+          signal.location.lng,
+          candidate.location.lat,
+          candidate.location.lng
+        );
+        if (distKm > 0.150) {
+          continue; // Physically distinct incident (> 150m) -> exclude from candidate discovery
+        }
+      }
+
       const members = await this.problemRepo.getMembers(candidate.id);
       let bestCandidateScore = 0;
       let bestCandidateRel = ClusterRelationshipType.SUPPORTING;
@@ -441,6 +543,18 @@ export class ClusteringService {
         }
 
         if (memSignal) {
+          if (memSignal.location && signal.location) {
+            const memDistKm = haversineDistanceKm(
+              signal.location.lat,
+              signal.location.lng,
+              memSignal.location.lat,
+              memSignal.location.lng
+            );
+            if (memDistKm > 0.150) {
+              continue;
+            }
+          }
+
           let memEmbedding: number[] = [];
           try {
             memEmbedding = await this.aiProvider.generateEmbedding(

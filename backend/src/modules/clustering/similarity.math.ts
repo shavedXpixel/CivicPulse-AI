@@ -167,6 +167,11 @@ export function calculateSignalRelationship(
     is_match = true;
   }
 
+  // Physical invariant: Two incidents separated by > 150m cannot be a DUPLICATE of the same physical incident
+  if (distanceMeters !== null && distanceMeters > 150 && relationship === ClusterRelationshipType.DUPLICATE) {
+    relationship = ClusterRelationshipType.RELATED;
+  }
+
   // Explainability string for inspection
   const reasons: string[] = [];
   if (isCategoryMatch) reasons.push(`matching ${catA} category`);
