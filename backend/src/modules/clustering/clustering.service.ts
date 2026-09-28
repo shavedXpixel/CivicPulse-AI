@@ -88,9 +88,14 @@ export class ClusteringService {
     });
 
     // If no exact category/ward candidates, look across recent active clusters
-    const candidates = candidateProblems.data.length > 0
+    const rawCandidates = candidateProblems.data.length > 0
       ? candidateProblems.data
       : (await this.problemRepo.list({ limit: 10 })).data;
+
+    // ACTIVE clusters only: never correlate incoming new signals into RESOLVED or CLOSED problems
+    const candidates = rawCandidates.filter(
+      (p) => p.status !== ProblemStatus.RESOLVED && p.status !== ProblemStatus.CLOSED
+    );
 
     let bestMatch: {
       problem: ProblemCluster;
@@ -234,7 +239,7 @@ export class ClusteringService {
    */
   async createClusterFromSignal(
     signalId: string,
-    options?: { customTitle?: string; failOnEmbeddingError?: boolean }
+    options?: { customTitle?: string; failOnEmbeddingError?: boolean; initialStatus?: ProblemStatus }
   ): Promise<{ problem: ProblemCluster; member: ProblemClusterMember }> {
     const signal = await this.signalRepo.findById(signalId);
     if (!signal) {
@@ -300,7 +305,7 @@ export class ClusteringService {
       ward_id: signal.ward_id || undefined,
       location: signal.location || undefined,
       centroid_embedding: signalEmbedding.length > 0 ? signalEmbedding : undefined,
-      status: ProblemStatus.TRIAGED,
+      status: options?.initialStatus || ProblemStatus.TRIAGED,
       signal_count: 1,
       severity_score: signal.severity === 'CRITICAL' ? 22 : signal.severity === 'HIGH' ? 18 : 12,
       population_score: 8,

@@ -733,7 +733,16 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     const paginated = result.slice(0, limit).map((s) => {
       if (s.problem_cluster_id && !s.problem_status) {
         const pc = this.problemClusters.get(s.problem_cluster_id);
-        return { ...s, problem_status: pc?.status };
+        let problemStatus = pc?.status;
+        if (pc && (pc.status === ProblemStatus.RESOLVED || pc.status === ProblemStatus.CLOSED)) {
+          const signalTime = new Date(s.submitted_at || s.created_at).getTime();
+          const resolvedTime = pc.resolved_at ? new Date(pc.resolved_at).getTime() : 0;
+          const closedTime = pc.closed_at ? new Date(pc.closed_at).getTime() : 0;
+          if ((resolvedTime > 0 && signalTime > resolvedTime) || (closedTime > 0 && signalTime > closedTime)) {
+            problemStatus = ProblemStatus.NEW;
+          }
+        }
+        return { ...s, problem_status: problemStatus };
       }
       return s;
     });

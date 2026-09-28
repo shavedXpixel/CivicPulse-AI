@@ -356,15 +356,27 @@ export default function CitizenHomePage() {
                               <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-semibold bg-amber-50 text-amber-900 border border-amber-300">
                                 Reopened
                               </span>
+                            ) : sig.problem_status === 'IN_PROGRESS' ? (
+                              <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-semibold bg-blue-50 text-civic-blue border border-civic-blue/30">
+                                In Progress
+                              </span>
+                            ) : sig.problem_status === 'ASSIGNED' ? (
+                              <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-semibold bg-blue-50 text-civic-blue border border-civic-blue/30">
+                                Officer Dispatched
+                              </span>
+                            ) : sig.problem_status === 'TRIAGED' ? (
+                              <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-semibold bg-amber-50 text-amber-900 border border-amber-200">
+                                Incident Triaged
+                              </span>
                             ) : (
                               <span
                                 className={`px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-semibold border ${
                                   sig.processing_status === 'COMPLETED'
-                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    ? 'bg-slate-50 text-slate-800 border-slate-200'
                                     : 'bg-amber-50 text-amber-900 border-amber-200'
                                 }`}
                               >
-                                {sig.processing_status === 'COMPLETED' ? 'Processed' : 'Pending Analysis'}
+                                {sig.processing_status === 'COMPLETED' ? 'Report Received' : 'Pending Analysis'}
                               </span>
                             )}
                             {sig.problem_cluster_id && (

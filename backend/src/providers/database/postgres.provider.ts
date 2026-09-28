@@ -657,7 +657,14 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     params.push(limit + 1);
 
     const sql = `
-      SELECT s.*, u.legacy_firebase_uid as citizen_legacy_uid, pc.status as problem_status
+      SELECT s.*, u.legacy_firebase_uid as citizen_legacy_uid,
+        CASE
+          WHEN pc.status IN ('RESOLVED', 'CLOSED') AND (
+            (pc.resolved_at IS NOT NULL AND s.created_at > pc.resolved_at) OR
+            (pc.closed_at IS NOT NULL AND s.created_at > pc.closed_at)
+          ) THEN 'NEW'
+          ELSE pc.status
+        END as problem_status
       FROM signals s
       LEFT JOIN users u ON u.id = s.citizen_id
       LEFT JOIN problem_clusters pc ON pc.id = s.problem_cluster_id
