@@ -17,11 +17,17 @@ build/
 
 # Environment files
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
 *.env.local
+
+# Secrets, Keys, and Certificates
+*.pem
+*.key
+*.crt
+*credential*
+*secret*
+secrets/
 
 # Logs
 npm-debug.log*
@@ -47,9 +53,9 @@ Thumbs.db
 
 # Turbopack cache
 .turbo
+
 # Operator and migration artifacts
 .scratch/
-secrets/
 .operator/
 migration/snapshots/
 raw_exports/
@@ -65,6 +71,4 @@ dumps/
 !package-lock.json
 !tsconfig*.json
 !data/**/*.json
-!migration/auth/auth-account-classification.json
-!migration/auth/firebase-to-supabase-user-map.json
 antigravity-test-credentials.local.md
