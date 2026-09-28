@@ -56,6 +56,9 @@ function CitizenReportContent() {
   const [photoError, setPhotoError] = useState<string | null>(null);
 
   // Stage 5 & 6: Submission & Processing state
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(
+    () => `idem_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+  );
   const [processingStatusText, setProcessingStatusText] = useState<string>('Submitting your report…');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [createdSignal, setCreatedSignal] = useState<{
@@ -204,6 +207,9 @@ function CitizenReportContent() {
           location_accuracy_m: selectedLocation?.accuracy_m,
           location_reference: locationRef,
           auto_process: true,
+        },
+        {
+          'Idempotency-Key': idempotencyKey
         }
       );
 
@@ -249,6 +255,7 @@ function CitizenReportContent() {
   };
 
   const handleReset = () => {
+    setIdempotencyKey(`idem_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
     setCreatedSignal(null);
     setDescription('');
     handleRemovePhoto();

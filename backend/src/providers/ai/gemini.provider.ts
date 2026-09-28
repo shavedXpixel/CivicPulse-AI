@@ -341,6 +341,7 @@ export class GeminiAIProvider implements IAIProvider {
           const errorText = await res.text();
           const err: any = new Error(`Gemini Embedding API returned HTTP ${res.status}: ${errorText.substring(0, 300)}`);
           err.status = res.status;
+          err.retryAfter = res.headers?.get ? res.headers.get('retry-after') : undefined;
           throw err;
         }
 
@@ -373,7 +374,16 @@ export class GeminiAIProvider implements IAIProvider {
           });
         }
         if (attempt < this.maxRetries) {
-          const delay = calculateBackoffWithJitter(attempt, this.baseDelayMs, this.maxDelayMs);
+          const effectiveBaseDelay = (status === 429 && process.env.NODE_ENV !== 'test')
+            ? Math.max(this.baseDelayMs, 1000)
+            : this.baseDelayMs;
+          let delay = calculateBackoffWithJitter(attempt, effectiveBaseDelay, this.maxDelayMs);
+          if (err.retryAfter) {
+            const parsed = parseInt(err.retryAfter, 10);
+            if (!isNaN(parsed) && parsed > 0) {
+              delay = Math.min(this.maxDelayMs, Math.max(delay, parsed * 1000));
+            }
+          }
           await new Promise((r) => setTimeout(r, delay));
         }
       }

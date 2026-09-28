@@ -16,6 +16,91 @@ import { SignalRepository } from './signal.repository';
 import { getStorageProvider, getGeographyProvider, SignalFilterCriteria } from '../../providers';
 import { AppError } from '../../middleware/error.middleware';
 import { env } from '../../config/env';
+import { haversineDistanceKm } from '../clustering/similarity.math';
+
+/**
+ * Evaluates whether an incoming signal submission is a duplicate/retry of a recent signal.
+ *
+ * Exact Duplicate Fingerprint Definition:
+ * Two reports from the same citizen within the cooldown window (default 60s) are considered
+ * the same logical submission if and only if ALL of the following criteria match:
+ * 1. Normalized text matches exactly:
+ *    normalize(incoming.original_text) === normalize(recent.original_text).
+ * 2. Location matches:
+ *    - If both provide GPS coordinates: haversine distance <= 25 meters (0.025 km).
+ *      Substantially different coordinates (> 25m) are treated as a NEW report.
+ *    - If one provides coordinates and the other does not: considered DIFFERENT locations -> NEW report.
+ *    - If neither provides coordinates: ward_id must match AND normalized location_reference must match.
+ * 3. Category matches (if both provide a category).
+ *
+ * If ANY of text, location, or category is meaningfully different, it is treated as a NEW report.
+ */
+export function isDuplicateSignalFingerprint(
+  incoming: CreateSignalInput,
+  recent: Signal,
+  cooldownMs: number = 60000,
+  nowMs: number = Date.now()
+): boolean {
+  const createdAtMs = new Date(recent.created_at).getTime();
+  if (nowMs - createdAtMs >= cooldownMs) {
+    return false;
+  }
+
+  // 1. Text check: normalized original_text
+  const incomingText = (incoming.original_text || '').trim().toLowerCase();
+  const recentText = (recent.original_text || '').trim().toLowerCase();
+  if (incomingText !== recentText) {
+    return false;
+  }
+
+  // 2. Category check: if both specify category, they must match
+  if (incoming.category && recent.category) {
+    if (incoming.category !== recent.category) {
+      return false;
+    }
+  }
+
+  // 3. Location check
+  const incomingHasCoords =
+    incoming.location &&
+    typeof incoming.location.lat === 'number' &&
+    typeof incoming.location.lng === 'number';
+  const recentHasCoords =
+    recent.location &&
+    typeof recent.location.lat === 'number' &&
+    typeof recent.location.lng === 'number';
+
+  if (incomingHasCoords && recentHasCoords) {
+    const distKm = haversineDistanceKm(
+      incoming.location!.lat,
+      incoming.location!.lng,
+      recent.location!.lat,
+      recent.location!.lng
+    );
+    // Distance > 25 meters (0.025 km) is considered a distinct physical location
+    if (distKm > 0.025) {
+      return false;
+    }
+  } else if (incomingHasCoords !== recentHasCoords) {
+    // One has explicit coordinates and the other does not
+    return false;
+  } else {
+    // Neither has coordinates: compare ward_id and location_reference
+    const incomingWard = incoming.ward_id || '';
+    const recentWard = recent.ward_id || '';
+    if (incomingWard !== recentWard) {
+      return false;
+    }
+
+    const incomingRef = (incoming.location_reference || '').trim().toLowerCase();
+    const recentRef = (recent.location_reference || '').trim().toLowerCase();
+    if (incomingRef !== recentRef) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 export class SignalService {
   constructor(private repo: SignalRepository = new SignalRepository()) {}
@@ -25,22 +110,26 @@ export class SignalService {
     if (user.role === UserRole.CITIZEN && input.auto_process) {
       const recentSignals = await this.repo.list({
         citizen_id: user.id,
-        limit: 5
+        limit: 10
       });
       const nowMs = Date.now();
-      const isDuplicate = recentSignals.data.some((s) => {
-        if (s.original_text?.trim().toLowerCase() === input.original_text?.trim().toLowerCase()) {
-          const createdAtMs = new Date(s.created_at).getTime();
-          return (nowMs - createdAtMs) < 60000; // 60-second cooldown window
+      const matchingRecent = recentSignals.data.find((s) =>
+        isDuplicateSignalFingerprint(input, s, 60000, nowMs)
+      );
+
+      if (matchingRecent) {
+        // If the prior signal was already successfully clustered, protect against rapid duplicates
+        if (matchingRecent.problem_cluster_id && matchingRecent.processing_status === SignalProcessingStatus.COMPLETED) {
+          throw new AppError({
+            statusCode: 409,
+            code: ERROR_CODES.CONFLICT,
+            message: 'Duplicate report submission detected within cooldown window. Please wait before submitting identical reports.'
+          });
         }
-        return false;
-      });
-      if (isDuplicate) {
-        throw new AppError({
-          statusCode: 409,
-          code: ERROR_CODES.CONFLICT,
-          message: 'Duplicate report submission detected within cooldown window. Please wait before submitting identical reports.'
-        });
+
+        // If the prior signal is unclustered / pending / degraded, idempotently return the existing signal
+        // so the citizen or background runner can re-attempt processing without creating a duplicate record.
+        return matchingRecent;
       }
     }
 

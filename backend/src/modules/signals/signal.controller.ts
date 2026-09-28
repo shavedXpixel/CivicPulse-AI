@@ -53,7 +53,43 @@ export class SignalController {
           return;
         } catch (aiErr: any) {
           console.warn(`[SignalController] Automated AI analysis/clustering failed for ${signal.id}:`, aiErr.message);
-          // Ensure raw signal is preserved and marked FAILED in DB
+
+          const isEmbeddingFailure =
+            aiErr?.code === 'EMBEDDING_FAILED' ||
+            (typeof aiErr?.message === 'string' && (
+              aiErr.message.includes('EMBEDDING_FAILED') ||
+              aiErr.message.includes('Semantic vector embedding') ||
+              aiErr.message.includes('Gemini Embedding API')
+            ));
+
+          if (isEmbeddingFailure) {
+            // DEGRADED MODE: Raw signal was successfully created and persisted.
+            // Semantic vector embedding is temporarily unavailable (e.g. Gemini 429 / quota / service degradation).
+            // Preserve raw signal in PENDING state so background worker or safe retry can process it later.
+            // Do NOT fail the citizen submission; return a 201 Created with truthful degraded state (no fake cluster, no fake embeddings).
+            try {
+              await signalService.updateSignal(signal.id, {
+                processing_status: SignalProcessingStatus.PENDING
+              });
+            } catch (_) {}
+
+            const persistedSignal = await signalService.getSignal(user, signal.id);
+
+            res.status(201).json({
+              data: {
+                ...persistedSignal,
+                cluster: null,
+                degraded: true,
+                degradation_reason: 'EMBEDDING_UNAVAILABLE'
+              },
+              cluster: null,
+              degraded: true,
+              message: 'Signal submitted successfully. AI semantic clustering is pending due to temporary provider capacity.'
+            });
+            return;
+          }
+
+          // Ensure raw signal is preserved and marked FAILED in DB for unexpected fatal errors
           try {
             await signalService.updateSignal(signal.id, {
               processing_status: SignalProcessingStatus.FAILED

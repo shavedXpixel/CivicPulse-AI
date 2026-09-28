@@ -236,8 +236,8 @@ describe('Citizen Report → Government Problem Pipeline (End-to-End Regression)
       expect(res.body.error.code).toBe('AI_PROCESSING_FAILED');
     });
 
-    it('fails cleanly with 502 EMBEDDING_FAILED when embedding service fails', async () => {
-      // Simulate Embedding failure
+    it('handles embedding service failure resiliently by persisting signal and returning degraded 201 status', async () => {
+      // Simulate Embedding failure (e.g. Gemini 429 / RESOURCE_EXHAUSTED)
       vi.spyOn(mockAI, 'generateEmbedding').mockRejectedValueOnce(new Error('Vector embedding service unavailable'));
 
       const res = await request(app)
@@ -249,10 +249,14 @@ describe('Citizen Report → Government Problem Pipeline (End-to-End Regression)
           auto_process: true
         });
 
-      // Must never silently claim success with zero-vector
-      expect(res.status).toBe(502);
-      expect(res.body.error).toBeDefined();
-      expect(res.body.error.code).toBe('EMBEDDING_FAILED');
+      // Must never drop signal, must return 201 with truthful degraded state
+      expect(res.status).toBe(201);
+      expect(res.body.data).toBeDefined();
+      expect(res.body.data.id).toMatch(/^sig_/);
+      expect(res.body.data.processing_status).toBe('PENDING');
+      expect(res.body.cluster).toBeNull();
+      expect(res.body.degraded).toBe(true);
+      expect(res.body.data.degradation_reason).toBe('EMBEDDING_UNAVAILABLE');
     });
 
     it('rejects rapid duplicate submissions from the same citizen with 409 CONFLICT', async () => {
