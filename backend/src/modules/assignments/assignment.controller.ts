@@ -38,7 +38,12 @@ export class AssignmentController {
 
       // 2. Server-side scoping
       if (user.role === UserRole.FIELD_OFFICER) {
-        if (req.query.assigned_to && req.query.assigned_to !== 'me' && req.query.assigned_to !== user.id) {
+        const userIds = new Set<string>();
+        if (user.id) userIds.add(user.id);
+        if ((user as any).legacy_firebase_uid) userIds.add((user as any).legacy_firebase_uid);
+        if ((user as any).auth_user_id) userIds.add((user as any).auth_user_id);
+
+        if (req.query.assigned_to && req.query.assigned_to !== 'me' && !userIds.has(req.query.assigned_to as string)) {
           return next(
             new AppError({
               statusCode: 403,
@@ -117,6 +122,11 @@ export class AssignmentController {
         activeList = activeList.filter((asgn) => {
           // Must have active assignment status
           if (asgn.status !== AssignmentStatus.ASSIGNED && asgn.status !== AssignmentStatus.ACCEPTED) {
+            return false;
+          }
+
+          // Assignment must be explicitly directed to this officer
+          if (asgn.assigned_to && !userIds.has(asgn.assigned_to)) {
             return false;
           }
 

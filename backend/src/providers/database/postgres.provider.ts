@@ -1075,7 +1075,11 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       await this.query(sql, params);
     }
 
-    return assignment;
+    return {
+      ...assignment,
+      assigned_to: assignedToUuid || assignment.assigned_to,
+      assigned_by: assignedByUuid || assignment.assigned_by
+    };
   }
 
   async getAssignments(problemId: string): Promise<Assignment[]> {
@@ -1095,8 +1099,8 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       problem_id: r.problem_id,
       department_id: r.department_id,
       previous_department_id: r.previous_department_id || undefined,
-      assigned_to: r.officer_legacy_uid || r.assigned_to || undefined,
-      assigned_by: r.assigned_by_legacy_uid || (r.assigned_by ? String(r.assigned_by) : 'SYSTEM'),
+      assigned_to: r.assigned_to ? String(r.assigned_to) : (r.officer_legacy_uid || undefined),
+      assigned_by: r.assigned_by ? String(r.assigned_by) : (r.assigned_by_legacy_uid || 'SYSTEM'),
       priority: r.priority,
       status: r.status,
       notes: r.notes || undefined,
@@ -1144,8 +1148,8 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       problem_id: r.problem_id,
       department_id: r.department_id,
       previous_department_id: r.previous_department_id || undefined,
-      assigned_to: r.officer_legacy_uid || r.assigned_to || undefined,
-      assigned_by: r.assigned_by_legacy_uid || (r.assigned_by ? String(r.assigned_by) : 'SYSTEM'),
+      assigned_to: r.assigned_to ? String(r.assigned_to) : (r.officer_legacy_uid || undefined),
+      assigned_by: r.assigned_by ? String(r.assigned_by) : (r.assigned_by_legacy_uid || 'SYSTEM'),
       priority: r.priority,
       status: r.status,
       notes: r.notes || undefined,
@@ -1471,7 +1475,7 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       [departmentId]
     );
     return rows.map((r) => ({
-      id: r.legacy_firebase_uid || r.id,
+      id: r.id ? String(r.id) : (r.legacy_firebase_uid || r.id),
       email: r.email,
       display_name: r.display_name,
       role: r.role,
@@ -1543,7 +1547,12 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       );
 
       // 3. Insert assignment
-      await this.createAssignment(assignment, client);
+      const assignmentToInsert: Assignment = {
+        ...assignment,
+        assigned_to: assignedToUuid || assignment.assigned_to,
+        assigned_by: (action.actor_id as string) || assignment.assigned_by
+      };
+      const createdAssignment = await this.createAssignment(assignmentToInsert, client);
 
       // 4. Insert action
       await this.createAction(action, client);
@@ -1560,7 +1569,7 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
           };
       return {
         problem: updatedProblem,
-        assignment,
+        assignment: createdAssignment,
         action
       };
     });
