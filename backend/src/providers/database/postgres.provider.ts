@@ -1619,25 +1619,24 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       }
 
       const setClauses: string[] = ['status = $1', 'updated_at = NOW()'];
-      const params: any[] = [nextStatus, problemId];
-      let pIdx = 3;
+      const params: any[] = [nextStatus];
 
       if (updates) {
         if ('resolved_at' in updates) {
-          setClauses.push(`resolved_at = $${pIdx++}`);
-          params.splice(params.length - 1, 0, updates.resolved_at || null);
+          params.push(updates.resolved_at || null);
+          setClauses.push(`resolved_at = $${params.length}`);
         }
         if ('closed_at' in updates) {
-          setClauses.push(`closed_at = $${pIdx++}`);
-          params.splice(params.length - 1, 0, updates.closed_at || null);
+          params.push(updates.closed_at || null);
+          setClauses.push(`closed_at = $${params.length}`);
         }
         if ('assigned_to' in updates) {
-          setClauses.push(`assigned_to = $${pIdx++}`);
-          params.splice(params.length - 1, 0, updates.assigned_to || null);
+          params.push(updates.assigned_to || null);
+          setClauses.push(`assigned_to = $${params.length}`);
         }
         if ('assigned_at' in updates) {
-          setClauses.push(`assigned_at = $${pIdx++}`);
-          params.splice(params.length - 1, 0, updates.assigned_at || null);
+          params.push(updates.assigned_at || null);
+          setClauses.push(`assigned_at = $${params.length}`);
         }
       }
 
@@ -1650,6 +1649,7 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
         }
       }
 
+      params.push(problemId);
       const updateSql = `UPDATE problem_clusters SET ${setClauses.join(', ')} WHERE id = $${params.length} RETURNING *;`;
       const updatedRes = await client.query(updateSql, params);
 

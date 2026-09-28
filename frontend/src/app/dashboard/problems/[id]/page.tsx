@@ -924,14 +924,22 @@ export default function ProblemDetailPage({
                       )}
 
                       {status === ProblemStatus.RESOLVED && (
-                        <button
-                          onClick={() => handleStatusTransition(ProblemStatus.CLOSED, 'Incident administrative audit complete. Case closed.')}
-                          disabled={workflowLoading}
-                          className="w-full py-2.5 px-4 text-xs font-mono uppercase bg-ink-primary text-canvas-card hover:bg-ink-secondary transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                          <span>Close Case (CLOSED)</span>
-                        </button>
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => handleStatusTransition(ProblemStatus.CLOSED, 'Incident administrative audit complete. Case closed.')}
+                            disabled={workflowLoading}
+                            className="w-full py-2.5 px-4 text-xs font-mono uppercase bg-ink-primary text-canvas-card hover:bg-ink-secondary transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                          >
+                            <XCircle className={`w-3.5 h-3.5 ${workflowLoading ? 'animate-spin' : ''}`} />
+                            <span>{workflowLoading ? 'Closing Case...' : 'Close Case (CLOSED)'}</span>
+                          </button>
+                          {workflowError && !isConflict && (
+                            <div className="p-2.5 bg-rose-50 border border-rose-300 text-xs font-mono text-rose-900 flex items-center gap-2">
+                              <AlertCircle className="w-3.5 h-3.5 text-rose-700 shrink-0" />
+                              <span>{workflowError}</span>
+                            </div>
+                          )}
+                        </div>
                       )}
 
                       {status === ProblemStatus.CLOSED && (
