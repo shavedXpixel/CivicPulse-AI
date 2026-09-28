@@ -140,7 +140,8 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     if (rows.length === 0) return null;
     const r = rows[0];
     return {
-      id: isUuid ? r.id : (r.legacy_firebase_uid || r.id),
+      id: isUuid ? String(r.id) : (r.legacy_firebase_uid || String(r.id)),
+      canonical_id: String(r.id),
       auth_user_id: r.auth_user_id || undefined,
       legacy_firebase_uid: r.legacy_firebase_uid || undefined,
       email: r.email,
@@ -656,9 +657,10 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     params.push(limit + 1);
 
     const sql = `
-      SELECT s.*, u.legacy_firebase_uid as citizen_legacy_uid
+      SELECT s.*, u.legacy_firebase_uid as citizen_legacy_uid, pc.status as problem_status
       FROM signals s
       LEFT JOIN users u ON u.id = s.citizen_id
+      LEFT JOIN problem_clusters pc ON pc.id = s.problem_cluster_id
       ${where}
       ORDER BY s.created_at DESC
       LIMIT $${pIdx};
@@ -693,6 +695,7 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
       language: r.language || 'en',
       status: r.status,
       problem_cluster_id: r.problem_cluster_id || undefined,
+      problem_status: r.problem_status || undefined,
       processing_status: r.processing_status,
       location: (r.latitude !== null && r.longitude !== null && r.latitude !== undefined && r.longitude !== undefined)
         ? { lat: Number(r.latitude), lng: Number(r.longitude) }
@@ -1469,13 +1472,25 @@ export class PostgresDatabaseProvider implements IDatabaseProvider {
     };
   }
 
-  async listDepartmentOfficers(departmentId: string): Promise<UserProfile[]> {
-    const rows = await this.query(
-      `SELECT * FROM users WHERE department_id = $1 AND role IN ('DEPARTMENT_OFFICER', 'FIELD_OFFICER') ORDER BY display_name ASC;`,
-      [departmentId]
-    );
+  async listDepartmentOfficers(
+    departmentId: string,
+    options?: { role?: string; assignable?: boolean }
+  ): Promise<UserProfile[]> {
+    let sql: string;
+    const params: any[] = [departmentId];
+
+    if (options?.assignable) {
+      sql = `SELECT * FROM users WHERE department_id = $1 AND role = 'FIELD_OFFICER' AND (status = 'ACTIVE' OR status IS NULL) ORDER BY display_name ASC;`;
+    } else if (options?.role) {
+      sql = `SELECT * FROM users WHERE department_id = $1 AND role = $2 AND (status = 'ACTIVE' OR status IS NULL) ORDER BY display_name ASC;`;
+      params.push(options.role);
+    } else {
+      sql = `SELECT * FROM users WHERE department_id = $1 AND role IN ('DEPARTMENT_OFFICER', 'FIELD_OFFICER') AND (status = 'ACTIVE' OR status IS NULL) ORDER BY display_name ASC;`;
+    }
+
+    const rows = await this.query(sql, params);
     return rows.map((r) => ({
-      id: r.id ? String(r.id) : (r.legacy_firebase_uid || r.id),
+      id: String(r.id),
       email: r.email,
       display_name: r.display_name,
       role: r.role,

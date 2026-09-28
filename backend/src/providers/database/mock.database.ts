@@ -730,7 +730,13 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     const limit = filter.limit || 20;
-    const paginated = result.slice(0, limit);
+    const paginated = result.slice(0, limit).map((s) => {
+      if (s.problem_cluster_id && !s.problem_status) {
+        const pc = this.problemClusters.get(s.problem_cluster_id);
+        return { ...s, problem_status: pc?.status };
+      }
+      return s;
+    });
 
     return {
       data: paginated,
@@ -1043,10 +1049,23 @@ export class MockDatabaseProvider implements IDatabaseProvider {
     };
   }
 
-  async listDepartmentOfficers(departmentId: string): Promise<UserProfile[]> {
-    return Array.from(this.users.values()).filter(
-      (u) => u.department_id === departmentId && (u.role === UserRole.FIELD_OFFICER || u.role === UserRole.DEPARTMENT_OFFICER)
-    );
+  async listDepartmentOfficers(
+    departmentId: string,
+    options?: { role?: string; assignable?: boolean }
+  ): Promise<UserProfile[]> {
+    return Array.from(this.users.values()).filter((u) => {
+      if (u.department_id !== departmentId) return false;
+      if (options?.assignable) {
+        return u.role === UserRole.FIELD_OFFICER && (u.status === UserStatus.ACTIVE || !u.status);
+      }
+      if (options?.role) {
+        return u.role === options.role && (u.status === UserStatus.ACTIVE || !u.status);
+      }
+      return (
+        (u.role === UserRole.FIELD_OFFICER || u.role === UserRole.DEPARTMENT_OFFICER) &&
+        (u.status === UserStatus.ACTIVE || !u.status)
+      );
+    });
   }
 
   // Atomic Workflow Mutations (Concurrency & State Integrity)

@@ -76,6 +76,7 @@ export interface Signal {
   critical_facility?: string;
   status: SignalStatus;
   problem_cluster_id?: string;
+  problem_status?: import('./problem').ProblemStatus;
   processing_status: SignalProcessingStatus;
   ai_confidence?: number;
   embedding?: number[];

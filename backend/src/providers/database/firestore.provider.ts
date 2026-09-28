@@ -20,7 +20,8 @@ import {
   SignalStatus,
   EvidenceStatus,
   ERROR_CODES,
-  AdminAuditRecord
+  AdminAuditRecord,
+  UserStatus
 } from '@civicpulse/shared';
 import { IDatabaseProvider, SignalFilterCriteria, ProblemFilterCriteria } from './database.interface';
 import { AppError } from '../../middleware/error.middleware';
@@ -567,14 +568,25 @@ export class FirestoreDatabaseProvider implements IDatabaseProvider {
     };
   }
 
-  async listDepartmentOfficers(departmentId: string): Promise<UserProfile[]> {
+  async listDepartmentOfficers(
+    departmentId: string,
+    options?: { role?: string; assignable?: boolean }
+  ): Promise<UserProfile[]> {
     const snap = await this.db
       .collection('users')
       .where('department_id', '==', departmentId)
       .get();
     return snap.docs
       .map((d: DocumentSnapshot) => d.data() as UserProfile)
-      .filter((u) => u.role === UserRole.FIELD_OFFICER || u.role === UserRole.DEPARTMENT_OFFICER);
+      .filter((u) => {
+        if (options?.assignable) {
+          return u.role === UserRole.FIELD_OFFICER && (u.status === UserStatus.ACTIVE || !u.status);
+        }
+        if (options?.role) {
+          return u.role === options.role && (u.status === UserStatus.ACTIVE || !u.status);
+        }
+        return u.role === UserRole.FIELD_OFFICER || u.role === UserRole.DEPARTMENT_OFFICER;
+      });
   }
 
   // Atomic Workflow Mutations

@@ -137,11 +137,18 @@ export default function ProblemDetailPage({
   const fetchOfficersForDept = useCallback(async (deptId: string) => {
     try {
       const res = await apiClient.get<{ data: any[] }>(
-        `/api/v1/departments/${deptId}/officers`
+        `/api/v1/departments/${deptId}/officers?role=FIELD_OFFICER&assignable=true`
       );
-      if (res?.data && res.data.length > 0 && res.data[0]) {
-        setDeptOfficers(res.data);
-        setAssignOfficer(res.data[0].id);
+      if (res?.data && res.data.length > 0) {
+        // Enforce: role = FIELD_OFFICER, active status, matching operational department (WATCO)
+        const eligible = res.data.filter(
+          (o) =>
+            o.role === 'FIELD_OFFICER' &&
+            (o.status === 'ACTIVE' || !o.status) &&
+            (o.department_id === deptId || o.department_id === 'WATCO')
+        );
+        setDeptOfficers(eligible);
+        setAssignOfficer(eligible.length > 0 ? eligible[0].id : '');
       } else {
         setDeptOfficers([]);
         setAssignOfficer('');
@@ -194,6 +201,10 @@ export default function ProblemDetailPage({
 
   const handleAssignSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!assignOfficer) {
+      setWorkflowError('Please select an eligible Field Officer before assigning work.');
+      return;
+    }
     setWorkflowLoading(true);
     setWorkflowSuccess(null);
     setWorkflowError(null);
@@ -1063,11 +1074,11 @@ export default function ProblemDetailPage({
                     className="w-full p-2 border border-ink-border bg-canvas-card text-ink-primary focus:outline-none focus:border-civic-terracotta"
                   >
                     {deptOfficers.length === 0 ? (
-                      <option value="">No field officers registered</option>
+                      <option value="">No eligible field officers registered for WATCO</option>
                     ) : (
                       deptOfficers.map((o) => (
                         <option key={o.id} value={o.id}>
-                          {o.display_name ? `${o.display_name} (${o.email || o.id})` : o.id}
+                          {o.display_name ? `${o.display_name} (${o.email || o.id})` : (o.email || o.id)}
                         </option>
                       ))
                     )}

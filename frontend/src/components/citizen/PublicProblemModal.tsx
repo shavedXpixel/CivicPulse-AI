@@ -11,7 +11,8 @@ import {
   Layers,
   MapPin,
   Loader2,
-  Info
+  Info,
+  CheckCircle2
 } from 'lucide-react';
 import { apiClient } from '../../lib/api-client';
 import { Button } from '../ui/Button';
@@ -57,31 +58,36 @@ interface PublicProblemDetails {
 interface PublicProblemModalProps {
   problemId: string;
   onClose: () => void;
+  initialProblem?: PublicProblemDetails;
 }
 
-export function PublicProblemModal({ problemId, onClose }: PublicProblemModalProps) {
-  const [problem, setProblem] = useState<PublicProblemDetails | null>(null);
-  const [loading, setLoading] = useState(true);
+export function PublicProblemModal({ problemId, onClose, initialProblem }: PublicProblemModalProps) {
+  const [problem, setProblem] = useState<PublicProblemDetails | null>(initialProblem || null);
+  const [loading, setLoading] = useState(!initialProblem);
   const [error, setError] = useState<string | null>(null);
 
   const fetchDetails = useCallback(async () => {
     try {
-      setLoading(true);
+      if (!initialProblem) setLoading(true);
       setError(null);
       const res = await apiClient.get<{ data: PublicProblemDetails }>(
         `/api/v1/problems/${problemId}/details`
       );
       setProblem(res.data);
     } catch (err: any) {
-      setError(err.message || 'Unable to retrieve public problem information.');
+      if (!initialProblem) {
+        setError(err.message || 'Unable to retrieve public problem information.');
+      }
     } finally {
       setLoading(false);
     }
-  }, [problemId]);
+  }, [problemId, initialProblem]);
 
   useEffect(() => {
-    fetchDetails();
-  }, [fetchDetails]);
+    if (!initialProblem) {
+      fetchDetails();
+    }
+  }, [fetchDetails, initialProblem]);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -105,6 +111,8 @@ export function PublicProblemModal({ problemId, onClose }: PublicProblemModalPro
         return 'bg-purple-50 text-purple-800 border-purple-200';
       case 'TRIAGED':
         return 'bg-amber-50 text-amber-900 border-amber-200';
+      case 'REOPENED':
+        return 'bg-amber-100 text-amber-900 border-amber-300';
       default:
         return 'bg-slate-100 text-slate-800 border-slate-200';
     }
@@ -251,6 +259,65 @@ export function PublicProblemModal({ problemId, onClose }: PublicProblemModalPro
                   </div>
                 </div>
               </div>
+
+              {/* PROMINENT CITIZEN STATUS BANNER (Authoritative Backend State Machine) */}
+              {problem.status === 'RESOLVED' && (
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="text-sm font-bold text-emerald-900 tracking-tight">Work Complete</div>
+                    <p className="text-xs text-emerald-800 leading-relaxed">
+                      The department has verified the submitted resolution.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {problem.status === 'CLOSED' && (
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-700 text-white flex items-center justify-center shrink-0 mt-0.5">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="text-sm font-bold text-emerald-900 tracking-tight">Work Complete</div>
+                    <p className="text-xs text-emerald-800 leading-relaxed">
+                      This issue has been completed and closed.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {problem.status === 'AWAITING_VERIFICATION' && (
+                <div className="p-4 rounded-2xl bg-purple-50 border border-purple-200 text-purple-950 flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="text-sm font-bold text-purple-900 tracking-tight">
+                      Work completed by field officer — awaiting verification
+                    </div>
+                    <p className="text-xs text-purple-800 leading-relaxed">
+                      Field crew has submitted resolution proof; municipal verification is in progress.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {problem.status === 'REOPENED' && (
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="text-sm font-bold text-amber-900 tracking-tight">Issue Reopened</div>
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      This issue has been reopened for further action and remediation.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Administrative Details */}
               <div className="p-4 rounded-2xl bg-canvas-subtle border border-ink-border space-y-2.5 text-xs">

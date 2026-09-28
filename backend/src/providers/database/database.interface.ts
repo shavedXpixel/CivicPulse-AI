@@ -99,7 +99,7 @@ export interface IDatabaseProvider {
   createDepartment?(department: Department): Promise<Department>;
   updateDepartment?(id: string, updates: Partial<Department>): Promise<Department>;
   getDepartmentWorkload(id: string, options?: { is_demo?: boolean }): Promise<DepartmentWorkload>;
-  listDepartmentOfficers(departmentId: string): Promise<UserProfile[]>;
+  listDepartmentOfficers(departmentId: string, options?: { role?: string; assignable?: boolean }): Promise<UserProfile[]>;
 
   // Atomic Workflow Mutations (Concurrency & State Integrity)
   atomicAssignProblem(

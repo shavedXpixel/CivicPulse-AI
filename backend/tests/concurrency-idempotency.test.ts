@@ -1071,6 +1071,11 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
         updated_at: new Date().toISOString()
       };
 
+      await mockDb.createUser(citizenUser);
+      await mockDb.createUser(fieldOfficerUser);
+      await mockDb.createUser(crossDeptOfficer);
+      await mockDb.createUser(validDeptOfficer);
+
       const assignInput = {
         department_id: PROD_DEPT_ID,
         assigned_to: FIELD_OFFICER_ID,

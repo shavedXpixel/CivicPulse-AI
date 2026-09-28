@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getDatabaseProvider } from '../../providers';
 import { AppError } from '../../middleware/error.middleware';
-import { ERROR_CODES, UserRole } from '@civicpulse/shared';
+import { ERROR_CODES, UserRole, UserStatus } from '@civicpulse/shared';
 
 export class DepartmentController {
   /**
@@ -111,8 +111,23 @@ export class DepartmentController {
         );
       }
 
+      const role = typeof req.query.role === 'string' ? req.query.role : undefined;
+      const assignable = req.query.assignable === 'true' || req.query.assignable === '1';
+
       const db = getDatabaseProvider();
-      const officers = await db.listDepartmentOfficers(deptId);
+      let officers = await db.listDepartmentOfficers(deptId, { role, assignable });
+
+      // Defensive filtering guarantee: when assignable is requested or role=FIELD_OFFICER,
+      // strictly return ONLY active FIELD_OFFICER records belonging to deptId.
+      if (assignable || role === UserRole.FIELD_OFFICER) {
+        officers = officers.filter(
+          (u) =>
+            u.role === UserRole.FIELD_OFFICER &&
+            (u.status === UserStatus.ACTIVE || !u.status) &&
+            u.department_id === deptId
+        );
+      }
+
       res.status(200).json({
         data: officers
       });

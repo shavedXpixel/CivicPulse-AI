@@ -8,6 +8,7 @@ import {
   AssignmentStatus,
   ProblemAction,
   ActionType,
+  UserStatus,
   ERROR_CODES
 } from '@civicpulse/shared';
 import { getDatabaseProvider } from '../../providers';
@@ -112,6 +113,63 @@ export class WorkflowService {
           message: `Cannot reassign problem belonging to ${problem.department_id}.`
         });
       }
+    }
+
+    // 3b. Strict Independent Backend Enforcement for Field Officer Assignment
+    if (input.assigned_to) {
+      const officer = await db.getUser(input.assigned_to);
+      if (!officer) {
+        throw new AppError({
+          statusCode: 404,
+          code: ERROR_CODES.NOT_FOUND,
+          message: `Assigned officer '${input.assigned_to}' not found.`
+        });
+      }
+
+      // Check role: strictly ONLY FIELD_OFFICER
+      if (officer.role !== UserRole.FIELD_OFFICER) {
+        throw new AppError({
+          statusCode: 400,
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: `Cannot assign incident to user with role '${officer.role}'. Only FIELD_OFFICER users can be assigned field work.`
+        });
+      }
+
+      // Check account status: must be active
+      if (officer.status && officer.status !== UserStatus.ACTIVE) {
+        throw new AppError({
+          statusCode: 400,
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: `Cannot assign incident to officer '${officer.display_name || officer.id}' because their account status is '${officer.status}'.`
+        });
+      }
+
+      // Check department: must match the target operational department
+      const targetDeptId = input.department_id || problem.department_id;
+      if (
+        officer.department_id &&
+        targetDeptId &&
+        officer.department_id !== targetDeptId &&
+        !(env.DEMO_MODE && officer.id === 'usr_field_drainage' && targetDeptId === 'WATCO')
+      ) {
+        throw new AppError({
+          statusCode: 400,
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: `Officer '${officer.display_name || officer.id}' belongs to department '${officer.department_id}', but incident department is '${targetDeptId}'.`
+        });
+      }
+
+      // In CivicPulse, operational department must be WATCO
+      if (targetDeptId && targetDeptId !== 'WATCO' && !env.DEMO_MODE) {
+        throw new AppError({
+          statusCode: 400,
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: `Department '${targetDeptId}' is not authorized. CivicPulse operational department is WATCO.`
+        });
+      }
+
+      // Authoritatively use the canonical public.users.id UUID if available
+      input.assigned_to = (officer as any).canonical_id || officer.id;
     }
 
     // 4. Determine target status & validate transition

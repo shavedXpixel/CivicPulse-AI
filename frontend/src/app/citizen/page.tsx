@@ -30,6 +30,7 @@ interface CitizenSignal {
   location_reference?: string;
   location?: { lat: number; lng: number };
   status: string;
+  problem_status?: string;
   processing_status: string;
   created_at: string;
   problem_cluster_id?: string;
@@ -343,15 +344,29 @@ export default function CitizenHomePage() {
                             <span className="text-[11px] font-mono font-bold text-civic-terracotta">
                               #{sig.id}
                             </span>
-                            <span
-                              className={`px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-semibold border ${
-                                sig.processing_status === 'COMPLETED'
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                  : 'bg-amber-50 text-amber-900 border-amber-200'
-                              }`}
-                            >
-                              {sig.processing_status === 'COMPLETED' ? 'Processed' : 'Pending Analysis'}
-                            </span>
+                            {sig.problem_status === 'RESOLVED' || sig.problem_status === 'CLOSED' ? (
+                              <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                                Work Complete
+                              </span>
+                            ) : sig.problem_status === 'AWAITING_VERIFICATION' ? (
+                              <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-semibold bg-purple-50 text-purple-800 border border-purple-200">
+                                Awaiting Verification
+                              </span>
+                            ) : sig.problem_status === 'REOPENED' ? (
+                              <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-semibold bg-amber-50 text-amber-900 border border-amber-300">
+                                Reopened
+                              </span>
+                            ) : (
+                              <span
+                                className={`px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-semibold border ${
+                                  sig.processing_status === 'COMPLETED'
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : 'bg-amber-50 text-amber-900 border-amber-200'
+                                }`}
+                              >
+                                {sig.processing_status === 'COMPLETED' ? 'Processed' : 'Pending Analysis'}
+                              </span>
+                            )}
                             {sig.problem_cluster_id && (
                               <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-semibold bg-canvas-subtle text-ink-primary border border-ink-border">
                                 Correlated: #{sig.problem_cluster_id}

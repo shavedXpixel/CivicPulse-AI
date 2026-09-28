@@ -175,14 +175,67 @@ export class ProblemService {
     ];
 
     if (problem.status !== ProblemStatus.NEW) {
+      let actionLabel = 'Incident Status';
+      let description = `Current operational status: ${problem.status}.`;
+      let isCompleted = false;
+      let isCurrent = false;
+
+      switch (problem.status) {
+        case ProblemStatus.AWAITING_VERIFICATION:
+          actionLabel = 'Awaiting Verification';
+          description = 'Work completed by field officer — awaiting verification.';
+          isCompleted = false;
+          isCurrent = true;
+          break;
+        case ProblemStatus.RESOLVED:
+          actionLabel = 'Work Complete';
+          description = 'The department has verified the submitted resolution.';
+          isCompleted = true;
+          isCurrent = false;
+          break;
+        case ProblemStatus.CLOSED:
+          actionLabel = 'Work Complete';
+          description = 'This issue has been completed and closed.';
+          isCompleted = true;
+          isCurrent = false;
+          break;
+        case ProblemStatus.REOPENED:
+          actionLabel = 'Incident Reopened';
+          description = 'This issue has been reopened for further action.';
+          isCompleted = false;
+          isCurrent = true;
+          break;
+        case ProblemStatus.IN_PROGRESS:
+          actionLabel = 'Field Work Underway';
+          description = 'Field crew mobilized and actively conducting repairs.';
+          isCompleted = false;
+          isCurrent = true;
+          break;
+        case ProblemStatus.ASSIGNED:
+          actionLabel = 'Work Dispatched';
+          description = `Dispatched to ${problem.department_id || 'operational department'}.`;
+          isCompleted = false;
+          isCurrent = true;
+          break;
+        case ProblemStatus.TRIAGED:
+          actionLabel = 'Triage Completed';
+          description = 'Municipal operations validated report and prepared work order.';
+          isCompleted = false;
+          isCurrent = true;
+          break;
+        default:
+          isCompleted = false;
+          isCurrent = false;
+      }
+
       timeline.push({
         id: 'tl_3',
         timestamp: problem.last_updated_at,
-        action: 'Incident Status',
+        action: actionLabel,
         actor: problem.department_id ? `${problem.department_id} Control Room` : 'Operations Hub',
-        description: `Current operational status: ${problem.status}.`,
-        isCompleted: problem.status === ProblemStatus.RESOLVED || problem.status === ProblemStatus.CLOSED,
-        isCurrent: problem.status === ProblemStatus.IN_PROGRESS || problem.status === ProblemStatus.TRIAGED
+        description,
+        isCompleted,
+        isCurrent
       });
     }
 
