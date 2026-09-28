@@ -564,8 +564,19 @@ export default function ProblemDetailPage({
                   <Clock className="w-3.5 h-3.5 text-civic-terracotta" />
                   <span>CURRENT DISPATCH STATE</span>
                 </div>
-                <div>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
                   <StatusBadge status={status} />
+                  {isSupervisor && status === ProblemStatus.CLOSED && (
+                    <button
+                      onClick={() => handleStatusTransition(ProblemStatus.REOPENED, 'Recurring failure reported. Problem reopened for investigation.')}
+                      disabled={workflowLoading}
+                      className="px-2.5 py-1 text-xs font-mono uppercase bg-canvas-card border border-civic-terracotta text-civic-terracotta hover:bg-civic-terracotta hover:text-white transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                      title="Reopen closed incident for investigation"
+                    >
+                      <RotateCcw className={`w-3 h-3 ${workflowLoading ? 'animate-spin' : ''}`} />
+                      <span>{workflowLoading ? 'Reopening...' : 'Reopen Case'}</span>
+                    </button>
+                  )}
                 </div>
                 <div className="pt-2 border-t border-ink-border text-xs font-mono space-y-1">
                   <div className="flex justify-between text-ink-secondary">

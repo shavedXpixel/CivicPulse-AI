@@ -269,4 +269,45 @@ describe('PHASE 15B.5.3.14: Production-Only CivicPulse Invariant Suite', () => {
     const envProvider = process.env.AI_PROVIDER || 'gemini';
     expect(['gemini', 'openai']).toContain(envProvider);
   });
+
+  // 16. CLOSED -> REOPENED UI Workflow Contract
+  describe('Invariant 16: CLOSED -> REOPENED UI Workflow Contract', () => {
+    const pageSourcePath = path.resolve(__dirname, '../src/app/dashboard/problems/[id]/page.tsx');
+    const badgeSourcePath = path.resolve(__dirname, '../src/components/domain/StatusBadge.tsx');
+    const pageSource = fs.readFileSync(pageSourcePath, 'utf-8');
+    const badgeSource = fs.readFileSync(badgeSourcePath, 'utf-8');
+
+    it('StatusBadge component remains purely presentational without onClick or interactive wrapping', () => {
+      expect(badgeSource).not.toContain('onClick');
+      expect(badgeSource).not.toContain('<button');
+      expect(badgeSource).toContain('return (');
+      expect(badgeSource).toContain('<span');
+    });
+
+    it('renders "Reopen Case" button beside Closed status in CURRENT DISPATCH STATE section', () => {
+      // Must reside in CURRENT DISPATCH STATE block beside StatusBadge
+      const dispatchStateSection = pageSource.substring(
+        pageSource.indexOf('CURRENT DISPATCH STATE'),
+        pageSource.indexOf('CURRENT DISPATCH STATE') + 1200
+      );
+
+      expect(dispatchStateSection).toContain('<StatusBadge status={status} />');
+      expect(dispatchStateSection).toContain('Reopen Case');
+      expect(dispatchStateSection).toContain('isSupervisor && status === ProblemStatus.CLOSED');
+      expect(dispatchStateSection).toContain('handleStatusTransition(ProblemStatus.REOPENED');
+      expect(dispatchStateSection).toContain('disabled={workflowLoading}');
+    });
+
+    it('reuses existing handleStatusTransition and existing ProblemStatus.REOPENED', () => {
+      expect(pageSource).toContain('handleStatusTransition = async (newStatus: ProblemStatus');
+      expect(pageSource).toContain('handleStatusTransition(ProblemStatus.REOPENED');
+    });
+
+    it('preserves existing bottom Operational Actions reopen button', () => {
+      // Section 06 must also preserve the operational reopen button
+      const actionsSection = pageSource.substring(pageSource.indexOf('06 // OPERATIONAL ACTIONS'));
+      expect(actionsSection).toContain('status === ProblemStatus.CLOSED');
+      expect(actionsSection).toContain('Reopen Incident (REOPENED)');
+    });
+  });
 });
