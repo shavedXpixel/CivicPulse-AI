@@ -5,6 +5,7 @@ import { ProviderContainer, MockDatabaseProvider, FirebaseAuthProvider } from '.
 import { env } from '../src/config/env';
 import {
   UserRole,
+  UserStatus,
   SignalStatus,
   SignalProcessingStatus,
   ImpactLevel,
@@ -67,7 +68,7 @@ describe('Phase 10 Step 4: Real-Mode Signal → Analysis → Clustering → Prob
       display_name: 'Officer Triage',
       role: UserRole.DEPARTMENT_OFFICER,
       department_id: 'bmc_sanitation',
-      status: 'ACTIVE' as any,
+      status: UserStatus.ACTIVE,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     });

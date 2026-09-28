@@ -16,6 +16,8 @@ import {
   SignalProcessingStatus,
   SignalSourceType,
   UserRole,
+  UserProfile,
+  UserStatus,
   AppError
 } from '@civicpulse/shared';
 import * as firebaseAdminModule from '../src/infrastructure/firebase/firebase-admin';
@@ -354,15 +356,18 @@ describe('Gemini 503 Resilience, Bounded Exponential Backoff & Model Fallback', 
         updated_at: new Date().toISOString()
       });
 
-      const userProfile = {
+      const userProfile: UserProfile = {
         id: 'usr_citizen_01',
         email: 'citizen@test.gov.in',
+        display_name: 'Test Citizen',
         role: UserRole.CITIZEN,
-        status: 'ACTIVE' as any
+        status: UserStatus.ACTIVE,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
       const aiService = new SignalAIService(signalRepo);
-      const result = await aiService.analyzeSignal(userProfile as any, testSignal.id);
+      const result = await aiService.analyzeSignal(userProfile, testSignal.id);
 
       // Verify the returned operation and DB operation record contains the fallback model
       expect(result.operation.model).toBe('gemini-3.5-flash');

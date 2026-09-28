@@ -490,7 +490,8 @@ describe('CivicPulse AI — Master Backend Workflow Matrix (49 Requirements)', (
         priority: AssignmentPriority.HIGH,
         status: AssignmentStatus.ASSIGNED,
         assigned_at: new Date().toISOString(),
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
 
       authenticate(deptOfficer);
@@ -520,7 +521,8 @@ describe('CivicPulse AI — Master Backend Workflow Matrix (49 Requirements)', (
         priority: AssignmentPriority.HIGH,
         status: AssignmentStatus.ASSIGNED,
         assigned_at: new Date().toISOString(),
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
 
       await mockDb.createAssignment({
@@ -532,7 +534,8 @@ describe('CivicPulse AI — Master Backend Workflow Matrix (49 Requirements)', (
         priority: AssignmentPriority.HIGH,
         status: AssignmentStatus.COMPLETED,
         assigned_at: new Date().toISOString(),
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
 
       authenticate(fieldOfficer1);
@@ -833,7 +836,8 @@ describe('CivicPulse AI — Master Backend Workflow Matrix (49 Requirements)', (
         priority: AssignmentPriority.HIGH,
         status: AssignmentStatus.COMPLETED,
         assigned_at: new Date().toISOString(),
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
 
       authenticate(deptOfficer);

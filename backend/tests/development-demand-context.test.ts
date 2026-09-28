@@ -26,6 +26,30 @@ import {
 } from '../src/providers';
 import { env } from '../src/config/env';
 
+const createTestProblemCluster = (overrides?: Partial<ProblemCluster>): ProblemCluster => ({
+  id: 'PRB-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+  title: 'Test Problem Cluster',
+  category: 'drinking_water',
+  department_id: 'WATCO',
+  status: ProblemStatus.TRIAGED,
+  signal_count: 1,
+  impact_score: 50,
+  impact_level: ImpactLevel.MEDIUM,
+  severity_score: 15,
+  population_score: 10,
+  duration_score: 8,
+  concentration_score: 7,
+  critical_exposure_score: 5,
+  recurrence_score: 3,
+  evidence_score: 2,
+  first_detected_at: new Date().toISOString(),
+  last_updated_at: new Date().toISOString(),
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  is_demo: false,
+  ...overrides
+});
+
 describe('PHASE 15B.5.3.20-HF7.4 — Development Indicators & Investment Context Suite', () => {
   beforeEach(() => {
     ProviderContainer.resetAllProviders();
@@ -260,10 +284,9 @@ describe('PHASE 15B.5.3.20-HF7.4 — Development Indicators & Investment Context
   // ============================================================================
   describe('4. Operational Problem Context & Privacy Safeguards', () => {
     it('aggregates registered problem counts while strictly excluding demo problems and citizen PII', async () => {
-      const mockProblems = [
-        {
+      const mockProblems: ProblemCluster[] = [
+        createTestProblemCluster({
           id: 'prob_real_01',
-          tracking_id: 'PRB-2026-001',
           title: 'Leaking water main pipeline',
           description: 'Citizen reported pipe break on main road',
           category: 'drinking_water',
@@ -274,24 +297,22 @@ describe('PHASE 15B.5.3.20-HF7.4 — Development Indicators & Investment Context
           is_demo: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        },
-        {
+        }),
+        createTestProblemCluster({
           id: 'prob_real_02',
-          tracking_id: 'PRB-2026-002',
           title: 'Damaged storm drain culvert',
           description: 'Culvert blockage causing waterlogging',
           category: 'drainage_flood_stormwater',
-          status: ProblemStatus.INVESTIGATING,
+          status: ProblemStatus.IN_PROGRESS,
           impact_score: 72,
           impact_level: ImpactLevel.HIGH,
           ward_id: 'WARD-001',
           is_demo: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        },
-        {
+        }),
+        createTestProblemCluster({
           id: 'prob_demo_fixture',
-          tracking_id: 'PRB-DEMO-001',
           title: 'Synthetic test problem',
           description: 'Demo problem fixture',
           category: 'drinking_water',
@@ -302,7 +323,7 @@ describe('PHASE 15B.5.3.20-HF7.4 — Development Indicators & Investment Context
           is_demo: true, // Should be excluded!
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        }
+        })
       ];
 
       const mockDb: Partial<IDatabaseProvider> = {

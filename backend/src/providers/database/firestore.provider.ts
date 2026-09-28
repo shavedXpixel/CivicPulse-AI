@@ -9,6 +9,7 @@ import {
   ProblemCluster,
   ProblemClusterMember,
   Assignment,
+  AssignmentStatus,
   ProblemAction,
   Department,
   DepartmentWorkload,

@@ -16,6 +16,8 @@ import {
   VerificationFailureReason,
   UserRole,
   UserProfile,
+  UserStatus,
+  ImpactLevel,
   Assignment,
   ProblemAction,
   ERROR_CODES
@@ -39,7 +41,9 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
     email: 'admin@civicpulse.gov.in',
     display_name: 'System Admin',
     role: UserRole.ADMIN,
-    created_at: new Date().toISOString()
+    status: UserStatus.ACTIVE,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   };
 
   const fieldOfficer: UserProfile = {
@@ -48,8 +52,10 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
     email: 'officer@civicpulse.gov.in',
     display_name: 'Field Officer Patel',
     role: UserRole.FIELD_OFFICER,
+    status: UserStatus.ACTIVE,
     department_id: 'WATCO',
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   };
 
   const wrongOfficer: UserProfile = {
@@ -58,8 +64,10 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
     email: 'other_officer@civicpulse.gov.in',
     display_name: 'Officer Sharma',
     role: UserRole.FIELD_OFFICER,
+    status: UserStatus.ACTIVE,
     department_id: 'WATCO',
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   };
 
   const supervisorUser: UserProfile = {
@@ -68,9 +76,34 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
     email: 'dept_head@civicpulse.gov.in',
     display_name: 'Department Head Das',
     role: UserRole.DEPARTMENT_OFFICER,
+    status: UserStatus.ACTIVE,
     department_id: 'WATCO',
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   };
+
+  const createTestProblemCluster = (overrides?: Partial<ProblemCluster>): ProblemCluster => ({
+    id: 'PRB-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
+    title: 'Test Incident',
+    category: 'water_supply',
+    department_id: 'WATCO',
+    status: ProblemStatus.TRIAGED,
+    signal_count: 1,
+    severity_score: 15,
+    population_score: 10,
+    duration_score: 5,
+    concentration_score: 5,
+    critical_exposure_score: 5,
+    recurrence_score: 5,
+    evidence_score: 5,
+    impact_score: 50,
+    impact_level: ImpactLevel.MEDIUM,
+    first_detected_at: new Date().toISOString(),
+    last_updated_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    ...overrides
+  });
 
   beforeEach(async () => {
     vi.restoreAllMocks();
@@ -339,7 +372,7 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
 
     it('8. no failure path auto-resolves/closes a problem', async () => {
       // Set up problem in AWAITING_VERIFICATION
-      const problem: ProblemCluster = {
+      const problem: ProblemCluster = createTestProblemCluster({
         id: 'PRB-AWAIT-001',
         title: 'Road Pit Repair',
         description: 'Deep road cavity',
@@ -348,10 +381,8 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
         status: ProblemStatus.AWAITING_VERIFICATION,
         assigned_to: fieldOfficer.id,
         signal_count: 5,
-        impact_score: 45,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+        impact_score: 45
+      });
       await db.createProblemCluster(problem);
 
       // Add evidence
@@ -441,7 +472,7 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
     let activeProblem: ProblemCluster;
 
     beforeEach(async () => {
-      activeProblem = {
+      activeProblem = createTestProblemCluster({
         id: 'PRB-PROD-001',
         title: 'Damaged Water Valve on Trunk Line',
         description: 'Potable water main leaking near junction',
@@ -451,10 +482,8 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
         assigned_to: fieldOfficer.id,
         is_demo: false, // Production problem
         signal_count: 8,
-        impact_score: 55,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+        impact_score: 55
+      });
       await db.createProblemCluster(activeProblem);
     });
 
@@ -600,7 +629,7 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
   // ===========================================================================
   describe('Assignment Projection & Historical Fallback', () => {
     it('17. new assignment populates problem_clusters.assigned_to', async () => {
-      const unassignedProblem: ProblemCluster = {
+      const unassignedProblem: ProblemCluster = createTestProblemCluster({
         id: 'PRB-NEW-001',
         title: 'New Drain Blockage',
         description: 'Water overflowing from drain',
@@ -608,10 +637,8 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
         department_id: 'BMC_DRAINAGE',
         status: ProblemStatus.TRIAGED,
         signal_count: 3,
-        impact_score: 30,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+        impact_score: 30
+      });
       await db.createProblemCluster(unassignedProblem);
 
       const assignment: Assignment = {
@@ -623,7 +650,8 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
         priority: AssignmentPriority.HIGH,
         status: AssignmentStatus.ASSIGNED,
         assigned_at: new Date().toISOString(),
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
       const action: ProblemAction = {
@@ -655,7 +683,7 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
 
     it('18. historical fallback resolves assigned_to read-only when problem_clusters.assigned_to is undefined', async () => {
       // Simulate historical problem created before HF5.1 where assigned_to was only in assignments table
-      const historicalProblem: ProblemCluster = {
+      const historicalProblem: ProblemCluster = createTestProblemCluster({
         id: 'PRB-HIST-001',
         title: 'Historical Road Cave-in',
         description: 'Historical record from early phase',
@@ -667,7 +695,7 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
         impact_score: 70,
         created_at: '2026-08-01T10:00:00Z',
         updated_at: '2026-08-01T10:00:00Z'
-      };
+      });
       await db.createProblemCluster(historicalProblem);
 
       // Create historical assignment
@@ -680,7 +708,8 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
         priority: AssignmentPriority.HIGH,
         status: AssignmentStatus.ASSIGNED,
         assigned_at: '2026-08-01T10:30:00Z',
-        created_at: '2026-08-01T10:30:00Z'
+        created_at: '2026-08-01T10:30:00Z',
+        updated_at: '2026-08-01T10:30:00Z'
       };
       await db.createAssignment(historicalAssignment);
 
@@ -692,7 +721,7 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
     });
 
     it('19. Field Officer matching the resolved ID remains authorized for workflow actions', async () => {
-      const historicalProblem: ProblemCluster = {
+      const historicalProblem: ProblemCluster = createTestProblemCluster({
         id: 'PRB-HIST-002',
         title: 'Historical Pipe Burst',
         description: 'Burst main',
@@ -704,7 +733,7 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
         impact_score: 50,
         created_at: '2026-08-02T10:00:00Z',
         updated_at: '2026-08-02T10:00:00Z'
-      };
+      });
       await db.createProblemCluster(historicalProblem);
 
       await db.createAssignment({
@@ -716,7 +745,8 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
         priority: AssignmentPriority.HIGH,
         status: AssignmentStatus.ASSIGNED,
         assigned_at: '2026-08-02T10:30:00Z',
-        created_at: '2026-08-02T10:30:00Z'
+        created_at: '2026-08-02T10:30:00Z',
+        updated_at: '2026-08-02T10:30:00Z'
       });
 
       // Field officer submits evidence on this historical problem
@@ -735,7 +765,7 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
     });
 
     it('20. wrong Field Officer remains forbidden (403) on historical problem', async () => {
-      const historicalProblem: ProblemCluster = {
+      const historicalProblem: ProblemCluster = createTestProblemCluster({
         id: 'PRB-HIST-003',
         title: 'Historical Streetlight Fault',
         description: 'Dark junction',
@@ -747,7 +777,7 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
         impact_score: 20,
         created_at: '2026-08-03T10:00:00Z',
         updated_at: '2026-08-03T10:00:00Z'
-      };
+      });
       await db.createProblemCluster(historicalProblem);
 
       // Assigned to fieldOfficer, NOT wrongOfficer
@@ -760,7 +790,8 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
         priority: AssignmentPriority.MEDIUM,
         status: AssignmentStatus.ASSIGNED,
         assigned_at: '2026-08-03T10:30:00Z',
-        created_at: '2026-08-03T10:30:00Z'
+        created_at: '2026-08-03T10:30:00Z',
+        updated_at: '2026-08-03T10:30:00Z'
       });
 
       // wrongOfficer attempts to submit evidence
@@ -778,7 +809,7 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
     });
 
     it('21. no write occurs to historical record during fallback', async () => {
-      const historicalProblem: ProblemCluster = {
+      const historicalProblem: ProblemCluster = createTestProblemCluster({
         id: 'PRB-HIST-004',
         title: 'Historical Sewer Overflow',
         description: 'Sewer manhole bubbling',
@@ -790,7 +821,7 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
         impact_score: 40,
         created_at: '2026-08-04T10:00:00Z',
         updated_at: '2026-08-04T10:00:00Z'
-      };
+      });
       await db.createProblemCluster(historicalProblem);
 
       await db.createAssignment({
@@ -802,7 +833,8 @@ describe('PHASE 15B.5.3.18-HF6.1 — Production Hardening Implementation', () =>
         priority: AssignmentPriority.HIGH,
         status: AssignmentStatus.ASSIGNED,
         assigned_at: '2026-08-04T10:30:00Z',
-        created_at: '2026-08-04T10:30:00Z'
+        created_at: '2026-08-04T10:30:00Z',
+        updated_at: '2026-08-04T10:30:00Z'
       });
 
       // Spy on updateProblemCluster

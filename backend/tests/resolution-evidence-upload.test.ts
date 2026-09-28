@@ -7,6 +7,8 @@ import {
   ProblemStatus,
   UserRole,
   UserProfile,
+  UserStatus,
+  ImpactLevel,
   EvidenceType,
   BeforeOrAfter,
   ProblemCluster,
@@ -31,9 +33,10 @@ describe('Resolution Evidence Presigned R2 Upload & Workflow Integration', () =>
     email: 'field.patel@watco.odisha.gov.in',
     display_name: 'Field Engineer Patel',
     role: UserRole.FIELD_OFFICER,
-    status: 'ACTIVE' as any,
+    status: UserStatus.ACTIVE,
     department_id: 'WATCO',
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   };
 
   const unassignedFieldOfficer: UserProfile = {
@@ -42,9 +45,10 @@ describe('Resolution Evidence Presigned R2 Upload & Workflow Integration', () =>
     email: 'other.officer@watco.odisha.gov.in',
     display_name: 'Field Engineer Rao',
     role: UserRole.FIELD_OFFICER,
-    status: 'ACTIVE' as any,
+    status: UserStatus.ACTIVE,
     department_id: 'WATCO',
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   };
 
   const watcoDeptOfficer: UserProfile = {
@@ -53,9 +57,10 @@ describe('Resolution Evidence Presigned R2 Upload & Workflow Integration', () =>
     email: 'supervisor.dash@watco.odisha.gov.in',
     display_name: 'Supervisor Dash',
     role: UserRole.DEPARTMENT_OFFICER,
-    status: 'ACTIVE' as any,
+    status: UserStatus.ACTIVE,
     department_id: 'WATCO',
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   };
 
   const citizenUser: UserProfile = {
@@ -64,7 +69,9 @@ describe('Resolution Evidence Presigned R2 Upload & Workflow Integration', () =>
     email: 'citizen@example.com',
     display_name: 'Citizen User',
     role: UserRole.CITIZEN,
-    created_at: new Date().toISOString()
+    status: UserStatus.ACTIVE,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   };
 
   let activeProblem: ProblemCluster;
@@ -118,7 +125,17 @@ describe('Resolution Evidence Presigned R2 Upload & Workflow Integration', () =>
       assigned_to: assignedFieldOfficer.id,
       is_demo: false,
       signal_count: 1,
+      severity_score: 15,
+      population_score: 10,
+      duration_score: 5,
+      concentration_score: 5,
+      critical_exposure_score: 5,
+      recurrence_score: 5,
+      evidence_score: 0,
       impact_score: 45,
+      impact_level: ImpactLevel.MEDIUM,
+      first_detected_at: new Date().toISOString(),
+      last_updated_at: new Date().toISOString(),
       location: {
         lat: 20.3179,
         lng: 85.8182

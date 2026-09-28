@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app';
 import { getDatabaseProvider, ProviderContainer, MockSimulationAIProvider } from '../src/providers';
-import { InterventionType, SlaStatus, SlaRiskBand } from '@civicpulse/shared';
+import { InterventionType, SlaStatus, SlaRiskBand, ProblemStatus, ImpactLevel } from '@civicpulse/shared';
 import { SimulationEngine } from '../src/modules/simulation/simulation.engine';
 
 describe('Phase 8: Intervention Simulator (Read-Only Civic Intelligence)', () => {
@@ -398,12 +398,42 @@ describe('Phase 8: Intervention Simulator (Read-Only Civic Intelligence)', () =>
       expect(res.body.data.problem_id).toBe('PRB-2026-0819');
     });
 
-    it('blocks WATCO Department Officer from simulating cross-department Drainage problems', async () => {
+    it('blocks WATCO Department Officer from simulating cross-department problems', async () => {
+      const db = getDatabaseProvider();
+      await db.createProblemCluster({
+        id: 'PRB-SIM-EXTERNAL-01',
+        title: 'External Department Test Incident',
+        description: 'Test incident under external jurisdiction',
+        category: 'sanitation',
+        department_id: 'EXTERNAL_DEPT',
+        ward_id: 'WARD-001',
+        location: { lat: 20.2961, lng: 85.8245 },
+        status: ProblemStatus.NEW,
+        signal_count: 5,
+        supporting_media_count: 1,
+        estimated_population: 500,
+        duration_days: 1,
+        severity_score: 10,
+        population_score: 10,
+        duration_score: 10,
+        concentration_score: 10,
+        critical_exposure_score: 5,
+        recurrence_score: 5,
+        evidence_score: 5,
+        impact_score: 40,
+        impact_level: ImpactLevel.MEDIUM,
+        confidence: 0.9,
+        first_detected_at: '2026-09-01T00:00:00Z',
+        last_updated_at: '2026-09-01T00:00:00Z',
+        created_at: '2026-09-01T00:00:00Z',
+        updated_at: '2026-09-01T00:00:00Z'
+      });
+
       const res = await request(app)
         .post('/api/v1/simulations/problem')
         .set('Authorization', 'Bearer demo-token-dept-watco')
         .send({
-          problem_id: 'PRB-2026-0820', // Drainage problem
+          problem_id: 'PRB-SIM-EXTERNAL-01',
           scenario_name: 'Cross Dept Attempt',
           intervention_type: InterventionType.CAPACITY_BOOST,
           additional_budget_inr: 200000,

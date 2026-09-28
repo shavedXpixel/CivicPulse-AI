@@ -94,13 +94,13 @@ describe('Phase 11 Operations Console API', () => {
         .post('/api/v1/problems/PRB-2026-0819/actions')
         .set('Authorization', 'Bearer demo-token-officer')
         .send({
-          action: 'STARTED_WORK',
-          note: 'Emergency maintenance crew mobilized on site.'
+          action: 'REQUESTED_INFO',
+          note: 'Requesting additional technical schematics for pipeline valve.'
         });
 
       expect(res.status).toBe(200);
       expect(res.body.data.action).toHaveProperty('id');
-      expect(res.body.data.action.action_type).toBe('STARTED_WORK');
+      expect(res.body.data.action.action_type).toBe('REQUESTED_INFO');
     });
 
     it('rejects invalid action schema with 400', async () => {

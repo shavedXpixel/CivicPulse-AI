@@ -70,12 +70,13 @@ describe('Phase 5 Operations & Government Workflows API', () => {
   });
 
   describe('2. Department Officer Scoping & Assignments', () => {
-    it('BMC_DRAINAGE officer cannot assign a problem belonging to WATCO', async () => {
+    it('Non-WATCO officer cannot assign a problem belonging to WATCO', async () => {
       const res = await request(app)
         .post('/api/v1/problems/PRB-2026-0819/assign')
         .set('Authorization', 'Bearer demo-token-dept-drainage')
         .send({
-          department_id: 'BMC_DRAINAGE',
+          department_id: 'WATCO',
+          assigned_to: 'usr_officer_01',
           notes: 'Attempting cross-department hijack'
         });
 
@@ -119,12 +120,12 @@ describe('Phase 5 Operations & Government Workflows API', () => {
       expect(res.body.error.message).toContain('WATCO');
     });
 
-    it('Admin can assign problem across departments', async () => {
+    it('Admin can assign problem to field officer', async () => {
       const res = await request(app)
         .post('/api/v1/problems/PRB-2026-0820/assign')
         .set('Authorization', 'Bearer demo-token-admin')
         .send({
-          department_id: 'BMC_DRAINAGE',
+          department_id: 'WATCO',
           assigned_to: 'usr_field_drainage',
           priority: 'HIGH',
           notes: 'Admin assignment for stormwater drain'
@@ -136,7 +137,7 @@ describe('Phase 5 Operations & Government Workflows API', () => {
   });
 
   describe('3. Field Officer Work Queue Scoping (assigned_to === user.id)', () => {
-    it('WATCO field officer sees ONLY PRB-2026-0819, NOT PRB-2026-0820', async () => {
+    it('WATCO field officer 1 sees ONLY PRB-2026-0819, NOT PRB-2026-0820', async () => {
       const res = await request(app)
         .get('/api/v1/assignments?assigned_to=me')
         .set('Authorization', 'Bearer demo-token-officer'); // usr_officer_01
@@ -148,7 +149,7 @@ describe('Phase 5 Operations & Government Workflows API', () => {
       expect(problemIds).not.toContain('PRB-2026-0820');
     });
 
-    it('BMC_DRAINAGE field officer sees ONLY PRB-2026-0820, NOT PRB-2026-0819', async () => {
+    it('WATCO field officer 2 sees ONLY PRB-2026-0820, NOT PRB-2026-0819', async () => {
       const res = await request(app)
         .get('/api/v1/assignments?assigned_to=me')
         .set('Authorization', 'Bearer demo-token-field-drainage'); // usr_field_drainage
@@ -203,17 +204,28 @@ describe('Phase 5 Operations & Government Workflows API', () => {
       expect(res.body.error.code).toBe('INVALID_STATE_TRANSITION');
     });
 
-    it('Field officer can transition IN_PROGRESS -> AWAITING_VERIFICATION via VERIFICATION_REQUESTED', async () => {
+    it('Field officer can transition IN_PROGRESS -> AWAITING_VERIFICATION via resolution evidence submission', async () => {
+      const mRes = await request(app)
+        .post('/api/v1/problems/PRB-2026-0819/media')
+        .set('Authorization', 'Bearer demo-token-officer')
+        .send({ file_name: 'valve_repair.jpg', mime_type: 'image/jpeg', file_size_bytes: 102400 });
+      await request(app)
+        .post(`/api/v1/problems/PRB-2026-0819/media/${mRes.body.data.media_id}/complete`)
+        .set('Authorization', 'Bearer demo-token-officer')
+        .send({});
+
       const res = await request(app)
-        .post('/api/v1/problems/PRB-2026-0819/actions')
+        .post('/api/v1/problems/PRB-2026-0819/evidence')
         .set('Authorization', 'Bearer demo-token-officer')
         .send({
-          action: 'VERIFICATION_REQUESTED',
-          note: 'Main pipeline replaced and pressure tested. Awaiting engineering sign-off.'
+          evidence_type: 'COMPLETION_PHOTO',
+          storage_path: mRes.body.data.storage_path,
+          media_ids: [mRes.body.data.media_id],
+          description: 'Main pipeline replaced and pressure tested. Awaiting engineering sign-off.'
         });
 
-      expect(res.status).toBe(200);
-      expect(res.body.data.problem.status).toBe('AWAITING_VERIFICATION');
+      expect(res.status).toBe(201);
+      expect(res.body.data.problem_status).toBe('AWAITING_VERIFICATION');
     });
 
     it('Department officer can transition AWAITING_VERIFICATION -> RESOLVED', async () => {
@@ -319,13 +331,9 @@ describe('Phase 5 Operations & Government Workflows API', () => {
 
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body.data)).toBe(true);
-      expect(res.body.data.length).toBe(5);
+      expect(res.body.data.length).toBe(1);
       const ids = res.body.data.map((d: any) => d.id);
-      expect(ids).toContain('WATCO');
-      expect(ids).toContain('BMC_DRAINAGE');
-      expect(ids).toContain('BMC_ROADS');
-      expect(ids).toContain('BMC_SAN');
-      expect(ids).toContain('TPCODL');
+      expect(ids).toEqual(['WATCO']);
     });
 
     it('GET /api/v1/departments/:id/workload returns workload metrics for that department', async () => {

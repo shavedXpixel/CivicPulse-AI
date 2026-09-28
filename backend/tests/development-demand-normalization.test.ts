@@ -321,17 +321,15 @@ describe('PHASE 15B.5.3.20-HF7.2 — Multilingual Demand Normalization Suite', (
     });
 
     it('fails closed when AI returns out-of-bounds confidence', async () => {
-      const invalidConfidenceProvider: IAIProvider = {
-        ...mockAI,
-        normalizeDemand: async () => ({
-          detected_language: 'en',
-          normalized_text: 'Water supply issue',
-          detected_category: 'drinking_water',
-          detected_urgency: 'MEDIUM',
-          normalization_confidence: 1.5, // Out of bounds > 1.0
-          reasoning: 'Test'
-        })
-      };
+      const invalidConfidenceProvider = new MockAIProvider();
+      invalidConfidenceProvider.normalizeDemand = async () => ({
+        detected_language: 'en',
+        normalized_text: 'Water supply issue',
+        detected_category: 'drinking_water',
+        detected_urgency: 'MEDIUM',
+        normalization_confidence: 1.5, // Out of bounds > 1.0
+        reasoning: 'Test'
+      });
 
       const customService = new DevelopmentDemandNormalizationService(invalidConfidenceProvider);
 

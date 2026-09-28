@@ -42,7 +42,7 @@ export class GovernanceClassifier {
     }
 
     // Check for Department and Categories (WATCO is the sole authoritative operational department)
-    extracted_entities.department_id = 'WATCO';
+    extracted_entities.department_id = context?.department_id || 'WATCO';
     if (q.includes('watco') || q.includes('water')) {
       extracted_entities.category = 'water_supply';
     } else if (q.includes('drainage')) {

@@ -23,6 +23,7 @@ import {
   ERROR_CODES,
   UserRole,
   UserProfile,
+  UserStatus,
   Assignment,
   ProblemAction
 } from '@civicpulse/shared';
@@ -35,6 +36,32 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
   let app: any;
   const originalDemoMode = env.DEMO_MODE;
   let mockVerifyIdToken: ReturnType<typeof vi.fn>;
+
+  const createTestProblem = (overrides?: Partial<ProblemCluster>): ProblemCluster => ({
+    id: 'PRB-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+    title: 'Water pipe rupture on Lewis Road',
+    description: 'Clean drinking water main leaking onto pavement',
+    category: 'water_supply',
+    department_id: 'WATCO',
+    ward_id: 'WARD-019',
+    status: ProblemStatus.TRIAGED,
+    signal_count: 1,
+    impact_score: 49,
+    impact_level: ImpactLevel.MEDIUM,
+    severity_score: 15,
+    population_score: 10,
+    duration_score: 8,
+    concentration_score: 7,
+    critical_exposure_score: 5,
+    recurrence_score: 2,
+    evidence_score: 2,
+    first_detected_at: new Date().toISOString(),
+    last_updated_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    is_demo: false,
+    ...overrides
+  });
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -276,7 +303,7 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
     const SAMPLE_SIGNAL_ID = 'sig_atomic_pg_123';
     const SAMPLE_PROBLEM_ID = 'PRB-2026-9999';
 
-    const sampleProblem: ProblemCluster = {
+    const sampleProblem: ProblemCluster = createTestProblem({
       id: SAMPLE_PROBLEM_ID,
       title: 'Water pipe rupture on Lewis Road',
       description: 'Clean drinking water main leaking onto pavement',
@@ -290,7 +317,7 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
       last_updated_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
-    };
+    });
 
     const sampleMember: ProblemClusterMember = {
       id: `mem_${SAMPLE_PROBLEM_ID}_${SAMPLE_SIGNAL_ID}`,
@@ -985,7 +1012,7 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
     // SCENARIO I: Authorization rejects cross-department/field-officer/citizen callers
     it('Scenario I: WorkflowService.assignProblem strictly enforces RBAC authorization', async () => {
       const mockDb = new MockDatabaseProvider();
-      await mockDb.createProblemCluster({
+      await mockDb.createProblemCluster(createTestProblem({
         id: PROD_PROBLEM_ID,
         title: 'Water supply rupture',
         description: 'Clean drinking water main leaking onto pavement',
@@ -998,7 +1025,7 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
         impact_level: ImpactLevel.MEDIUM,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
-      });
+      }));
       ProviderContainer.setDatabaseProvider(mockDb);
 
       const citizenUser: UserProfile = {
@@ -1006,6 +1033,7 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
         email: 'citizen@test.com',
         display_name: 'Citizen Test',
         role: UserRole.CITIZEN,
+        status: UserStatus.ACTIVE,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -1016,6 +1044,7 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
         display_name: 'Field Officer Priyanshu',
         role: UserRole.FIELD_OFFICER,
         department_id: PROD_DEPT_ID,
+        status: UserStatus.ACTIVE,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -1026,6 +1055,7 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
         display_name: 'Drainage Dept Officer',
         role: UserRole.DEPARTMENT_OFFICER,
         department_id: 'DRAINAGE',
+        status: UserStatus.ACTIVE,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -1036,6 +1066,7 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
         display_name: 'WATCO Dept Officer',
         role: UserRole.DEPARTMENT_OFFICER,
         department_id: PROD_DEPT_ID,
+        status: UserStatus.ACTIVE,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -1402,7 +1433,7 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
           })
         };
 
-        provider = new PostgresDatabaseProvider('postgresql://fake:fake@localhost:5432/fake');
+        provider = new PostgresDatabaseProvider({ connectionString: 'postgresql://fake:fake@localhost:5432/fake' });
         (provider as any).pool = mockPool;
       });
 
@@ -1510,7 +1541,7 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
       });
 
       it('L.5: WorkflowStateMachine permits ASSIGNED -> IN_PROGRESS for matching Field Officer', () => {
-        const problem: ProblemCluster = {
+        const problem: ProblemCluster = createTestProblem({
           id: PROD_PROBLEM_ID,
           title: 'Water pipe rupture',
           category: 'water_supply',
@@ -1524,13 +1555,17 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
           last_updated_at: '2026-09-20T10:29:32.616Z',
           created_at: '2026-09-20T10:29:32.616Z',
           updated_at: '2026-09-21T19:33:00.720Z'
-        };
+        });
 
         const matchingFieldOfficer: UserProfile = {
           id: FIELD_OFFICER_ID,
+          email: 'field@watco.gov.in',
+          display_name: 'WATCO Field Officer',
           role: UserRole.FIELD_OFFICER,
           department_id: PROD_DEPT_ID,
-          status: 'ACTIVE' as any
+          status: UserStatus.ACTIVE,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         };
 
         expect(() => {
@@ -1544,7 +1579,7 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
       });
 
       it('L.6: WorkflowStateMachine rejects ASSIGNED -> IN_PROGRESS with 403 for different Field Officer', () => {
-        const problem: ProblemCluster = {
+        const problem: ProblemCluster = createTestProblem({
           id: PROD_PROBLEM_ID,
           title: 'Water pipe rupture',
           category: 'water_supply',
@@ -1558,13 +1593,17 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
           last_updated_at: '2026-09-20T10:29:32.616Z',
           created_at: '2026-09-20T10:29:32.616Z',
           updated_at: '2026-09-21T19:33:00.720Z'
-        };
+        });
 
         const unassignedFieldOfficer: UserProfile = {
           id: OTHER_FIELD_OFFICER_ID,
+          email: 'other_field@watco.gov.in',
+          display_name: 'Other WATCO Field Officer',
           role: UserRole.FIELD_OFFICER,
           department_id: PROD_DEPT_ID,
-          status: 'ACTIVE' as any
+          status: UserStatus.ACTIVE,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         };
 
         expect(() => {
@@ -1578,7 +1617,7 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
       });
 
       it('L.7: Department Officer and Admin authorization behavior is preserved', () => {
-        const problem: ProblemCluster = {
+        const problem: ProblemCluster = createTestProblem({
           id: PROD_PROBLEM_ID,
           title: 'Water pipe rupture',
           category: 'water_supply',
@@ -1592,19 +1631,27 @@ describe('Phase 14 Concurrency & Idempotency Hardening', () => {
           last_updated_at: '2026-09-20T10:29:32.616Z',
           created_at: '2026-09-20T10:29:32.616Z',
           updated_at: '2026-09-21T19:33:00.720Z'
-        };
+        });
 
         const deptOfficer: UserProfile = {
           id: DEPT_OFFICER_ID,
+          email: 'dept@watco.gov.in',
+          display_name: 'WATCO Dept Officer',
           role: UserRole.DEPARTMENT_OFFICER,
           department_id: PROD_DEPT_ID,
-          status: 'ACTIVE' as any
+          status: UserStatus.ACTIVE,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         };
 
         const admin: UserProfile = {
           id: '10000000-0000-4000-8000-000000000001',
+          email: 'admin@civicpulse.gov.in',
+          display_name: 'Municipal Admin',
           role: UserRole.ADMIN,
-          status: 'ACTIVE' as any
+          status: UserStatus.ACTIVE,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         };
 
         expect(() => {

@@ -131,7 +131,7 @@ describe('PHASE 15B.5.3.18-HF1 — Citizen Ownership Identifier Consistency', ()
     it('returns PostgreSQL UUID as citizen_id across listSignals results', async () => {
       mockPool.query.mockResolvedValueOnce({ rows: [rawSignalRow] });
 
-      const result = await provider.listSignals({ citizen_id: MIGRATED_POSTGRES_USER_ID });
+      const result = await provider.listSignals({ citizen_id: MIGRATED_POSTGRES_USER_ID, limit: 10 });
       expect(result.data).toHaveLength(1);
       expect(result.data[0].citizen_id).toBe(MIGRATED_POSTGRES_USER_ID);
       expect(result.data[0].citizen_legacy_uid).toBe(MIGRATED_LEGACY_FIREBASE_UID);

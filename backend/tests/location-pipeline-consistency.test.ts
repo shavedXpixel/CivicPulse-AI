@@ -31,18 +31,22 @@ describe('Production Location Pipeline & Geometry Consistency', () => {
   const citizenUser: UserProfile = {
     id: 'usr_citizen_test_loc',
     email: 'citizen.test@civicpulse.org',
+    display_name: 'Citizen Test User',
     role: UserRole.CITIZEN,
     status: UserStatus.ACTIVE,
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   };
 
   const officerUser: UserProfile = {
     id: 'usr_officer_test_loc',
     email: 'officer.watco@civicpulse.org',
+    display_name: 'WATCO Officer Test User',
     role: UserRole.DEPARTMENT_OFFICER,
     department_id: 'WATCO',
     status: UserStatus.ACTIVE,
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   };
 
   beforeEach(() => {
