@@ -54,6 +54,34 @@ describe('Phase 13: Real Government Experience & Operations Workflows', () => {
 
     app = createApp();
     try {
+      const db = getFirestoreDb();
+      await db.collection('users').doc(UIDS.ADMIN).set({
+        id: UIDS.ADMIN,
+        role: UserRole.ADMIN,
+        email: 'admin@example.com',
+        status: 'ACTIVE'
+      }, { merge: true });
+      await db.collection('users').doc(UIDS.DEPT_OFFICER).set({
+        id: UIDS.DEPT_OFFICER,
+        role: UserRole.DEPARTMENT_OFFICER,
+        email: 'officer@example.com',
+        department_id: 'WATCO',
+        status: 'ACTIVE'
+      }, { merge: true });
+      await db.collection('users').doc(UIDS.FIELD_OFFICER).set({
+        id: UIDS.FIELD_OFFICER,
+        role: UserRole.FIELD_OFFICER,
+        email: 'field@example.com',
+        department_id: 'WATCO',
+        status: 'ACTIVE'
+      }, { merge: true });
+      await db.collection('users').doc(UIDS.CITIZEN).set({
+        id: UIDS.CITIZEN,
+        role: UserRole.CITIZEN,
+        email: 'test-citizen@example.com',
+        status: 'ACTIVE'
+      }, { merge: true });
+
       tokens = {
         admin: await getIdTokenForUid(UIDS.ADMIN),
         deptOfficer: await getIdTokenForUid(UIDS.DEPT_OFFICER),
