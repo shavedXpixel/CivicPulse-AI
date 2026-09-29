@@ -40,6 +40,7 @@ export const RegisterMediaSchema = z.object({
 });
 
 export const SignalAnalysisOutputSchema = z.object({
+  // Compatible with canonical "or" (Odia), "hi" (Hindi), "en" (English), and raw provider responses
   detected_language: z.string().default('en'),
   normalized_summary: z.string().min(1, 'Summary must not be empty').max(1000),
   category: z.string().min(1),

@@ -52,8 +52,12 @@ export class SignalAIService {
 
       const latencyMs = Date.now() - startTime;
 
+      // Canonical language normalization: normalize any Gemini response "od" to canonical "or"
+      const rawLanguage = (analysisOutput.detected_language || '').trim().toLowerCase();
+      const canonicalLanguage = rawLanguage === 'od' ? 'or' : (analysisOutput.detected_language || 'en');
+
       const analysis: SignalAIAnalysis = {
-        detected_language: analysisOutput.detected_language,
+        detected_language: canonicalLanguage,
         normalized_summary: analysisOutput.normalized_summary,
         category: analysisOutput.category,
         subcategory: analysisOutput.subcategory || null,
@@ -73,6 +77,7 @@ export class SignalAIService {
       // 4. Update Signal:
       // CRITICAL: Store AI recommendation in advisory `recommended_department` ONLY.
       // Do NOT overwrite authoritative `department_id` (Phase 5).
+      // CRITICAL: original_text is preserved exactly and NEVER modified during analysis or re-analysis.
       const updatedSignal = await this.repo.update(signalId, {
         normalized_text: analysis.normalized_summary,
         language: analysis.detected_language,
