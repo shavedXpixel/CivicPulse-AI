@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   User,
   ArrowRight,
-  Lock,
   Mail,
   AlertCircle,
   Loader2,
@@ -18,6 +17,7 @@ import {
 import { UserRole } from '@civicpulse/shared';
 import { apiClient } from '../../lib/api-client';
 import { useAuth } from '../../context/AuthContext';
+import { PasswordInput } from '../../components/ui/PasswordInput';
 
 function LoginContent() {
   const router = useRouter();
@@ -354,17 +354,13 @@ function LoginContent() {
                       </Link>
                     )}
                   </div>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 text-ink-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full pl-9 pr-3 py-2 text-xs rounded-sm border border-ink-border bg-canvas-subtle/50 focus:bg-canvas-card focus:outline-none focus:border-civic-terracotta transition-colors text-ink-primary font-mono"
-                    />
-                  </div>
+                  <PasswordInput
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete={isRegistering ? 'new-password' : 'current-password'}
+                  />
                 </div>
 
                 <button

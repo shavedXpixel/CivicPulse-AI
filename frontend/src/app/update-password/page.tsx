@@ -3,9 +3,10 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Lock, CheckCircle2, AlertCircle, Loader2, ArrowRight, Shield } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2, ArrowRight, Shield } from 'lucide-react';
 import { getSupabaseClient } from '../../lib/supabase-client';
 import { apiClient } from '../../lib/api-client';
+import { PasswordInput } from '../../components/ui/PasswordInput';
 
 function UpdatePasswordContent() {
   const router = useRouter();
@@ -315,19 +316,15 @@ function UpdatePasswordContent() {
                 <label className="block text-[10px] font-mono uppercase tracking-widest font-semibold text-ink-secondary">
                   New Password
                 </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-ink-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="password"
-                    required
-                    autoFocus
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="••••••••"
-                    minLength={6}
-                    className="w-full pl-9 pr-3 py-2 text-xs rounded-sm border border-ink-border bg-canvas-subtle/50 focus:bg-canvas-card focus:outline-none focus:border-civic-terracotta transition-colors text-ink-primary font-mono"
-                  />
-                </div>
+                <PasswordInput
+                  required
+                  autoFocus
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  minLength={6}
+                  autoComplete="new-password"
+                />
                 <span className="text-[10px] text-ink-tertiary font-mono">
                   Minimum 6 characters.
                 </span>
@@ -337,18 +334,14 @@ function UpdatePasswordContent() {
                 <label className="block text-[10px] font-mono uppercase tracking-widest font-semibold text-ink-secondary">
                   Confirm New Password
                 </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-ink-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="password"
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    minLength={6}
-                    className="w-full pl-9 pr-3 py-2 text-xs rounded-sm border border-ink-border bg-canvas-subtle/50 focus:bg-canvas-card focus:outline-none focus:border-civic-terracotta transition-colors text-ink-primary font-mono"
-                  />
-                </div>
+                <PasswordInput
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  minLength={6}
+                  autoComplete="new-password"
+                />
               </div>
 
               <button
