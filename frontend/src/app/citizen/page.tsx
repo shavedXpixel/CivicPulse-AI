@@ -20,6 +20,7 @@ import {
 import { Button } from '../../components/ui/Button';
 import { apiClient } from '../../lib/api-client';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from '../../context/LanguageContext';
 
 interface CitizenSignal {
   id: string;
@@ -39,6 +40,7 @@ interface CitizenSignal {
 
 export default function CitizenHomePage() {
   const { user, loading: authLoading } = useAuth();
+  const { t } = useTranslation();
 
   const [signals, setSignals] = useState<CitizenSignal[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -92,7 +94,7 @@ export default function CitizenHomePage() {
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-mono bg-civic-blueLight text-civic-blueDark">
               <ShieldCheck className="w-3.5 h-3.5 text-civic-blue" />
-              <span>Verified Citizen Portal</span>
+              <span>{t('home.heroBadge')}</span>
             </div>
             {user && (
               <span className="text-xs text-ink-secondary font-mono">
@@ -102,10 +104,10 @@ export default function CitizenHomePage() {
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink-primary">
-            {user ? `Welcome, ${citizenName}` : 'Civic Problem Reporting'}
+            {user ? `${t('home.welcomePrefix')}, ${citizenName}` : t('home.defaultHeading')}
           </h1>
           <p className="text-xs sm:text-sm text-ink-secondary leading-relaxed">
-            Report civic issues in your neighborhood. CivicPulse analyzes plain language, detects categories, correlates public problems, and routes actions to municipal authorities.
+            {t('home.subheading')}
           </p>
         </div>
 
@@ -114,21 +116,21 @@ export default function CitizenHomePage() {
           <div className="p-6 rounded-2xl border border-amber-200 bg-amber-50/70 text-xs text-amber-950 space-y-3 shadow-sm">
             <div className="flex items-center gap-2 font-bold text-amber-900 text-sm">
               <Lock className="w-4 h-4 text-amber-700 shrink-0" />
-              <span>Sign In to Track Your Neighborhood Reports</span>
+              <span>{t('home.unauthTitle')}</span>
             </div>
             <p className="leading-relaxed text-xs text-amber-900/90">
-              Sign in with your citizen profile to file verified civic reports, receive real-time updates on municipal triage, and track resolution timelines with DPDP privacy protections.
+              {t('home.unauthDesc')}
             </p>
             <div className="pt-1 flex items-center gap-3">
               <Link href="/login">
                 <Button variant="primary" size="sm" className="text-xs gap-1.5">
-                  <span>Sign In as Citizen</span>
+                  <span>{t('home.signInCitizen')}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Button>
               </Link>
               <Link href="/citizen/report">
                 <Button variant="secondary" size="sm" className="text-xs">
-                  File a Report
+                  {t('home.fileReport')}
                 </Button>
               </Link>
             </div>
@@ -145,8 +147,8 @@ export default function CitizenHomePage() {
               <Mic className="w-4 h-4" />
             </div>
             <div>
-              <div className="text-xs font-semibold text-ink-primary">Speak description</div>
-              <div className="text-[10px] font-mono text-ink-secondary">Odia (ଓଡ଼ିଆ), Hindi, English</div>
+              <div className="text-xs font-semibold text-ink-primary">{t('home.speakDescription')}</div>
+              <div className="text-[10px] font-mono text-ink-secondary">{t('home.speakSubtitle')}</div>
             </div>
           </Link>
 
@@ -158,21 +160,21 @@ export default function CitizenHomePage() {
               <Camera className="w-4 h-4" />
             </div>
             <div>
-              <div className="text-xs font-semibold text-ink-primary">Attach photo</div>
-              <div className="text-[10px] font-mono text-ink-secondary">Up to 10 MB with GPS</div>
+              <div className="text-xs font-semibold text-ink-primary">{t('home.takePhoto')}</div>
+              <div className="text-[10px] font-mono text-ink-secondary">{t('home.photoSubtitle')}</div>
             </div>
           </Link>
 
           <Link
-            href="/citizen/report?mode=text"
+            href="/citizen/issues"
             className="flex items-center sm:flex-col justify-start sm:justify-center p-4 rounded-sm border border-ink-border bg-canvas-card shadow-none hover:border-ink-secondary transition-all gap-3 text-left sm:text-center group"
           >
             <div className="w-9 h-9 rounded-sm bg-canvas-subtle border border-ink-border flex items-center justify-center text-civic-terracotta group-hover:border-ink-primary transition-colors">
               <FileText className="w-4 h-4" />
             </div>
             <div>
-              <div className="text-xs font-semibold text-ink-primary">Type description</div>
-              <div className="text-[10px] font-mono text-ink-secondary">Plain-language civic text</div>
+              <div className="text-xs font-semibold text-ink-primary">{t('home.trackReports')}</div>
+              <div className="text-[10px] font-mono text-ink-secondary">{t('home.trackSubtitle')}</div>
             </div>
           </Link>
         </div>
@@ -245,21 +247,21 @@ export default function CitizenHomePage() {
               <Building2 className="w-5 h-5 text-civic-terracotta" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-base font-bold text-ink-primary">No reports yet</h3>
+              <h3 className="text-base font-bold text-ink-primary">{t('home.recentEmptyTitle')}</h3>
               <p className="text-xs text-ink-secondary max-w-md mx-auto leading-relaxed">
-                You have not submitted any civic reports yet. When you report public issues in your area, your reports and correlated government progress will appear here.
+                {t('home.recentEmptyDesc')}
               </p>
             </div>
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link href="/citizen/report">
                 <Button variant="primary" size="sm" className="text-xs gap-1.5 font-mono">
                   <PlusCircle className="w-3.5 h-3.5" />
-                  <span>Report a Public Issue</span>
+                  <span>{t('home.fileReport')}</span>
                 </Button>
               </Link>
               <Link href="/citizen/issues">
                 <Button variant="secondary" size="sm" className="text-xs font-mono">
-                  Track My Reports
+                  {t('home.trackReports')}
                 </Button>
               </Link>
             </div>
@@ -271,7 +273,7 @@ export default function CitizenHomePage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="p-4 rounded-sm border border-ink-border bg-canvas-card shadow-none space-y-1">
                 <span className="text-[10px] font-mono font-semibold text-ink-secondary uppercase tracking-widest block">
-                  Total Reports
+                  {t('home.statsTotal')}
                 </span>
                 <span className="text-2xl font-bold font-mono text-ink-primary">
                   {totalReports}
@@ -280,7 +282,7 @@ export default function CitizenHomePage() {
 
               <div className="p-4 rounded-sm border border-ink-border bg-canvas-card shadow-none space-y-1">
                 <span className="text-[10px] font-mono font-semibold text-ink-secondary uppercase tracking-widest block">
-                  In Progress
+                  {t('home.statsInProgress')}
                 </span>
                 <span className="text-2xl font-bold font-mono text-civic-amber">
                   {inProgressReports}
@@ -289,7 +291,7 @@ export default function CitizenHomePage() {
 
               <div className="p-4 rounded-sm border border-ink-border bg-canvas-card shadow-none space-y-1">
                 <span className="text-[10px] font-mono font-semibold text-ink-secondary uppercase tracking-widest block">
-                  Resolved
+                  {t('home.statsResolved')}
                 </span>
                 <span className="text-2xl font-bold font-mono text-civic-emerald">
                   {resolvedReports}
@@ -298,7 +300,7 @@ export default function CitizenHomePage() {
 
               <div className="p-4 rounded-sm border border-ink-border bg-canvas-card shadow-none space-y-1">
                 <span className="text-[10px] font-mono font-semibold text-ink-secondary uppercase tracking-widest block">
-                  Correlated
+                  {t('home.statsCorrelated')}
                 </span>
                 <span className="text-2xl font-bold font-mono text-civic-terracotta">
                   {correlatedProblems}
@@ -310,7 +312,7 @@ export default function CitizenHomePage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between border-b border-ink-border pb-2">
                 <h2 className="text-sm font-mono font-bold text-ink-primary uppercase tracking-wider flex items-center gap-2">
-                  <span>Your recent reports</span>
+                  <span>{t('home.recentHeading')}</span>
                   <span className="text-xs font-mono font-normal text-ink-tertiary">
                     ({signals.length})
                   </span>
@@ -319,7 +321,7 @@ export default function CitizenHomePage() {
                   href="/citizen/issues"
                   className="text-xs font-mono font-medium text-civic-terracotta hover:underline flex items-center gap-1"
                 >
-                  <span>Track My Reports</span>
+                  <span>{t('home.trackReports')}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>

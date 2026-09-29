@@ -25,6 +25,7 @@ import { Button } from '../../../components/ui/Button';
 import { SignalAIPreview, SignalAIPreviewData } from '../../../components/citizen/SignalAIPreview';
 import { PublicProblemModal } from '../../../components/citizen/PublicProblemModal';
 import { useAuth } from '../../../context/AuthContext';
+import { useTranslation } from '../../../context/LanguageContext';
 
 interface CitizenSignal {
   id: string;
@@ -46,6 +47,7 @@ interface CitizenSignal {
 
 export default function CitizenIssuesPage() {
   const { user, loading: authLoading } = useAuth();
+  const { t } = useTranslation();
 
   const [signals, setSignals] = useState<CitizenSignal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -95,23 +97,23 @@ export default function CitizenIssuesPage() {
             className="inline-flex items-center gap-1.5 text-xs text-ink-secondary hover:text-ink-primary font-medium"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Back to Home</span>
+            <span>{t('common.backToHome')}</span>
           </Link>
 
           <Link href="/citizen/report">
             <Button variant="primary" size="sm" className="gap-1.5 text-xs">
               <Plus className="w-3.5 h-3.5" />
-              <span>New Report</span>
+              <span>{t('issues.newReport')}</span>
             </Button>
           </Link>
         </div>
 
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight text-ink-primary">
-            My Submitted Reports
+            {t('issues.title')}
           </h1>
           <p className="text-xs text-ink-secondary">
-            Real reports submitted by your authenticated citizen profile, persisted in PostgreSQL.
+            {t('issues.subtitle')}
           </p>
         </div>
 
@@ -122,14 +124,14 @@ export default function CitizenIssuesPage() {
               <Lock className="w-5 h-5 text-civic-terracotta" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-sm font-bold text-ink-primary font-mono uppercase tracking-wider">Authentication Required</h3>
+              <h3 className="text-sm font-bold text-ink-primary font-mono uppercase tracking-wider">{t('issues.authRequiredTitle')}</h3>
               <p className="text-xs text-ink-secondary max-w-sm mx-auto leading-relaxed">
-                Sign in with your citizen account to securely view and track the status of your submitted municipal reports.
+                {t('issues.authRequiredDesc')}
               </p>
             </div>
             <Link href="/login" className="inline-block pt-1">
               <Button variant="primary" size="sm" className="font-mono text-xs">
-                Sign In as Citizen
+                {t('issues.signInCitizen')}
               </Button>
             </Link>
           </div>
@@ -147,11 +149,11 @@ export default function CitizenIssuesPage() {
                     className="text-xs font-semibold text-civic-terracotta hover:underline flex items-center gap-1"
                   >
                     <RefreshCw className="w-3 h-3" />
-                    <span>Retry</span>
+                    <span>{t('common.retry')}</span>
                   </button>
                   {!user && (
                     <Link href="/login" className="text-xs font-semibold text-civic-rose hover:underline">
-                      Sign In
+                      {t('common.signIn')}
                     </Link>
                   )}
                 </div>
@@ -162,7 +164,7 @@ export default function CitizenIssuesPage() {
               <div className="p-12 text-center text-ink-secondary space-y-3 font-mono">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto text-civic-terracotta" />
                 <p className="text-xs">
-                  Retrieving your reports from PostgreSQL...
+                  {t('common.loading')}
                 </p>
               </div>
             ) : signals.length === 0 ? (
@@ -171,14 +173,14 @@ export default function CitizenIssuesPage() {
                   <Building2 className="w-5 h-5 text-civic-terracotta" />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-sm font-bold text-ink-primary font-mono uppercase tracking-wider">No Reports Yet</h3>
+                  <h3 className="text-sm font-bold text-ink-primary font-mono uppercase tracking-wider">{t('issues.emptyTitle')}</h3>
                   <p className="text-xs text-ink-secondary leading-relaxed">
-                    You have not submitted any municipal signals under this citizen account.
+                    {t('issues.emptyDesc')}
                   </p>
                 </div>
                 <Link href="/citizen/report" className="inline-block">
                   <Button variant="primary" size="sm" className="font-mono text-xs">
-                    Submit a Report
+                    {t('issues.fileFirstReport')}
                   </Button>
                 </Link>
               </div>

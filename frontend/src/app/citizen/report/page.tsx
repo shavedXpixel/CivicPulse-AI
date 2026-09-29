@@ -26,6 +26,9 @@ import { apiClient } from '../../../lib/api-client';
 import { SignalAIPreview } from '../../../components/citizen/SignalAIPreview';
 import { LocationPicker, LocationPickerValue } from '../../../components/domain/LocationPicker';
 import { useAuth } from '../../../context/AuthContext';
+import { useTranslation } from '../../../context/LanguageContext';
+import { VoiceDictationButton } from '../../../components/citizen/VoiceDictationButton';
+import { VoiceReadAloudButton } from '../../../components/citizen/VoiceReadAloudButton';
 
 const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB Canonical MVP Limit
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
@@ -34,6 +37,7 @@ type ReportStage = 'describe' | 'location' | 'media' | 'review' | 'processing' |
 
 function CitizenReportContent() {
   const { user, loading: authLoading } = useAuth();
+  const { t } = useTranslation();
   const searchParams = useSearchParams();
   const intakeMode = searchParams.get('mode') || 'text';
 
@@ -42,6 +46,16 @@ function CitizenReportContent() {
   // Stage 1: Description state
   const [description, setDescription] = useState('');
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
+
+  const handleVoiceTranscript = (chunk: string) => {
+    setDescription((prev) => {
+      const trimmedPrev = prev.trim();
+      return trimmedPrev ? `${trimmedPrev} ${chunk}` : chunk;
+    });
+    if (descriptionError) {
+      setDescriptionError(null);
+    }
+  };
 
 // Stage 2: Location state
   // Initialized to null to guarantee that initial visual fallback center coordinates
@@ -105,7 +119,7 @@ function CitizenReportContent() {
   // Step transition validators
   const handleNextFromDescribe = () => {
     if (description.trim().length < 3) {
-      setDescriptionError('Please describe the issue in at least 3 characters.');
+      setDescriptionError(t('report.errorMinLength'));
       return;
     }
     setDescriptionError(null);
@@ -115,7 +129,7 @@ function CitizenReportContent() {
   const handleNextFromLocation = () => {
     setLocationError(null);
     if (!selectedLocation || typeof selectedLocation.lat !== 'number' || typeof selectedLocation.lng !== 'number') {
-      setLocationError('Please position the pin on the map or click Confirm Location before continuing.');
+      setLocationError(t('report.errorLocationRequired'));
       return;
     }
     if (
@@ -124,7 +138,7 @@ function CitizenReportContent() {
       selectedLocation.lng < -180 ||
       selectedLocation.lng > 180
     ) {
-      setLocationError('Coordinates out of valid range (-90 to 90 lat, -180 to 180 lng).');
+      setLocationError(t('report.errorCoordinatesRange'));
       return;
     }
     setStage('media');
@@ -137,14 +151,14 @@ function CitizenReportContent() {
   // Submission handler
   const handleFinalSubmit = async () => {
     if (description.trim().length < 3) {
-      setSubmitError('Please provide a description of at least 3 characters.');
+      setSubmitError(t('report.errorMinLength'));
       setStage('describe');
       return;
     }
 
     // Requires authenticated user
     if (!user) {
-      setSubmitError('You must be signed in to submit a citizen report. Please sign in to continue.');
+      setSubmitError(t('report.errorSignInRequired'));
       return;
     }
 
@@ -265,10 +279,10 @@ function CitizenReportContent() {
 
   // Stepper steps configuration
   const steps = [
-    { id: 'describe', label: 'Describe', stepNum: 1 },
-    { id: 'location', label: 'Location', stepNum: 2 },
-    { id: 'media', label: 'Media', stepNum: 3 },
-    { id: 'review', label: 'Review', stepNum: 4 },
+    { id: 'describe', label: t('report.stepDescribe'), stepNum: 1 },
+    { id: 'location', label: t('report.stepLocation'), stepNum: 2 },
+    { id: 'media', label: t('report.stepMedia'), stepNum: 3 },
+    { id: 'review', label: t('report.stepReview'), stepNum: 4 },
   ];
 
   const currentStepIndex = steps.findIndex((s) => s.id === stage);
@@ -283,21 +297,21 @@ function CitizenReportContent() {
             className="inline-flex items-center gap-1.5 text-xs text-ink-secondary hover:text-ink-primary font-medium"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Back to Home</span>
+            <span>{t('common.backToHome')}</span>
           </Link>
           <div className="flex items-center gap-1.5 text-[11px] font-mono text-ink-tertiary">
             <ShieldCheck className="w-3.5 h-3.5 text-civic-blue" />
-            <span>DPDP Protected</span>
+            <span>{t('common.dpdpProtected')}</span>
           </div>
         </div>
 
         {/* Page Title */}
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight text-ink-primary">
-            Report a Public Issue
+            {t('report.title')}
           </h1>
           <p className="text-xs text-ink-secondary">
-            Citizen Signals → Government Intelligence → Public Action
+            {t('report.subtitle')}
           </p>
         </div>
 
@@ -306,15 +320,15 @@ function CitizenReportContent() {
           <div className="p-4 rounded-xl border border-amber-300 bg-amber-50 text-xs text-amber-900 space-y-2">
             <div className="flex items-center gap-2 font-bold text-amber-800">
               <Lock className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>Authentication Required</span>
+              <span>{t('report.authRequiredTitle')}</span>
             </div>
             <p className="leading-relaxed">
-              You must be signed in with a citizen account to submit civic reports. Reports will be securely associated with your verified profile.
+              {t('report.authRequiredDesc')}
             </p>
             <div className="pt-1">
               <Link href="/login?redirect=/citizen/report">
                 <Button variant="primary" size="sm" className="text-xs">
-                  Sign In as Citizen
+                  {t('report.signInToReport')}
                 </Button>
               </Link>
             </div>
@@ -325,8 +339,8 @@ function CitizenReportContent() {
         {stage !== 'processing' && stage !== 'result' && (
           <div className="border-b border-ink-border pb-4 space-y-3">
             <div className="flex items-center justify-between text-[10px] font-mono text-ink-tertiary uppercase tracking-widest">
-              <span>FORM REF: CP-INT-01 // PUBLIC SERVICE INTAKE</span>
-              <span>STEP {currentStepIndex + 1} OF {steps.length}</span>
+              <span>{t('report.formRef')}</span>
+              <span>{t('report.stepOf', { current: currentStepIndex + 1, total: steps.length })}</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {steps.map((s, idx) => {
@@ -364,7 +378,7 @@ function CitizenReportContent() {
           <div className="p-3.5 rounded-xl border border-civic-rose/30 bg-rose-50 text-xs text-rose-900 flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-civic-rose shrink-0 mt-0.5" />
             <div className="flex-1 space-y-1">
-              <div className="font-semibold">Submission Notice</div>
+              <div className="font-semibold">{t('report.submissionNotice')}</div>
               <div className="leading-relaxed">{submitError}</div>
             </div>
           </div>
@@ -381,11 +395,11 @@ function CitizenReportContent() {
                   1
                 </span>
                 <h3 className="text-sm font-bold text-ink-primary uppercase tracking-wider font-mono">
-                  Describe the Issue
+                  {t('report.describeTitle')}
                 </h3>
               </div>
               <p className="text-xs text-ink-secondary pl-7">
-                Describe what is happening, where it is happening, and how it is affecting people.
+                {t('report.describeSubtitle')}
               </p>
             </div>
 
@@ -393,15 +407,21 @@ function CitizenReportContent() {
               <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 flex items-start gap-2">
                 <Info className="w-4 h-4 text-civic-blue shrink-0 mt-0.5" />
                 <span>
-                  Voice intake mode: You can dictate or paste plain speech in Odia (ଓଡ଼ିଆ), Hindi, or English. Gemini AI will structure and categorize it.
+                  {t('report.voiceModeNotice')}
                 </span>
               </div>
             )}
 
             <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label htmlFor="problem-description-input" className="block text-[11px] font-mono uppercase tracking-wider text-ink-secondary">
+                  {t('report.problemDescLabel')}
+                </label>
+                <VoiceDictationButton onTranscript={handleVoiceTranscript} />
+              </div>
               <Textarea
-                label="Problem Description"
-                placeholder="Example: Broken water main pipe leaking heavily onto the road outside Block 4, creating flooded walkway and muddy hazards for commuters."
+                id="problem-description-input"
+                placeholder={t('report.problemDescPlaceholder')}
                 value={description}
                 onChange={(e) => {
                   setDescription(e.target.value);
@@ -412,9 +432,9 @@ function CitizenReportContent() {
                 rows={5}
               />
               <div className="flex items-center justify-between text-[11px] text-ink-secondary">
-                <span>Minimum 3 characters</span>
+                <span>{t('report.minCharacters')}</span>
                 <span className={description.length > 4500 ? 'text-amber-600 font-bold' : ''}>
-                  {description.length} / 5000 characters
+                  {t('report.charactersCount', { count: description.length, max: 5000 })}
                 </span>
               </div>
               {descriptionError && (
@@ -426,11 +446,11 @@ function CitizenReportContent() {
             </div>
 
             <div className="p-3 rounded-xl bg-canvas-subtle border border-ink-border/60 text-[11px] text-ink-secondary space-y-1">
-              <div className="font-semibold text-ink-primary">Helpful reporting tips:</div>
+              <div className="font-semibold text-ink-primary">{t('report.helpfulTipsTitle')}</div>
               <ul className="list-disc pl-4 space-y-0.5">
-                <li>Mention nearby landmarks (e.g. crossing, market, school).</li>
-                <li>Note severity (e.g. minor leak vs arterial flooding).</li>
-                <li>No government codes or technical jargon required.</li>
+                <li>{t('report.tipLandmarks')}</li>
+                <li>{t('report.tipSeverity')}</li>
+                <li>{t('report.tipPlainLanguage')}</li>
               </ul>
             </div>
 
@@ -440,7 +460,7 @@ function CitizenReportContent() {
                 onClick={handleNextFromDescribe}
                 className="gap-2 text-xs"
               >
-                <span>Continue to Location</span>
+                <span>{t('report.continueToLocation')}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Button>
             </div>
@@ -458,11 +478,11 @@ function CitizenReportContent() {
                   2
                 </span>
                 <h3 className="text-sm font-bold text-ink-primary uppercase tracking-wider font-mono">
-                  Incident Location
+                  {t('report.locationTitle')}
                 </h3>
               </div>
               <p className="text-xs text-ink-secondary pl-7">
-                Place the pin on the real map or use your device location to position the civic incident accurately.
+                {t('report.locationSubtitle')}
               </p>
             </div>
 
@@ -482,11 +502,11 @@ function CitizenReportContent() {
             {/* OPTIONAL LANDMARK / DESCRIPTIVE REFERENCE */}
             <div className="space-y-1.5 pt-1">
               <label className="block text-[11px] font-mono uppercase tracking-wider text-ink-secondary">
-                Nearby Landmark or Address Reference (Optional)
+                {t('report.manualLocationLabel')}
               </label>
               <Input
                 type="text"
-                placeholder="e.g. Near Damana Square, opposite Post Office, VIP Road"
+                placeholder={t('report.manualLocationPlaceholder')}
                 value={manualLocationRef}
                 onChange={(e) => setManualLocationRef(e.target.value)}
                 className="text-xs"
@@ -510,14 +530,14 @@ function CitizenReportContent() {
                 className="gap-1.5 text-xs"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Back</span>
+                <span>{t('report.backToDescribe')}</span>
               </Button>
               <Button
                 variant="primary"
                 onClick={handleNextFromLocation}
                 className="gap-1.5 text-xs"
               >
-                <span>Continue to Media</span>
+                <span>{t('report.continueToMedia')}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Button>
             </div>
@@ -535,11 +555,11 @@ function CitizenReportContent() {
                   3
                 </span>
                 <h3 className="text-sm font-bold text-ink-primary uppercase tracking-wider font-mono">
-                  Attach Photo Evidence (Optional)
+                  {t('report.mediaTitle')}
                 </h3>
               </div>
               <p className="text-xs text-ink-secondary pl-7">
-                Add an image of the civic issue. Maximum 10 MB (JPEG, PNG, WEBP, HEIC).
+                {t('report.mediaSubtitle')}
               </p>
             </div>
 
@@ -566,7 +586,7 @@ function CitizenReportContent() {
                     type="button"
                     onClick={handleRemovePhoto}
                     className="p-2 rounded-lg hover:bg-canvas text-ink-secondary hover:text-civic-rose transition-colors"
-                    title="Remove Photo"
+                    title={t('report.removePhoto')}
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -578,10 +598,10 @@ function CitizenReportContent() {
                   </div>
                   <div className="space-y-0.5">
                     <span className="text-xs font-semibold text-ink-primary block">
-                      Click to choose photo or capture image
+                      {t('report.photoUploadTitle')}
                     </span>
                     <span className="text-[11px] text-ink-secondary block">
-                      Max file size: 10 MB (JPEG, PNG, WEBP, HEIC)
+                      {t('report.photoUploadDesc')}
                     </span>
                   </div>
                   <input
@@ -608,14 +628,14 @@ function CitizenReportContent() {
                 className="gap-1.5 text-xs"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Back</span>
+                <span>{t('report.backToLocation')}</span>
               </Button>
               <Button
                 variant="primary"
                 onClick={handleNextFromMedia}
                 className="gap-1.5 text-xs"
               >
-                <span>Review Report</span>
+                <span>{t('report.continueToReview')}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Button>
             </div>
@@ -633,11 +653,11 @@ function CitizenReportContent() {
                   4
                 </span>
                 <h3 className="text-sm font-bold text-ink-primary uppercase tracking-wider font-mono">
-                  Review Your Civic Report
+                  {t('report.reviewTitle')}
                 </h3>
               </div>
               <p className="text-xs text-ink-secondary pl-7">
-                Confirm your report details before submitting to municipal intelligence intake.
+                {t('report.reviewSubtitle')}
               </p>
             </div>
 
@@ -645,7 +665,7 @@ function CitizenReportContent() {
             <div className="p-3.5 rounded-xl border border-ink-border bg-canvas-subtle space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-tertiary">
-                  Description
+                  {t('report.reviewDescriptionLabel')}
                 </span>
                 <button
                   type="button"
@@ -665,7 +685,7 @@ function CitizenReportContent() {
             <div className="p-3.5 rounded-xl border border-ink-border bg-canvas-subtle space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-tertiary">
-                  Location
+                  {t('report.reviewLocationLabel')}
                 </span>
                 <button
                   type="button"
@@ -695,7 +715,7 @@ function CitizenReportContent() {
             <div className="p-3.5 rounded-xl border border-ink-border bg-canvas-subtle space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-tertiary">
-                  Attached Media
+                  {t('report.reviewPhotoLabel')}
                 </span>
                 <button
                   type="button"
@@ -722,7 +742,7 @@ function CitizenReportContent() {
                   </div>
                 </div>
               ) : (
-                <span className="text-xs text-ink-tertiary italic">No photo attached</span>
+                <span className="text-xs text-ink-tertiary italic">{t('report.reviewNoPhoto')}</span>
               )}
             </div>
 
@@ -733,7 +753,7 @@ function CitizenReportContent() {
                 <span>AI Categorization & Intelligence Ingestion</span>
               </div>
               <p>
-                Upon submission, Google Gemini AI analyzes your report to detect civic category, language, and urgency. AI categorization is an advisory interpretation, not verified municipal fact. Official triage is performed by the municipal administration.
+                {t('report.reviewPrivacyNotice')}
               </p>
             </div>
 
@@ -744,7 +764,7 @@ function CitizenReportContent() {
                 className="gap-1.5 text-xs"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Back</span>
+                <span>{t('report.backToMedia')}</span>
               </Button>
               <Button
                 variant="primary"
@@ -753,7 +773,7 @@ function CitizenReportContent() {
                 className="gap-2 text-xs"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>{!user ? 'Sign in to Submit' : 'Submit Civic Report'}</span>
+                <span>{!user ? t('report.signInToSubmit') : t('report.submitButton')}</span>
               </Button>
             </div>
           </div>
@@ -773,13 +793,13 @@ function CitizenReportContent() {
 
             <div className="space-y-2">
               <h3 className="text-base font-bold text-ink-primary">
-                Processing Your Civic Report
+                {t('report.processingTitle')}
               </h3>
               <p className="text-xs font-medium text-civic-blue animate-pulse">
                 {processingStatusText}
               </p>
               <p className="text-[11px] text-ink-tertiary max-w-sm mx-auto leading-relaxed">
-                Persisting to operational database, executing Gemini AI understanding, generating semantic embeddings, and checking for related public issues…
+                {t('report.processingNotice')}
               </p>
             </div>
           </div>
@@ -797,29 +817,46 @@ function CitizenReportContent() {
             <div className="space-y-1">
               <h3 className="text-lg font-bold text-ink-primary">
                 {createdSignal.cluster?.isNewCluster
-                  ? 'New Public Problem Created'
+                  ? t('report.resultNewProblem')
                   : createdSignal.cluster?.matched
-                  ? 'Correlated with Existing Public Problem'
-                  : 'Report Successfully Submitted'}
+                  ? t('report.resultCorrelated')
+                  : t('report.resultSuccess')}
               </h3>
               <p className="text-xs text-ink-secondary max-w-sm mx-auto leading-relaxed">
                 {createdSignal.cluster?.isNewCluster
-                  ? 'Your report established a new verified municipal problem cluster in the civic directory.'
+                  ? t('report.resultNewProblemDesc')
                   : createdSignal.cluster?.matched
-                  ? 'Your report was correlated with an existing neighborhood public problem cluster.'
-                  : 'Your report has been securely logged and queued for operational municipal action.'}
+                  ? t('report.resultCorrelatedDesc')
+                  : t('report.resultSuccessDesc')}
               </p>
+              <div className="pt-2 flex justify-center">
+                <VoiceReadAloudButton
+                  textToRead={`${
+                    createdSignal.cluster?.isNewCluster
+                      ? t('report.resultNewProblem')
+                      : createdSignal.cluster?.matched
+                      ? t('report.resultCorrelated')
+                      : t('report.resultSuccess')
+                  }. ${
+                    createdSignal.cluster?.isNewCluster
+                      ? t('report.resultNewProblemDesc')
+                      : createdSignal.cluster?.matched
+                      ? t('report.resultCorrelatedDesc')
+                      : t('report.resultSuccessDesc')
+                  }`}
+                />
+              </div>
             </div>
 
             {/* Authoritative Response Details */}
             <div className="p-4 rounded-xl bg-canvas-subtle border border-ink-border text-left text-xs space-y-2.5">
               <div className="flex justify-between items-center">
-                <span className="text-ink-secondary">Signal Reference:</span>
+                <span className="text-ink-secondary">{t('report.signalRef')}:</span>
                 <span className="font-mono font-bold text-ink-primary">#{createdSignal.id}</span>
               </div>
 
               <div className="flex justify-between items-center">
-                <span className="text-ink-secondary">Public Problem:</span>
+                <span className="text-ink-secondary">{t('report.publicProblem')}:</span>
                 {createdSignal.cluster?.problem ? (
                   <span className="font-mono font-bold text-civic-blue text-right">
                     #{createdSignal.cluster.problem.id}
@@ -836,10 +873,10 @@ function CitizenReportContent() {
 
               {createdSignal.cluster && (
                 <div className="flex justify-between items-center">
-                  <span className="text-ink-secondary">Relationship Status:</span>
+                  <span className="text-ink-secondary">{t('report.relationshipStatus')}:</span>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-800 border border-blue-200">
                     {createdSignal.cluster.isNewCluster
-                      ? 'New Public Problem Created'
+                      ? t('report.resultNewProblem')
                       : `Correlated (${createdSignal.cluster.relationship || 'Related'})`}
                   </span>
                 </div>
@@ -847,7 +884,7 @@ function CitizenReportContent() {
 
               {createdSignal.cluster?.problem?.impact_score !== undefined && (
                 <div className="flex justify-between items-center">
-                  <span className="text-ink-secondary">Public Impact Score:</span>
+                  <span className="text-ink-secondary">{t('report.publicImpactScore')}:</span>
                   <span className="font-mono font-bold text-civic-rose">
                     {createdSignal.cluster.problem.impact_score}/100 ({createdSignal.cluster.problem.impact_level || 'EVALUATED'})
                   </span>
@@ -855,7 +892,7 @@ function CitizenReportContent() {
               )}
 
               <div className="flex justify-between items-center">
-                <span className="text-ink-secondary">Ward / Location:</span>
+                <span className="text-ink-secondary">{t('report.wardLocation')}:</span>
                 <span className="font-semibold text-ink-primary">
                   {createdSignal.ward_name ||
                     createdSignal.ward_id ||
@@ -864,14 +901,14 @@ function CitizenReportContent() {
               </div>
 
               <div className="flex justify-between items-center">
-                <span className="text-ink-secondary">Status:</span>
+                <span className="text-ink-secondary">{t('report.statusLabel')}:</span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                  Processed & Correlated
+                  {t('report.statusProcessed')}
                 </span>
               </div>
 
               <div className="flex justify-between items-center">
-                <span className="text-ink-secondary">Submission Time:</span>
+                <span className="text-ink-secondary">{t('report.submissionTime')}:</span>
                 <span className="font-mono text-ink-secondary text-[11px]">
                   {new Date(createdSignal.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
@@ -891,7 +928,7 @@ function CitizenReportContent() {
             <div className="pt-2 flex flex-col gap-2">
               <Link href="/citizen/issues" className="block w-full">
                 <Button variant="primary" className="w-full">
-                  Track My Report
+                  {t('report.trackMyReport')}
                 </Button>
               </Link>
               <button
@@ -899,7 +936,7 @@ function CitizenReportContent() {
                 onClick={handleReset}
                 className="text-xs font-semibold text-civic-blue hover:underline py-1.5"
               >
-                Report Another Issue
+                {t('report.reportAnother')}
               </button>
             </div>
           </div>

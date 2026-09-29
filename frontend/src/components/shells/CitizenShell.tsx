@@ -7,10 +7,11 @@ import {
   Home,
   PlusCircle,
   FileText,
-  Globe,
   LogOut
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from '../../context/LanguageContext';
+import { LanguageSelector } from '../ui/LanguageSelector';
 
 export interface CitizenShellProps {
   children: ReactNode;
@@ -19,11 +20,12 @@ export interface CitizenShellProps {
 export function CitizenShell({ children }: CitizenShellProps) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
+  const { t } = useTranslation();
 
   const navItems = [
-    { label: 'Home', href: '/citizen', icon: Home },
-    { label: 'Report an Issue', href: '/citizen/report', icon: PlusCircle, isHighlight: true },
-    { label: 'My Reports', href: '/citizen/issues', icon: FileText },
+    { label: t('common.home'), href: '/citizen', icon: Home },
+    { label: t('common.reportIssue'), href: '/citizen/report', icon: PlusCircle, isHighlight: true },
+    { label: t('common.myReports'), href: '/citizen/issues', icon: FileText },
   ];
 
   return (
@@ -37,7 +39,7 @@ export function CitizenShell({ children }: CitizenShellProps) {
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-sm tracking-tight text-ink-primary">
-                CivicPulse <span className="font-normal text-xs text-ink-secondary">Citizen</span>
+                CivicPulse <span className="font-normal text-xs text-ink-secondary">{t('common.citizenPortal')}</span>
               </span>
             </div>
           </Link>
@@ -52,7 +54,7 @@ export function CitizenShell({ children }: CitizenShellProps) {
                   : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
               }`}
             >
-              Home
+              {t('common.home')}
             </Link>
             <Link
               href="/citizen/report"
@@ -63,7 +65,7 @@ export function CitizenShell({ children }: CitizenShellProps) {
               }`}
             >
               <PlusCircle className="w-3.5 h-3.5" />
-              <span>Report an Issue</span>
+              <span>{t('common.reportIssue')}</span>
             </Link>
             <Link
               href="/citizen/issues"
@@ -73,16 +75,13 @@ export function CitizenShell({ children }: CitizenShellProps) {
                   : 'text-ink-secondary hover:text-ink-primary hover:bg-canvas-subtle'
               }`}
             >
-              My Reports
+              {t('common.myReports')}
             </Link>
           </nav>
 
           {/* Language Selector & Switcher / Auth Actions */}
           <div className="flex items-center gap-3 shrink-0">
-            <button className="hidden md:flex items-center gap-1 text-xs text-ink-secondary hover:text-ink-primary px-2.5 py-1 rounded-sm border border-ink-border bg-canvas-card">
-              <Globe className="w-3.5 h-3.5 text-civic-terracotta" />
-              <span>English / ଓଡ଼ିଆ</span>
-            </button>
+            <LanguageSelector />
             {user ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs font-mono text-ink-secondary hidden sm:inline">
@@ -91,10 +90,10 @@ export function CitizenShell({ children }: CitizenShellProps) {
                 <button
                   onClick={() => signOut()}
                   className="text-xs font-medium text-ink-tertiary hover:text-civic-rose flex items-center gap-1"
-                  title="Sign Out"
+                  title={t('common.signOut')}
                 >
                   <LogOut className="w-3 h-3" />
-                  <span className="hidden sm:inline">Sign Out</span>
+                  <span className="hidden sm:inline">{t('common.signOut')}</span>
                 </button>
               </div>
             ) : (
@@ -102,7 +101,7 @@ export function CitizenShell({ children }: CitizenShellProps) {
                 href="/login"
                 className="text-xs font-semibold text-civic-terracotta hover:underline"
               >
-                Sign In
+                {t('common.signIn')}
               </Link>
             )}
           </div>
@@ -173,7 +172,7 @@ export function CitizenShell({ children }: CitizenShellProps) {
               </Link>
             ))}
           </div>
-          <span className="font-mono text-[11px]">DPDP Act Compliant • PII Redacted</span>
+          <span className="font-mono text-[11px]">{t('common.dpdpFooter')}</span>
         </div>
       </footer>
     </div>

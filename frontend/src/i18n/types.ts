@@ -1,0 +1,174 @@
+export type SupportedLanguage = 'en' | 'hi' | 'or';
+
+export interface LanguageOption {
+  code: SupportedLanguage;
+  label: string;
+  nativeLabel: string;
+  speechCode: string;
+}
+
+export const SUPPORTED_LANGUAGES: LanguageOption[] = [
+  { code: 'en', label: 'English', nativeLabel: 'English', speechCode: 'en-IN' },
+  { code: 'hi', label: 'Hindi', nativeLabel: 'हिन्दी', speechCode: 'hi-IN' },
+  { code: 'or', label: 'Odia', nativeLabel: 'ଓଡ଼ିଆ', speechCode: 'or-IN' },
+];
+
+export interface TranslationDictionary {
+  common: {
+    appName: string;
+    citizenPortal: string;
+    home: string;
+    reportIssue: string;
+    myReports: string;
+    signIn: string;
+    signOut: string;
+    backToHome: string;
+    dpdpProtected: string;
+    dpdpFooter: string;
+    retry: string;
+    loading: string;
+    cancel: string;
+    submit: string;
+    readAloud: string;
+    stopReading: string;
+  };
+  home: {
+    heroBadge: string;
+    welcomePrefix: string;
+    defaultHeading: string;
+    subheading: string;
+    unauthTitle: string;
+    unauthDesc: string;
+    signInCitizen: string;
+    fileReport: string;
+    speakDescription: string;
+    speakSubtitle: string;
+    takePhoto: string;
+    photoSubtitle: string;
+    trackReports: string;
+    trackSubtitle: string;
+    statsTotal: string;
+    statsInProgress: string;
+    statsResolved: string;
+    statsCorrelated: string;
+    recentHeading: string;
+    recentEmptyTitle: string;
+    recentEmptyDesc: string;
+    statusActive: string;
+    statusResolved: string;
+    statusClosed: string;
+    statusPending: string;
+    viewAllReports: string;
+  };
+  report: {
+    title: string;
+    subtitle: string;
+    formRef: string;
+    stepOf: string;
+    stepDescribe: string;
+    stepLocation: string;
+    stepMedia: string;
+    stepReview: string;
+    authRequiredTitle: string;
+    authRequiredDesc: string;
+    signInToReport: string;
+    submissionNotice: string;
+    describeTitle: string;
+    describeSubtitle: string;
+    voiceModeNotice: string;
+    problemDescLabel: string;
+    problemDescPlaceholder: string;
+    minCharacters: string;
+    charactersCount: string;
+    helpfulTipsTitle: string;
+    tipLandmarks: string;
+    tipSeverity: string;
+    tipPlainLanguage: string;
+    continueToLocation: string;
+    locationTitle: string;
+    locationSubtitle: string;
+    manualLocationLabel: string;
+    manualLocationPlaceholder: string;
+    backToDescribe: string;
+    continueToMedia: string;
+    mediaTitle: string;
+    mediaSubtitle: string;
+    photoUploadTitle: string;
+    photoUploadDesc: string;
+    photoUploadHint: string;
+    removePhoto: string;
+    backToLocation: string;
+    continueToReview: string;
+    reviewTitle: string;
+    reviewSubtitle: string;
+    reviewDescriptionLabel: string;
+    reviewLocationLabel: string;
+    reviewCoordinatesLabel: string;
+    reviewPhotoLabel: string;
+    reviewNoPhoto: string;
+    reviewPrivacyNotice: string;
+    backToMedia: string;
+    submitButton: string;
+    submittingButton: string;
+    signInToSubmit: string;
+    processingTitle: string;
+    processingSubtitle: string;
+    processingNotice: string;
+    resultNewProblem: string;
+    resultCorrelated: string;
+    resultSuccess: string;
+    resultNewProblemDesc: string;
+    resultCorrelatedDesc: string;
+    resultSuccessDesc: string;
+    signalRef: string;
+    publicProblem: string;
+    relationshipStatus: string;
+    publicImpactScore: string;
+    wardLocation: string;
+    statusLabel: string;
+    statusProcessed: string;
+    submissionTime: string;
+    trackMyReport: string;
+    reportAnother: string;
+    errorMinLength: string;
+    errorLocationRequired: string;
+    errorCoordinatesRange: string;
+    errorSignInRequired: string;
+    voiceDictationStart: string;
+    voiceDictationStop: string;
+    voiceUnsupported: string;
+    voicePermissionDenied: string;
+    voiceNoSpeech: string;
+    voiceNetworkError: string;
+    voiceLanguageNotSupported: string;
+  };
+  issues: {
+    title: string;
+    subtitle: string;
+    newReport: string;
+    authRequiredTitle: string;
+    authRequiredDesc: string;
+    signInCitizen: string;
+    emptyTitle: string;
+    emptyDesc: string;
+    fileFirstReport: string;
+    statusActive: string;
+    statusResolved: string;
+    statusClosed: string;
+    statusUnderTriage: string;
+    department: string;
+    ward: string;
+    viewDetails: string;
+    clusterTag: string;
+  };
+  aiPreview: {
+    title: string;
+    description: string;
+    detectedLanguage: string;
+    suggestedCategory: string;
+    estimatedSeverity: string;
+    recommendedDepartment: string;
+    confidence: string;
+    readSummary: string;
+  };
+}

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Sparkles, CheckCircle2, AlertCircle, Loader2, Building, ShieldAlert, Cpu } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { apiClient } from '../../lib/api-client';
+import { VoiceReadAloudButton } from './VoiceReadAloudButton';
 
 export interface SignalAIPreviewData {
   detected_language: string;
@@ -70,6 +71,8 @@ export const SignalAIPreview: React.FC<SignalAIPreviewProps> = ({
   const getLanguageLabel = (code: string) => {
     switch (code) {
       case 'od':
+      case 'or':
+      case 'ory':
         return 'Odia (ଓଡ଼ିଆ)';
       case 'hi':
         return 'Hindi (हिन्दी)';
@@ -141,8 +144,11 @@ export const SignalAIPreview: React.FC<SignalAIPreviewProps> = ({
         <div className="space-y-3.5 text-xs">
           {/* Normalized Summary */}
           <div className="p-3 rounded-xl bg-white border border-ink-border space-y-1">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-tertiary">
-              Normalized Issue Summary
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-tertiary">
+                Normalized Issue Summary
+              </div>
+              <VoiceReadAloudButton textToRead={`${analysis.normalized_summary}. ${analysis.explanation || ''}`} />
             </div>
             <p className="text-xs font-medium text-ink-primary leading-relaxed">
               {analysis.normalized_summary}
