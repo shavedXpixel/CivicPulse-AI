@@ -27,7 +27,7 @@ Turn citizen-reported civic issues into structured, actionable, and accountable 
 
 <br />
 
-[**Live Application**](https://civicpulse-ai-henna.vercel.app) &nbsp;&bull;&nbsp; [**Backend API**](https://civicpulse-ai-backend-osz4.onrender.com) &nbsp;&bull;&nbsp; [**GitHub Repository**](https://github.com/shavedXpixel/CivicPulse-AI)
+[**Live Application**](https://civicpulse-ai-henna.vercel.app) &nbsp;&bull;&nbsp; [**Backend API**](https://civicpulse-backend-b9ul.onrender.com) &nbsp;&bull;&nbsp; [**GitHub Repository**](https://github.com/shavedXpixel/CivicPulse-AI)
 
 <br />
 
