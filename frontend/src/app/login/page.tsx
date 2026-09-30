@@ -15,10 +15,11 @@ import {
   Shield
 } from 'lucide-react';
 import { UserRole } from '@civicpulse/shared';
-import { apiClient } from '../../lib/api-client';
+import { apiClient, getBackendHealthUrl } from '../../lib/api-client';
 import { useAuth } from '../../context/AuthContext';
 import { PasswordInput } from '../../components/ui/PasswordInput';
 import { AuthLoadingScreen } from '../../components/auth/AuthLoadingScreen';
+import { LoginWakeupOverlay, LoginWakeupState } from '../../components/auth/LoginWakeupOverlay';
 import { isBackendUnreachableError, determineRoleDestination } from '../../lib/auth-retry';
 
 function LoginContent() {
@@ -49,8 +50,16 @@ function LoginContent() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmationNotice, setConfirmationNotice] = useState<string | null>(null);
+  const [wakeupState, setWakeupState] = useState<LoginWakeupState | 'idle'>('idle');
 
   const wasResolvingRef = useRef<boolean>(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     if (isResolvingProfile) {
@@ -72,23 +81,84 @@ function LoginContent() {
     return determineRoleDestination(role, explicitRedirect);
   };
 
-  const handleRealAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError(null);
+  const probeHealth = async (signal: AbortSignal): Promise<boolean> => {
+    const healthUrl = getBackendHealthUrl();
+    const startTime = Date.now();
+    const MAX_DURATION_MS = 90000; // 90 seconds timeout
 
-    if (!email.trim() || !password.trim()) {
-      setFormError('Please enter both email and password.');
-      return;
+    while (Date.now() - startTime < MAX_DURATION_MS) {
+      if (signal.aborted) {
+        return false;
+      }
+
+      try {
+        const res = await fetch(healthUrl, {
+          method: 'GET',
+          cache: 'no-store',
+          signal
+        });
+
+        if (res.ok && res.status === 200) {
+          return true;
+        }
+      } catch (probeErr: any) {
+        if (signal.aborted) {
+          return false;
+        }
+        // Network error while waking up, wait and poll again
+      }
+
+      // Wait 2s between poll attempts if still within window
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 2000);
+        signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
+      });
     }
 
-    if (password.length < 6) {
-      setFormError('Password must be at least 6 characters long.');
-      return;
+    return false;
+  };
+
+  const runWakeupAndAuth = async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setSubmitting(true);
+    setFormError(null);
     setConfirmationNotice(null);
+    setWakeupState('waking');
+
     try {
+      // Step 1: Probe backend /health (with ~90s timeout)
+      const isServerReady = await probeHealth(controller.signal);
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      if (!isServerReady) {
+        // Step 2: On timeout/failure, transition to timeout state
+        setWakeupState('timeout');
+        setSubmitting(false);
+        return;
+      }
+
+      // Step 3: Server ready briefly displayed
+      setWakeupState('ready');
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 450);
+        controller.signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
+      });
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      // Step 4: Normal login request with "Signing you in..."
+      setWakeupState('authenticating');
+
       let resolvedRole: string | undefined;
 
       if (isRegistering) {
@@ -97,6 +167,7 @@ function LoginContent() {
           setConfirmationNotice(
             `Verification email sent to ${email.trim()}. Please check your inbox and click the confirmation link to complete account activation.`
           );
+          setWakeupState('idle');
           setSubmitting(false);
           return;
         }
@@ -110,6 +181,7 @@ function LoginContent() {
       if (!resolvedRole) {
         if (isResolvingProfile) {
           wasResolvingRef.current = true;
+          setWakeupState('idle');
           setSubmitting(false);
           return;
         }
@@ -123,11 +195,13 @@ function LoginContent() {
             if (retryProfileResolution) {
               retryProfileResolution();
             }
+            setWakeupState('idle');
             setSubmitting(false);
             return;
           }
           if (meErr?.status >= 500) {
             setFormError('CivicPulse server encountered an error while verifying profile. Please try again shortly.');
+            setWakeupState('idle');
             setSubmitting(false);
             return;
           }
@@ -143,6 +217,7 @@ function LoginContent() {
             setFormError('Unable to resolve account role. Profile authorization could not be verified by the backend. Please retry or contact municipal IT administration.');
           }
         }
+        setWakeupState('idle');
         setSubmitting(false);
         return;
       }
@@ -150,18 +225,23 @@ function LoginContent() {
       const destination = determineDestination(resolvedRole);
       if (!destination) {
         setFormError('Unrecognized user role. Access cannot be granted.');
+        setWakeupState('idle');
         setSubmitting(false);
         return;
       }
 
+      setWakeupState('idle');
+      setSubmitting(false);
       router.push(destination);
     } catch (err: any) {
+      setWakeupState('idle');
+      setSubmitting(false);
+
       if (isBackendUnreachableError(err)) {
         wasResolvingRef.current = true;
         if (retryProfileResolution) {
           retryProfileResolution();
         }
-        setSubmitting(false);
         return;
       }
 
@@ -186,10 +266,30 @@ function LoginContent() {
         msg = 'CivicPulse server encountered an error while verifying profile. Please try again shortly.';
       }
       setFormError(msg);
-    } finally {
-      setSubmitting(false);
     }
   };
+
+  const handleRealAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    if (submitting || wakeupState !== 'idle') {
+      return;
+    }
+
+    if (!email.trim() || !password.trim()) {
+      setFormError('Please enter both email and password.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setFormError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    await runWakeupAndAuth();
+  };
+
 
   // Normal profile resolution or background retry state (shows normal AUTHENTICATING screen, or timeout screen)
   if (user && isResolvingProfile) {
@@ -429,7 +529,7 @@ function LoginContent() {
 
               <button
                 type="submit"
-                disabled={submitting || authLoading}
+                disabled={submitting || authLoading || wakeupState !== 'idle'}
                 className="w-full py-2.5 px-4 rounded-sm text-xs font-mono font-semibold bg-civic-terracotta text-white hover:bg-civic-terracottaDark transition-colors flex items-center justify-center gap-2 disabled:opacity-60 uppercase tracking-wider"
               >
                 {submitting ? (
@@ -468,6 +568,20 @@ function LoginContent() {
           </Link>
         </div>
       </div>
+
+      {wakeupState !== 'idle' && (
+        <LoginWakeupOverlay
+          state={wakeupState}
+          onRetry={runWakeupAndAuth}
+          onCancel={() => {
+            if (abortControllerRef.current) {
+              abortControllerRef.current.abort();
+            }
+            setWakeupState('idle');
+            setSubmitting(false);
+          }}
+        />
+      )}
     </div>
   );
 }

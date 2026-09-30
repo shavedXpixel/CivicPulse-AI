@@ -212,7 +212,23 @@ async function requestBlob(
   return res.blob();
 }
 
+/**
+ * Correctly derives the backend root health check URL from NEXT_PUBLIC_API_URL.
+ * Since NEXT_PUBLIC_API_URL typically ends with '/api/v1', this strips '/api/v1' (or '/api')
+ * to target the backend root '/health' endpoint.
+ */
+export function getBackendHealthUrl(): string {
+  const rawBase = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!rawBase) {
+    return '/health';
+  }
+  const baseNormalized = rawBase.replace(/\/+$/, '');
+  const origin = baseNormalized.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
+  return `${origin}/health`;
+}
+
 export const apiClient = {
+
   get: <T>(endpoint: string, headers?: Record<string, string>) =>
     request<T>(endpoint, { method: 'GET', headers }),
 
