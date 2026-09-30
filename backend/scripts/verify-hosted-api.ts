@@ -5,7 +5,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../frontend/.env.local') });
 
 import { getCitizenSessionToken } from './get-citizen-token';
 
-const HOSTED_BACKEND = 'https://civicpulse-ai-backend-osz4.onrender.com/api/v1';
+const HOSTED_BACKEND = process.env.HOSTED_BACKEND || process.env.NEXT_PUBLIC_API_URL || 'https://civicpulse-ai-backend-osz4.onrender.com/api/v1';
 
 async function main() {
   console.log('========================================================================');
