@@ -9,3 +9,10 @@ if (!env.DEMO_MODE) {
 const app = createApp();
 
 export default app;
+
+// Ensure CommonJS compatibility for Vercel serverless loader
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = app;
+  module.exports.default = app;
+}
+
