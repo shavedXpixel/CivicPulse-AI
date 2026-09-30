@@ -5,6 +5,15 @@ import { createApp } from '../src/app';
 describe('Health Endpoint', () => {
   const app = createApp();
 
+  it('GET /health returns 200 OK with minimal safe response without auth', async () => {
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: 'ok' });
+    expect(res.body.version).toBeUndefined();
+    expect(res.body.env).toBeUndefined();
+    expect(res.body.secret).toBeUndefined();
+  });
+
   it('GET /api/v1/health returns 200 OK with status ok', async () => {
     const res = await request(app).get('/api/v1/health');
     expect(res.status).toBe(200);

@@ -53,6 +53,11 @@ export function createApp(): Express {
   // AUD-OBS-01: Centralized structured logging & Request ID
   app.use(structuredLogger);
 
+  // Minimal public health endpoint for Render health checks and liveness
+  app.get('/health', (_req: Request, res: Response) => {
+    res.status(200).json({ status: 'ok' });
+  });
+
   // Health endpoint (liveness probe)
   app.get('/api/v1/health', (_req: Request, res: Response) => {
     res.status(200).json({
