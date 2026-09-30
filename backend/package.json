@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "main": "dist/index.js",
+  "overrides": {
+    "jwks-rsa": {
+      "jose": "4.15.9"
+    }
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p ../shared/tsconfig.json && tsc -p tsconfig.json",
