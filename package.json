@@ -8,21 +8,12 @@
     "backend",
     "frontend"
   ],
-  "engines": {
-    "node": "24.x"
-  },
-  "overrides": {
-    "jwks-rsa": {
-      "jose": "4.15.9"
-    }
-  },
   "scripts": {
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "dev": "concurrently -k -p \"[{name}]\" -n \"BACKEND,FRONTEND\" -c \"blue,green\" \"npm run dev:backend\" \"npm run dev:frontend\"",
     "build:shared": "npm --prefix shared run build",
     "build:backend": "npm --prefix backend run build",
-    "build:api": "npm run build:shared && npm run build:backend",
     "build:frontend": "npm --prefix frontend run build",
     "build": "npm run build:shared && npm run build:backend && npm run build:frontend",
     "test:shared": "npm --prefix shared run test",

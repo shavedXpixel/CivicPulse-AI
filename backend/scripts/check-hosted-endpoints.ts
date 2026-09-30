@@ -1,9 +1,7 @@
 async function checkHosted() {
-  const base = process.env.HOSTED_BACKEND || process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, '') || 'https://civicpulse-ai-backend-osz4.onrender.com';
   const endpoints = [
-    `${base}/health`,
-    `${base}/api/v1/health`,
-    `${base}/api/v1/ready`,
+    'https://civicpulse-ai-backend-osz4.onrender.com/api/v1/health',
+    'https://civicpulse-ai-backend-osz4.onrender.com/api/v1/ready',
     'https://civicpulse-ai-henna.vercel.app'
   ];
 

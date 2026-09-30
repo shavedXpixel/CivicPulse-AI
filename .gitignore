@@ -70,6 +70,5 @@ dumps/
 !package.json
 !package-lock.json
 !tsconfig*.json
-!vercel.json
 !data/**/*.json
 antigravity-test-credentials.local.md
