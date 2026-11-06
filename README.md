@@ -518,7 +518,7 @@ Contributions to CivicPulse AI are welcome. To propose enhancements or fixes:
 
 ## 18. License
 
-License: Not yet specified.
+    License: MIT LICENSE.
 
 ---
 
